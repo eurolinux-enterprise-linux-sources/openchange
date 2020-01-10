@@ -20,7 +20,7 @@
  */
 
 /**
-   \file dcesrv_exchange_rfr.c
+   \file dcesrv_exchange_ds_rfr.c
 
    \brief OpenChange RFR Server implementation
  */
@@ -51,7 +51,7 @@ static enum MAPISTATUS dcesrv_RfrGetNewDSA(struct dcesrv_call_state *dce_call,
 	DEBUG(5, ("exchange_ds_rfr: RfrGetNewDSA (0x0)\n"));
 
 	/* Step 0. Ensure incoming user is authenticated */
-	if (!NTLM_AUTH_IS_OK(dce_call)) {
+	if (!dcesrv_call_authenticated(dce_call)) {
 		DEBUG(1, ("No challenge requested by client, cannot authenticate\n"));
 
 		r->out.ppszUnused = NULL;
@@ -61,8 +61,8 @@ static enum MAPISTATUS dcesrv_RfrGetNewDSA(struct dcesrv_call_state *dce_call,
 	}
 
 	/* Step 1. We don't have load-balancing support yet, just return Samba FQDN name */
-	netbiosname = lp_netbios_name(dce_call->conn->dce_ctx->lp_ctx);
-	realm = lp_realm(dce_call->conn->dce_ctx->lp_ctx);
+	netbiosname = lpcfg_netbios_name(dce_call->conn->dce_ctx->lp_ctx);
+	realm = lpcfg_realm(dce_call->conn->dce_ctx->lp_ctx);
 	if (!netbiosname || !realm) {
 		r->out.ppszUnused = NULL;
 		r->out.ppszServer = NULL;
@@ -95,12 +95,12 @@ static enum MAPISTATUS dcesrv_RfrGetFQDNFromLegacyDN(struct dcesrv_call_state *d
 						     struct RfrGetFQDNFromLegacyDN *r)
 {
 	char		*fqdn;
-	const char	*netbiosname;
-	const char	*realm;
+	const char	*netbiosname = NULL;
+	const char	*realm = NULL;
 
 	DEBUG(3, ("exchange_ds_rfr: RfrGetFQDNFromLegacyDN (0x1)\n"));
 
-	if (!NTLM_AUTH_IS_OK(dce_call)) {
+	if (!dcesrv_call_authenticated(dce_call)) {
 		DEBUG(1, ("No challenge requested by client, cannot authenticate\n"));
 
 	failure:
@@ -110,8 +110,8 @@ static enum MAPISTATUS dcesrv_RfrGetFQDNFromLegacyDN(struct dcesrv_call_state *d
 		return MAPI_E_LOGON_FAILED;
 	}
 
-	netbiosname = lp_netbios_name(dce_call->conn->dce_ctx->lp_ctx);
-	realm = lp_realm(dce_call->conn->dce_ctx->lp_ctx);
+	netbiosname = lpcfg_netbios_name(dce_call->conn->dce_ctx->lp_ctx);
+	realm = lpcfg_realm(dce_call->conn->dce_ctx->lp_ctx);
 	if (!netbiosname || !realm) {
 		goto failure;
 	}
@@ -141,7 +141,6 @@ static NTSTATUS dcesrv_exchange_ds_rfr_dispatch(struct dcesrv_call_state *dce_ca
 						TALLOC_CTX *mem_ctx,
 						void *r, struct mapiproxy *mapiproxy)
 {
-	enum MAPISTATUS				retval;
 	const struct ndr_interface_table	*table;
 	uint16_t				opnum;
 
@@ -154,10 +153,10 @@ static NTSTATUS dcesrv_exchange_ds_rfr_dispatch(struct dcesrv_call_state *dce_ca
 
 	switch (opnum) {
 	case NDR_RFRGETNEWDSA:
-		retval = dcesrv_RfrGetNewDSA(dce_call, mem_ctx, (struct RfrGetNewDSA *)r);
+		dcesrv_RfrGetNewDSA(dce_call, mem_ctx, (struct RfrGetNewDSA *)r);
 		break;
 	case NDR_RFRGETFQDNFROMLEGACYDN:
-		retval = dcesrv_RfrGetFQDNFromLegacyDN(dce_call, mem_ctx, (struct RfrGetFQDNFromLegacyDN *)r);
+		dcesrv_RfrGetFQDNFromLegacyDN(dce_call, mem_ctx, (struct RfrGetFQDNFromLegacyDN *)r);
 		break;
 	}
 

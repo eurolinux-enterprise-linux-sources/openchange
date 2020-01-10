@@ -19,7 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libexchange2ical/libexchange2ical.h>
+#include "libexchange2ical/libexchange2ical.h"
 
 #define MAXCAT  100000
 
@@ -112,7 +112,8 @@ void ical2exchange_property_ATTACH(struct ical2exchange *ical2exchange)
 		if(filename){
 			char buff[256]; 
 			char *temp;
-			strcpy(buff,filename);
+			strncpy(buff,filename, 255);
+			buff[255] = '\0';
 			extension = strtok(buff, ".");
 			while((temp = strtok(NULL, "."))) extension = temp;
 		}
@@ -403,7 +404,7 @@ void ical2exchange_property_LOCATION(struct ical2exchange *ical2exchange)
 		const char* langName;
 		langtag = talloc(ical2exchange->mem_ctx, uint32_t);
 		langName = icalparameter_get_language(param);
-		*langtag = lcid_lang2lcid(langName);
+		*langtag = mapi_get_lcid_from_language(langName);
 		ical2exchange->lpProps = add_SPropValue(ical2exchange->mem_ctx, ical2exchange->lpProps, &ical2exchange->cValues, PR_MESSAGE_LOCALE_ID, 
 					(const void *) langtag);
 	} 
@@ -697,6 +698,7 @@ void ical2exchange_property_STATUS(struct ical2exchange *ical2exchange)
 				break;
 			case ICAL_TRANSP_OPAQUE:
 				temp = 0x00000002;
+				break;
 			default:
 				return;
 		}
@@ -712,6 +714,7 @@ void ical2exchange_property_STATUS(struct ical2exchange *ical2exchange)
 				break;
 			case ICAL_STATUS_CONFIRMED:
 				temp = 0x00000002;
+				break;
 			default:
 				return;
 		}
@@ -753,7 +756,7 @@ void ical2exchange_property_SUMMARY(struct ical2exchange *ical2exchange)
 	if((param=icalproperty_get_first_parameter(ical2exchange->summaryProp, ICAL_LANGUAGE_PARAMETER))){
 		const char *langName;
 		langName = icalparameter_get_language(param);
-		langtag = lcid_lang2lcid(langName);
+		langtag = mapi_get_lcid_from_language(langName);
 		ical2exchange->lpProps = add_SPropValue(ical2exchange->mem_ctx, ical2exchange->lpProps, &ical2exchange->cValues, PR_MESSAGE_LOCALE_ID, 
 						(const void *) &langtag);
 	}

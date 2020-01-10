@@ -34,6 +34,7 @@ struct ldb_context;
  */
 struct mapi_profile
 {
+	struct mapi_context	*mapi_ctx;
 	struct cli_credentials	*credentials;
 	char			*profname;
 	const char		*org;
@@ -46,10 +47,13 @@ struct mapi_profile
 	const char     		*domain;
 	const char     		*realm;
 	const char     		*server;
+	const char		*localaddr;
 	bool			seal;
 	uint32_t		codepage;
 	uint32_t		language;
 	uint32_t		method;
+	uint32_t		exchange_version;
+	const char		*kerberos;
 };
 
 typedef int (*mapi_profile_callback_t)(struct SRowSet *, const void *);

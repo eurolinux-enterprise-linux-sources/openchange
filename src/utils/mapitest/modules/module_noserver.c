@@ -19,7 +19,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
 #include "utils/mapitest/mapitest.h"
 #include "utils/mapitest/proto.h"
 
@@ -68,12 +67,24 @@ _PUBLIC_ bool mapitest_noserver_lzfu(struct mapitest *mt)
 		return false;
 	}
 
+	uint32_t crc = calculateCRC(compressed, 0x10, (49-0x10));
+	if (crc == 0xA7C7C5F1) {
+		  mapitest_print(mt, "* CRC pass\n");
+	} else {
+		  mapitest_print(mt, "* CRC failure, expected 0xA7C7C5F1, but got 0x%08X\n", crc);
+	}
+
 	retval = uncompress_rtf(mt->mem_ctx, compressed, compressed_length, &uncompressed1);
 	if (retval != MAPI_E_SUCCESS) {
-		mapitest_print_retval(mt, "uncompress_rtf - step 1");
+		mapitest_print_retval(mt, "uncompress_rtf - step 1 (bad retval)");
 		return false;
 	}	   
 
+	if (sizeof(RTF_UNCOMPRESSED1) != uncompressed1.length) {
+		mapitest_print(mt, "* %-40s: FAILED (bad length: %i vs %i)\n", "uncompress_rtf - step 1",
+			       sizeof(RTF_UNCOMPRESSED1), uncompressed1.length);
+		return false;
+	}
 	if (!strncmp((char*)uncompressed1.data, RTF_UNCOMPRESSED1, uncompressed1.length)) {
 		mapitest_print(mt, "* %-40s: PASSED\n", "uncompress_rtf - step 1");
 	} else {
@@ -87,10 +98,9 @@ _PUBLIC_ bool mapitest_noserver_lzfu(struct mapitest *mt)
 		mapitest_print(mt, "* %-40s: uncompress RTF - Bad length\n", "LZFU");
 		return false;
 	}
-
 	retval = uncompress_rtf(mt->mem_ctx, compressed, compressed_length, &uncompressed2);
 	if (retval != MAPI_E_SUCCESS) {
-		mapitest_print_retval(mt, "uncompress_rtf - step 2");
+		mapitest_print_retval(mt, "uncompress_rtf - step 2 (bad retval)");
 		return false;
 	}	   
 
@@ -106,8 +116,157 @@ _PUBLIC_ bool mapitest_noserver_lzfu(struct mapitest *mt)
 	return true;
 }
 
-#define SROWSET_UNTAGGED "005b4d545d2044756d6d792046726f6d00426f6479206f66206d657373616765203800005b4d545d2044756d6d792046726f6d00426f6479206f66206d657373616765203900005b4d545d2044756d6d792046726f6d00426f6479206f66206d657373616765203700005b4d545d2044756d6d792046726f6d00426f6479206f66206d657373616765203600005b4d545d2044756d6d793400426f6479206f66206d657373616765203400005b4d545d2044756d6d792046726f6d00426f6479206f66206d657373616765203500005b4d545d2044756d6d793300426f6479206f66206d657373616765203300005b4d545d2044756d6d793100426f6479206f66206d657373616765203100005b4d545d2044756d6d793200426f6479206f66206d657373616765203200005b4d545d2044756d6d793000426f6479206f66206d657373616765203000"
-#define SROWSET_UNTAGGED_LEN 330
+/**
+     \details Test the Compressed RTF compression routine.
+
+   This function:
+   -# Loads some test data and checks it
+   -# Compresses the test data
+   -# Checks that the compressed data matches the expected result
+
+   \param mt pointer to the top-level mapitest structure
+
+   \return true on success, otherwise false
+*/ 
+_PUBLIC_ bool mapitest_noserver_rtfcp(struct mapitest *mt)
+{
+	enum MAPISTATUS		retval;
+	uint8_t			*compressed;
+	size_t			compressed_length;
+	char 			*compressed_hex;
+
+	/* compress the test data */
+	retval = compress_rtf(mt->mem_ctx, RTF_UNCOMPRESSED1, sizeof(RTF_UNCOMPRESSED1) - 1, &compressed, &compressed_length);
+	if (retval != MAPI_E_SUCCESS) {
+		mapitest_print_retval(mt, "compress_rtf - step 1 (bad retval)");
+		return false;
+	}
+
+	/* Check the compressed result matches the compressed array */
+	compressed_hex = hex_encode_talloc(mt->mem_ctx, compressed, compressed_length);
+	if (strncasecmp(compressed_hex, RTF_COMPRESSED1_HEX, (size_t)98) != 0) {
+		mapitest_print(mt, "* %-40s: compare results RTF_COMPRESSED1 - mismatch\n", "RTFCP");
+		mapitest_print(mt, "- %s\n", RTF_COMPRESSED1_HEX);
+		mapitest_print(mt, "- %s\n", compressed_hex);
+		return false;
+	} else {
+		mapitest_print(mt, "* %-40s: compare results RTF_COMPRESSED1 - match\n", "RTFCP");
+		mapitest_print(mt, "- %s\n", RTF_COMPRESSED1_HEX);
+		mapitest_print(mt, "- %s\n", compressed_hex);
+	}
+	talloc_free(compressed_hex);
+	talloc_free(compressed);
+
+	/* compress the test data */
+	retval = compress_rtf(mt->mem_ctx, RTF_UNCOMPRESSED2, sizeof(RTF_UNCOMPRESSED2) - 1, &compressed, &compressed_length);
+	if (retval != MAPI_E_SUCCESS) {
+		mapitest_print_retval(mt, "compress_rtf - step 2 (bad retval)");
+		return false;
+	}
+
+	// Check the compressed result matches the compressed array.
+	compressed_hex = hex_encode_talloc(mt->mem_ctx, compressed, compressed_length);
+	if (strncasecmp(compressed_hex, RTF_COMPRESSED2_HEX, sizeof(RTF_COMPRESSED2_HEX)) != 0) {
+		mapitest_print(mt, "* %-40s: compare results RTF_COMPRESSED2 - mismatch\n", "RTFCP");
+		mapitest_print(mt, "- %s\n", RTF_COMPRESSED2_HEX);
+		mapitest_print(mt, "- %s\n", compressed_hex);
+		return false;
+	} else {
+		mapitest_print(mt, "* %-40s: compare results RTF_COMPRESSED2 - match\n", "RTFCP");
+		mapitest_print(mt, "- %s\n", RTF_COMPRESSED2_HEX);
+		mapitest_print(mt, "- %s\n", compressed_hex);
+	}
+	talloc_free(compressed_hex);
+	talloc_free(compressed);
+	return true;
+}
+
+/**
+     \details Test the Compressed RTF compression / decompression routines on a larger file
+
+   \param mt pointer to the top-level mapitest structure
+
+   \return true on success, otherwise false
+*/ 
+_PUBLIC_ bool mapitest_noserver_rtfcp_large(struct mapitest *mt)
+{
+	enum MAPISTATUS		retval;
+
+	char			*filename = NULL;
+	char			*original_uncompressed_data;
+	size_t			original_uncompressed_length;
+	char			*original_uncompressed_hex;
+
+	uint8_t			*compressed;
+	size_t			compressed_length;
+
+	DATA_BLOB		decompressed;
+	char 			*decompressed_hex;
+
+	/* load the test file */
+	filename = talloc_asprintf(mt->mem_ctx, "%s/testcase.rtf", LZFU_DATADIR);
+	original_uncompressed_data = file_load(filename, &original_uncompressed_length, 0, mt->mem_ctx);
+	if (!original_uncompressed_data) {
+		perror(filename);
+		mapitest_print(mt, "%s: Error while loading %s\n", __FUNCTION__, filename);
+		talloc_free(filename);
+		return false;
+	}
+	talloc_free(filename);
+	original_uncompressed_hex = hex_encode_talloc(mt->mem_ctx, (const unsigned char*)original_uncompressed_data, original_uncompressed_length);
+
+	/* compress it */
+	retval = compress_rtf(mt->mem_ctx, original_uncompressed_data, original_uncompressed_length, &compressed, &compressed_length);
+	if (retval != MAPI_E_SUCCESS) {
+		mapitest_print_retval_clean(mt, "mapitest_noserver_rtfcp_large - step 1 (bad retval)", retval);
+		return false;
+	}
+
+	/* decompress it */
+	retval = uncompress_rtf(mt->mem_ctx, compressed, compressed_length, &decompressed);
+	if (retval != MAPI_E_SUCCESS) {
+		mapitest_print_retval_clean(mt, "mapitest_noserver_rtfcp_large - step 2 (bad retval)", retval);
+		return false;
+	}
+
+	mapitest_print(mt, "Original data size = 0x%zx\n", original_uncompressed_length);
+	mapitest_print(mt, "Decompressed size  = 0x%zx\n", decompressed.length);
+	{
+		int i;
+		int min;
+
+		min = (original_uncompressed_length >= decompressed.length) ? decompressed.length : original_uncompressed_length;
+		mapitest_print(mt, "Comparing data over 0x%x bytes\n", min);
+		for (i = 0; i < min; i++) {
+			if (decompressed.data[i] != original_uncompressed_data[i]) {
+				mapitest_print(mt, "Bytes differ at offset 0x%x: original (0x%.2x) decompressed (0x%.2x)\n", 
+						i, original_uncompressed_data[i], decompressed.data[i]);
+			}
+		}
+		
+	}
+
+	/* check the uncompressed version (less trailing null) matches the original test file contents */
+	decompressed_hex = hex_encode_talloc(mt->mem_ctx, decompressed.data, decompressed.length -1);
+	if (strncasecmp(original_uncompressed_hex, decompressed_hex, original_uncompressed_length) != 0) {
+		mapitest_print(mt, "* %-40s: compare results - mismatch\n", "RTFCP_LARGE");
+		return false;
+	} else {
+		mapitest_print(mt, "* %-40s: compare results - match\n", "RTFCP_LARGE");
+		// mapitest_print(mt, "- %s\n", original_uncompressed_hex);
+		// mapitest_print(mt, "- %s\n", decompressed_hex);
+	}
+	
+	/* clean up */
+	talloc_free(decompressed_hex);
+	talloc_free(compressed);
+	talloc_free(original_uncompressed_hex);
+
+	return true;
+}
+
+#define SROWSET_UNTAGGED "004d542044756d6d792046726f6d00426f6479206f66206d657373616765203800004d542044756d6d792046726f6d00426f6479206f66206d657373616765203900004d542044756d6d792046726f6d00426f6479206f66206d657373616765203700004d542044756d6d792046726f6d00426f6479206f66206d657373616765203600004d542044756d6d793400426f6479206f66206d657373616765203400004d542044756d6d792046726f6d00426f6479206f66206d657373616765203500004d542044756d6d793300426f6479206f66206d657373616765203300004d542044756d6d793100426f6479206f66206d657373616765203100004d542044756d6d793200426f6479206f66206d657373616765203200004d542044756d6d793000426f6479206f66206d657373616765203000"
+#define SROWSET_UNTAGGED_LEN 310
 
 static bool mapitest_noserver_srowset_untagged(struct mapitest *mt)
 {
@@ -119,9 +278,8 @@ static bool mapitest_noserver_srowset_untagged(struct mapitest *mt)
 	struct SRowSet		referenceRowSet;
 	struct SPropTagArray	*proptags;
 	uint32_t		rowNum;
-	int		i;
 
-	retval = GetLoadparmContext(&lp_ctx);
+	retval = GetLoadparmContext(mt->mapi_ctx, &lp_ctx);
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	rawData.data = talloc_array(mt->mem_ctx, uint8_t, 1024);
@@ -135,7 +293,7 @@ static bool mapitest_noserver_srowset_untagged(struct mapitest *mt)
 	proptags = set_SPropTagArray(mt->mem_ctx, 2, PR_SENDER_NAME,  PR_BODY);
 	rowSet.cRows = 10;
 	rowSet.aRow = talloc_array(mt->mem_ctx, struct SRow, 10);
-	emsmdb_get_SRowSet(mt->mem_ctx, lp_ctx, &rowSet, proptags, &rawData);
+	emsmdb_get_SRowSet(mt->mem_ctx, &rowSet, proptags, &rawData);
 
 	/* Check the resulting SRowSet */
 	if (rowSet.cRows != 10) {
@@ -155,30 +313,31 @@ static bool mapitest_noserver_srowset_untagged(struct mapitest *mt)
 		referenceRowSet.aRow[rowNum].lpProps[1].ulPropTag = PR_BODY;
 		referenceRowSet.aRow[rowNum].lpProps[1].dwAlignPad = 0;
 	}
-	referenceRowSet.aRow[0].lpProps[0].value.lpszA = "[MT] Dummy From";
+	referenceRowSet.aRow[0].lpProps[0].value.lpszA = "MT Dummy From";
 	referenceRowSet.aRow[0].lpProps[1].value.lpszA = "Body of message 8";
-	referenceRowSet.aRow[1].lpProps[0].value.lpszA = "[MT] Dummy From";
+	referenceRowSet.aRow[1].lpProps[0].value.lpszA = "MT Dummy From";
 	referenceRowSet.aRow[1].lpProps[1].value.lpszA = "Body of message 9";
-	referenceRowSet.aRow[2].lpProps[0].value.lpszA = "[MT] Dummy From";
+	referenceRowSet.aRow[2].lpProps[0].value.lpszA = "MT Dummy From";
 	referenceRowSet.aRow[2].lpProps[1].value.lpszA = "Body of message 7";
-	referenceRowSet.aRow[3].lpProps[0].value.lpszA = "[MT] Dummy From";
+	referenceRowSet.aRow[3].lpProps[0].value.lpszA = "MT Dummy From";
 	referenceRowSet.aRow[3].lpProps[1].value.lpszA = "Body of message 6";
-	referenceRowSet.aRow[4].lpProps[0].value.lpszA = "[MT] Dummy4";
+	referenceRowSet.aRow[4].lpProps[0].value.lpszA = "MT Dummy4";
 	referenceRowSet.aRow[4].lpProps[1].value.lpszA = "Body of message 4";
-	referenceRowSet.aRow[5].lpProps[0].value.lpszA = "[MT] Dummy From";
+	referenceRowSet.aRow[5].lpProps[0].value.lpszA = "MT Dummy From";
 	referenceRowSet.aRow[5].lpProps[1].value.lpszA = "Body of message 5";
-	referenceRowSet.aRow[6].lpProps[0].value.lpszA = "[MT] Dummy3";
+	referenceRowSet.aRow[6].lpProps[0].value.lpszA = "MT Dummy3";
 	referenceRowSet.aRow[6].lpProps[1].value.lpszA = "Body of message 3";
-	referenceRowSet.aRow[7].lpProps[0].value.lpszA = "[MT] Dummy1";
+	referenceRowSet.aRow[7].lpProps[0].value.lpszA = "MT Dummy1";
 	referenceRowSet.aRow[7].lpProps[1].value.lpszA = "Body of message 1";
-	referenceRowSet.aRow[8].lpProps[0].value.lpszA = "[MT] Dummy2";
+	referenceRowSet.aRow[8].lpProps[0].value.lpszA = "MT Dummy2";
 	referenceRowSet.aRow[8].lpProps[1].value.lpszA = "Body of message 2";
-	referenceRowSet.aRow[9].lpProps[0].value.lpszA = "[MT] Dummy0";
+	referenceRowSet.aRow[9].lpProps[0].value.lpszA = "MT Dummy0";
 	referenceRowSet.aRow[9].lpProps[1].value.lpszA = "Body of message 0";
 
 
 	/* compare result with reference rowset */
 	for (rowNum = 0; rowNum < rowSet.cRows; ++rowNum) {
+		uint32_t	i;
 		/* check each row has expected number of properties */
 		if (rowSet.aRow[rowNum].cValues != referenceRowSet.aRow[rowNum].cValues) {
 			mapitest_print(mt, "* %-40s: unexpected props count, row %i: %i\n", "SRowSet", rowSet.aRow[rowNum].cValues, rowNum);
@@ -200,8 +359,8 @@ static bool mapitest_noserver_srowset_untagged(struct mapitest *mt)
 	return true;
 }
 
-#define SROWSET_TAGGED	"01005b4d545d2044756d6d792046726f6d000a0f010480005b4d545d2044756d6d792046726f6d00426f6479206f66206d657373616765203500005b4d545d2044756d6d792046726f6d00426f6479206f66206d657373616765203600005b4d545d2044756d6d792046726f6d00426f6479206f66206d657373616765203700005b4d545d2044756d6d792046726f6d00426f6479206f66206d657373616765203800005b4d545d2044756d6d792046726f6d00426f6479206f66206d65737361676520390001005b4d545d2044756d6d7930000a0f010480005b4d545d2044756d6d793000426f6479206f66206d65737361676520300001005b4d545d2044756d6d7931000a0f010480005b4d545d2044756d6d793100426f6479206f66206d65737361676520310001005b4d545d2044756d6d7932000a0f010480005b4d545d2044756d6d793200426f6479206f66206d65737361676520320001005b4d545d2044756d6d7933000a0f010480005b4d545d2044756d6d793300426f6479206f66206d65737361676520330001005b4d545d2044756d6d7934000a0f010480005b4d545d2044756d6d793400426f6479206f66206d657373616765203400"
-#define SROWSET_TAGGED_LEN 448
+#define SROWSET_TAGGED	"01004d542044756d6d792046726f6d000a0f010480004d542044756d6d792046726f6d00426f6479206f66206d657373616765203500004d542044756d6d792046726f6d00426f6479206f66206d657373616765203600004d542044756d6d792046726f6d00426f6479206f66206d657373616765203700004d542044756d6d792046726f6d00426f6479206f66206d657373616765203800004d542044756d6d792046726f6d00426f6479206f66206d65737361676520390001004d542044756d6d7930000a0f010480004d542044756d6d793000426f6479206f66206d65737361676520300001004d542044756d6d7931000a0f010480004d542044756d6d793100426f6479206f66206d65737361676520310001004d542044756d6d7932000a0f010480004d542044756d6d793200426f6479206f66206d65737361676520320001004d542044756d6d7933000a0f010480004d542044756d6d793300426f6479206f66206d65737361676520330001004d542044756d6d7934000a0f010480004d542044756d6d793400426f6479206f66206d657373616765203400"
+#define SROWSET_TAGGED_LEN 416
 
 
 static bool mapitest_noserver_srowset_tagged(struct mapitest *mt)
@@ -214,9 +373,8 @@ static bool mapitest_noserver_srowset_tagged(struct mapitest *mt)
 	struct SRowSet		referenceRowSet;
 	struct SPropTagArray	*proptags;
 	uint32_t		rowNum;
-	int		i;
 
-	retval = GetLoadparmContext(&lp_ctx);
+	retval = GetLoadparmContext(mt->mapi_ctx, &lp_ctx);
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	rawData.data = talloc_array(mt->mem_ctx, uint8_t, 1024);
@@ -230,7 +388,7 @@ static bool mapitest_noserver_srowset_tagged(struct mapitest *mt)
 	proptags = set_SPropTagArray(mt->mem_ctx, 2, PR_SENDER_NAME,  PR_BODY);
 	rowSet.cRows = 16;
 	rowSet.aRow = talloc_array(mt->mem_ctx, struct SRow, 16);
-	emsmdb_get_SRowSet(mt->mem_ctx, lp_ctx, &rowSet, proptags, &rawData);
+	emsmdb_get_SRowSet(mt->mem_ctx, &rowSet, proptags, &rawData);
 
 	/* Check the resulting SRowSet */
 	if (rowSet.cRows != 16) {
@@ -250,47 +408,48 @@ static bool mapitest_noserver_srowset_tagged(struct mapitest *mt)
 		referenceRowSet.aRow[rowNum].lpProps[1].ulPropTag = PR_BODY;
 		referenceRowSet.aRow[rowNum].lpProps[1].dwAlignPad = 0;
 	}
-	referenceRowSet.aRow[0].lpProps[0].value.lpszA = "[MT] Dummy From";
+	referenceRowSet.aRow[0].lpProps[0].value.lpszA = "MT Dummy From";
 	referenceRowSet.aRow[0].lpProps[1].ulPropTag = PR_BODY_ERROR;
 	referenceRowSet.aRow[0].lpProps[1].value.err = MAPI_E_NOT_FOUND;
-	referenceRowSet.aRow[1].lpProps[0].value.lpszA = "[MT] Dummy From";
+	referenceRowSet.aRow[1].lpProps[0].value.lpszA = "MT Dummy From";
 	referenceRowSet.aRow[1].lpProps[1].value.lpszA = "Body of message 5";
-	referenceRowSet.aRow[2].lpProps[0].value.lpszA = "[MT] Dummy From";
+	referenceRowSet.aRow[2].lpProps[0].value.lpszA = "MT Dummy From";
 	referenceRowSet.aRow[2].lpProps[1].value.lpszA = "Body of message 6";
-	referenceRowSet.aRow[3].lpProps[0].value.lpszA = "[MT] Dummy From";
+	referenceRowSet.aRow[3].lpProps[0].value.lpszA = "MT Dummy From";
 	referenceRowSet.aRow[3].lpProps[1].value.lpszA = "Body of message 7";
-	referenceRowSet.aRow[4].lpProps[0].value.lpszA = "[MT] Dummy From";
+	referenceRowSet.aRow[4].lpProps[0].value.lpszA = "MT Dummy From";
 	referenceRowSet.aRow[4].lpProps[1].value.lpszA = "Body of message 8";
-	referenceRowSet.aRow[5].lpProps[0].value.lpszA = "[MT] Dummy From";
+	referenceRowSet.aRow[5].lpProps[0].value.lpszA = "MT Dummy From";
 	referenceRowSet.aRow[5].lpProps[1].value.lpszA = "Body of message 9";
-	referenceRowSet.aRow[6].lpProps[0].value.lpszA = "[MT] Dummy0";
+	referenceRowSet.aRow[6].lpProps[0].value.lpszA = "MT Dummy0";
 	referenceRowSet.aRow[6].lpProps[1].ulPropTag = PR_BODY_ERROR;
 	referenceRowSet.aRow[6].lpProps[1].value.err = MAPI_E_NOT_FOUND;
-	referenceRowSet.aRow[7].lpProps[0].value.lpszA = "[MT] Dummy0";
+	referenceRowSet.aRow[7].lpProps[0].value.lpszA = "MT Dummy0";
 	referenceRowSet.aRow[7].lpProps[1].value.lpszA = "Body of message 0";
-	referenceRowSet.aRow[8].lpProps[0].value.lpszA = "[MT] Dummy1";
+	referenceRowSet.aRow[8].lpProps[0].value.lpszA = "MT Dummy1";
 	referenceRowSet.aRow[8].lpProps[1].ulPropTag = PR_BODY_ERROR;
 	referenceRowSet.aRow[8].lpProps[1].value.err = MAPI_E_NOT_FOUND;
-	referenceRowSet.aRow[9].lpProps[0].value.lpszA = "[MT] Dummy1";
+	referenceRowSet.aRow[9].lpProps[0].value.lpszA = "MT Dummy1";
 	referenceRowSet.aRow[9].lpProps[1].value.lpszA = "Body of message 1";
-	referenceRowSet.aRow[10].lpProps[0].value.lpszA = "[MT] Dummy2";
+	referenceRowSet.aRow[10].lpProps[0].value.lpszA = "MT Dummy2";
 	referenceRowSet.aRow[10].lpProps[1].ulPropTag = PR_BODY_ERROR;
 	referenceRowSet.aRow[10].lpProps[1].value.err = MAPI_E_NOT_FOUND;
-	referenceRowSet.aRow[11].lpProps[0].value.lpszA = "[MT] Dummy2";
+	referenceRowSet.aRow[11].lpProps[0].value.lpszA = "MT Dummy2";
 	referenceRowSet.aRow[11].lpProps[1].value.lpszA = "Body of message 2";
-	referenceRowSet.aRow[12].lpProps[0].value.lpszA = "[MT] Dummy3";
+	referenceRowSet.aRow[12].lpProps[0].value.lpszA = "MT Dummy3";
 	referenceRowSet.aRow[12].lpProps[1].ulPropTag = PR_BODY_ERROR;
 	referenceRowSet.aRow[12].lpProps[1].value.err = MAPI_E_NOT_FOUND;
-	referenceRowSet.aRow[13].lpProps[0].value.lpszA = "[MT] Dummy3";
+	referenceRowSet.aRow[13].lpProps[0].value.lpszA = "MT Dummy3";
 	referenceRowSet.aRow[13].lpProps[1].value.lpszA = "Body of message 3";
-	referenceRowSet.aRow[14].lpProps[0].value.lpszA = "[MT] Dummy4";
+	referenceRowSet.aRow[14].lpProps[0].value.lpszA = "MT Dummy4";
 	referenceRowSet.aRow[14].lpProps[1].ulPropTag = PR_BODY_ERROR;
 	referenceRowSet.aRow[14].lpProps[1].value.err = MAPI_E_NOT_FOUND;
-	referenceRowSet.aRow[15].lpProps[0].value.lpszA = "[MT] Dummy4";
+	referenceRowSet.aRow[15].lpProps[0].value.lpszA = "MT Dummy4";
 	referenceRowSet.aRow[15].lpProps[1].value.lpszA = "Body of message 4";
 
 	/* compare result with reference rowset */
 	for (rowNum = 0; rowNum < rowSet.cRows; ++rowNum) {
+		uint32_t	i;
 		/* check each row has expected number of properties */
 		if (rowSet.aRow[rowNum].cValues != referenceRowSet.aRow[rowNum].cValues) {
 			mapitest_print(mt, "* %-40s: unexpected props count, row %i: %i\n", "SRowSet", rowSet.aRow[rowNum].cValues, rowNum);
@@ -575,7 +734,7 @@ static bool mapitest_no_server_props_bin(struct mapitest *mt)
 
 	struct Binary_r bin;
 	const struct Binary_r *binget;
-	int i;
+	uint32_t	i;
 
 	// initialise bin
 	bin.cb = 8;
@@ -676,7 +835,7 @@ static bool mapitest_no_server_props_mv_bin(struct mapitest *mt)
 
 	// create and initialise binarray
 	struct Binary_r bin1, bin2;
-	int i;
+	uint32_t i;
 
 	// initialise bin
 	bin1.cb = 8;
@@ -754,8 +913,8 @@ static bool mapitest_no_server_props_mv_unicode(struct mapitest *mt)
 {
 	bool res;
 	struct SPropValue propvalue;
-	struct WStringArray_r unicodearray;
-	const struct WStringArray_r *unicodearrayget;
+	struct StringArrayW_r unicodearray;
+	const struct StringArrayW_r *unicodearrayget;
 
 	// create and initialise unicodearray
 	unicodearray.cValues = 4;
@@ -771,7 +930,7 @@ static bool mapitest_no_server_props_mv_unicode(struct mapitest *mt)
 		mapitest_print(mt, "* %-40s: [FAILURE]\n", "SPropValue set with PT_MV_UNICODE");
 		return false;
 	}
-	unicodearrayget = (const struct WStringArray_r *)get_SPropValue_data(&propvalue);
+	unicodearrayget = (const struct StringArrayW_r *)get_SPropValue_data(&propvalue);
 	if (!unicodearrayget || (unicodearray.cValues != unicodearrayget->cValues) || (unicodearray.lppszW != unicodearrayget->lppszW)) {
 		/* failure */
 		mapitest_print(mt, "* %-40s: [FAILURE]\n", "SPropValue get/set with PT_MV_UNICODE");
@@ -958,7 +1117,7 @@ _PUBLIC_ bool mapitest_noserver_mapi_properties(struct mapitest *mt)
 	valarray.lpProps[5].value.bin.lpb[1] = 0x00;
 	valarray.lpProps[5].value.bin.lpb[2] = 0x20;
 	valarray.lpProps[5].value.bin.lpb[3] = 0x00;
-	valarray.lpProps[6].ulPropTag = PR_FREEBUSY_BUSY_MONTHS;
+	valarray.lpProps[6].ulPropTag = PR_SCHDINFO_MONTHS_BUSY;
 	valarray.lpProps[6].value.MVl.cValues = 2;
 	valarray.lpProps[6].value.MVl.lpl = talloc_array(mt->mem_ctx, uint32_t, 2);
 	valarray.lpProps[6].value.MVl.lpl[0] = 32130;
@@ -1030,7 +1189,7 @@ _PUBLIC_ bool mapitest_noserver_mapi_properties(struct mapitest *mt)
 	mapitest_print(mt, "* %-40s: [SUCCESS]\n", "mapi_SPropValue find with PT_BINARY");
 
 
-	mvi4get = find_mapi_SPropValue_data(&valarray, PR_FREEBUSY_BUSY_MONTHS);
+	mvi4get = find_mapi_SPropValue_data(&valarray, PR_SCHDINFO_MONTHS_BUSY);
 	if (!mvi4get || (mvi4get->cValues != 2 ) || (mvi4get->lpl[0] != 32130) || (mvi4get->lpl[1] != 32131)) {
 		/* failure */
 		mapitest_print(mt, "* %-40s: [FAILURE]\n", "mapi_SPropValue find with PT_MV_LONG");
@@ -1071,27 +1230,27 @@ _PUBLIC_ bool mapitest_noserver_proptagvalue(struct mapitest *mt)
 {
 	uint32_t proptag;
 	
-	proptag = get_proptag_value("PR_ACKNOWLEDGEMENT_MODE");
-	if (proptag != PR_ACKNOWLEDGEMENT_MODE) {
-		mapitest_print(mt, "* %-40s: [FAILURE]\n", "get_proptag_value with PR_ACKNOWLEDGEMENT_MODE");
+	proptag = get_proptag_value("PidTagTemplateData");
+	if (proptag != PidTagTemplateData) {
+		mapitest_print(mt, "* %-40s: [FAILURE]\n", "get_proptag_value with PidTagTemplateData");
 		return false;
 	}
 
-	proptag = get_proptag_value("PR_PROFILE_OPEN_FLAGS");
-	if (proptag != PR_PROFILE_OPEN_FLAGS) {
-		mapitest_print(mt, "* %-40s: [FAILURE]\n", "get_proptag_value with PR_PROFILE_OPEN_FLAGS");
+	proptag = get_proptag_value("PidTagDelegatedByRule");
+	if (proptag != PidTagDelegatedByRule) {
+		mapitest_print(mt, "* %-40s: [FAILURE]\n", "get_proptag_value with PidTagDelegatedByRule");
 		return false;
 	}
 
-	proptag = get_proptag_value("PR_EMS_AB_SERVER");
-	if (proptag != PR_EMS_AB_SERVER) {
-		mapitest_print(mt, "* %-40s: [FAILURE]\n", "get_proptag_value with PR_EMS_AB_SERVER_ERROR");
+	proptag = get_proptag_value("PidTagAddressBookContainerId_Error");
+	if (proptag != PidTagAddressBookContainerId_Error) {
+		mapitest_print(mt, "* %-40s: [FAILURE]\n", "get_proptag_value with PidTagAddressBookContainerId_Error");
 		return false;
 	}
 
 	proptag = get_proptag_value("No such tag, ok?");
 	if (proptag != 0) {
-		mapitest_print(mt, "* %-40s: [FAILURE]\n", "get_proptag_value with non-existant tag");
+		mapitest_print(mt, "* %-40s: [FAILURE]\n", "get_proptag_value with non-existent tag");
 		return false;
 	}
 

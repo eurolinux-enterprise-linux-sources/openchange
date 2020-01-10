@@ -22,7 +22,7 @@
 /**
    \file libmapiserver_oxctabl.c
 
-   \brief OXCTABL Rops
+   \brief OXCTABL ROP Response size calculations
  */
 
 #include "libmapiserver.h"
@@ -108,7 +108,9 @@ _PUBLIC_ uint16_t libmapiserver_RopQueryRows_size(struct EcDoRpc_MAPI_REPL *resp
 	}
 
 	size += SIZE_DFLT_ROPQUERYROWS;
-	size += response->u.mapi_QueryRows.RowData.length;
+	if (response->u.mapi_QueryRows.RowCount) {
+		size += response->u.mapi_QueryRows.RowData.length;
+	}
 
 	return size;
 }
@@ -180,4 +182,17 @@ _PUBLIC_ uint16_t libmapiserver_RopFindRow_size(struct EcDoRpc_MAPI_REPL *respon
 	}
 
 	return size;
+}
+
+/**
+   \details Calculate ResetTable (0x81) Rop size
+
+   \param response pointer to the ResetTable EcDoRpc_MAPI_REPL
+   structure
+
+   \return Size of ResetTable response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopResetTable_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	return SIZE_DFLT_MAPI_RESPONSE;
 }

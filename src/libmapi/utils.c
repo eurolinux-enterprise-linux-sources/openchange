@@ -1,7 +1,7 @@
 /*
    OpenChange MAPI implementation.
 
-   Copyright (C) Julien Kerihuel 2005 - 2006.
+   Copyright (C) Julien Kerihuel 2005 - 2011.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,9 +17,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/proto_private.h>
-#include <gen_ndr/ndr_exchange.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
+#include "gen_ndr/ndr_exchange.h"
 
 /**
    \file utils.c
@@ -56,7 +56,7 @@ _PUBLIC_ char *guid_delete_dash(TALLOC_CTX *mem_ctx, const char *recipient_id)
 		if (recipient_id[i] != '-') count++;
 	}
 
-	guid = talloc_zero_size(mem_ctx, count+1);
+	guid = (char *)talloc_zero_size(mem_ctx, count+1);
 	for (count=0,i = 0;i!=strlen(recipient_id);i++) {
 		if (recipient_id[i] != '-') {
 			guid[count] = recipient_id[i];
@@ -84,7 +84,7 @@ _PUBLIC_ struct Binary_r *generate_recipient_entryid(TALLOC_CTX *mem_ctx, const 
 		entryid->cb += strlen(guid);
 	}
 
-	entryid->lpb = talloc_zero_size(mem_ctx, entryid->cb);
+	entryid->lpb = (uint8_t *)talloc_zero_size(mem_ctx, entryid->cb);
 	off = 4;
 	memcpy(entryid->lpb + off, MAPI_LOCAL_UID, sizeof (MAPI_LOCAL_UID));
 	off += sizeof (MAPI_LOCAL_UID);
@@ -99,30 +99,6 @@ _PUBLIC_ struct Binary_r *generate_recipient_entryid(TALLOC_CTX *mem_ctx, const 
 	
 	return entryid;
 }
-
-/**
- * convert utf8 windows string into classic utf8
- * NOTE: windows utf8 encoding is equal or larger to classic utf8
- *       we should anyway find a better way to allocate the output buf
- */
-
-int yyparse_utf8(char *, const char *);
-
-_PUBLIC_ char *windows_to_utf8(TALLOC_CTX *mem_ctx, const char *input)
-{
-	char	*tmp = NULL;
-	char	*output;
-
-	if (!input) return NULL;
-
-	tmp = malloc(strlen(input) + 1);
-	yyparse_utf8(tmp, input);
-	output = talloc_strdup(mem_ctx, tmp);
-	free(tmp);
-	
-	return output;
-}
-
 
 /**
    \details Create a FID from an EntryID

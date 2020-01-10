@@ -22,7 +22,7 @@
 /**
    \file libmapiserver_oxcfold.c
 
-   \brief OXCFOLD Rops
+   \brief OXCFOLD ROP Response size calculations
  */
 
 #include "libmapiserver.h"
@@ -90,5 +90,158 @@ _PUBLIC_ uint16_t libmapiserver_RopGetContentsTable_size(struct EcDoRpc_MAPI_REP
 
 	size += SIZE_DFLT_ROPGETCONTENTSTABLE;
 	
+	return size;
+}
+
+
+/**
+   \details Calculate CreateFolder Rop size
+
+   \param response pointer to the CreateFolder EcDoRpc_MAPI_REPL
+   structure
+
+   \return Size of CreateFolder response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopCreateFolder_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPCREATEFOLDER;
+
+	if (response->u.mapi_CreateFolder.IsExistingFolder != 0) {
+		size += sizeof(response->u.mapi_CreateFolder.GhostUnion.GhostInfo.HasRules);
+		size += sizeof(response->u.mapi_CreateFolder.GhostUnion.GhostInfo.IsGhosted);
+		if (response->u.mapi_CreateFolder.GhostUnion.GhostInfo.IsGhosted != 0) {
+			size += sizeof(response->u.mapi_CreateFolder.GhostUnion.GhostInfo.Ghost.Replicas.ServerCount);
+			size += sizeof(response->u.mapi_CreateFolder.GhostUnion.GhostInfo.Ghost.Replicas.CheapServerCount);
+			/* TODO: size += sizeof( servers )*/
+		}
+	}
+	return size;
+}
+
+
+/**
+   \details Calculate DeleteFolder Rop size
+
+   \param response pointer to the DeleteFolder EcDoRpc_MAPI_REPL
+   structure
+
+   \return Size of DeleteFolder response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopDeleteFolder_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPDELETEFOLDER;
+
+	return size;
+}
+
+/**
+   \details Calculate DeleteMessage (0x1e) Rop size
+
+   \param response pointer to the DeleteMessage EcDoRpc_MAPI_REPL
+   structure
+
+   \return Size of DeleteMessage response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopDeleteMessage_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPDELETEMESSAGE;
+
+	return size;
+}
+
+
+/**
+   \details Calculate SetSearchCriteria (0x30) Rop size
+
+   \param response pointer to the SetSearchCriteria EcDoRpc_MAPI_REPL
+   structure
+
+   \return Size of SetSearchCriteria response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopSetSearchCriteria_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	return SIZE_DFLT_MAPI_RESPONSE;
+}
+
+
+/**
+   \details Calculate GetSearchCriteria (0x31) Rop size
+
+   \param response pointer to the GetSearchCriteria EcDoRpc_MAPI_REPL
+   structure
+
+   \return Size of GetSearchCriteria response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopGetSearchCriteria_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPGETSEARCHCRITERIA;
+	size += response->u.mapi_GetSearchCriteria.RestrictionDataSize;
+	size += response->u.mapi_GetSearchCriteria.FolderIdCount * sizeof (uint64_t);
+
+	return size;
+}
+
+
+ /**
+   \details Calculate EmptyFolder Rop size
+
+   \param response pointer to the EmptyFolder EcDoRpc_MAPI_REPL
+   structure
+
+   \return Size of EmptyFolder response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopEmptyFolder_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t        size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPEMPTYFOLDER;
+	return size;
+}
+
+/**
+   \details Calculate MoveCopyMessages rop size
+
+   \param response pointer to the MoveCopyMessags EcDoRpc_MAPI_REPL
+   structure
+
+   \return Size of MoveCopyMessages response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopMoveCopyMessages_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t        size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPMOVECOPYMESSAGES;
 	return size;
 }

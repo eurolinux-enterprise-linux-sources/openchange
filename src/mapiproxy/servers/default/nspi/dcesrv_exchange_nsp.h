@@ -22,11 +22,12 @@
 #ifndef	__DCESRV_EXCHANGE_NSP_H
 #define	__DCESRV_EXCHANGE_NSP_H
 
-#include <libmapi/libmapi.h>
-#include <libmapi/proto_private.h>
-#include <mapiproxy/libmapiproxy/libmapiproxy.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
+#include "mapiproxy/libmapiproxy/libmapiproxy.h"
 #include <ldb.h>
 #include <ldb_errors.h>
+#include <tevent.h>
 #include <fcntl.h>
 #include <util/debug.h>
 
@@ -50,13 +51,12 @@ struct emsabp_context {
 	TALLOC_CTX		*mem_ctx;
 };
 
-
 struct exchange_nsp_session {
 	struct mpm_session		*session;
+	struct GUID			uuid;
 	struct exchange_nsp_session	*prev;
 	struct exchange_nsp_session	*next;
 };
-
 
 struct emsabp_MId {
 	uint32_t	MId;
@@ -106,10 +106,12 @@ struct EphemeralEntryID {
 #define	EMSABP_TDB_TMP_MID_START	0x5000
 #define	EMSABP_TDB_DATA_REC		"MId_index"
 
+#define DCESRV_NSP_RETURN(r,c,ctx) { r->out.result = c; return; if (ctx) talloc_free(ctx); }
+
 __BEGIN_DECLS
 
 NTSTATUS	samba_init_module(void);
-struct ldb_context *samdb_connect(TALLOC_CTX *, struct tevent_context *, struct loadparm_context *, struct auth_session_info *);
+struct ldb_context *samdb_connect(TALLOC_CTX *, struct tevent_context *, struct loadparm_context *, struct auth_session_info *, int);
 const struct GUID *samdb_ntds_objectGUID(struct ldb_context *);
 
 /* definitions from emsabp.c */
@@ -130,7 +132,7 @@ enum MAPISTATUS		emsabp_fetch_attrs_from_msg(TALLOC_CTX *, struct emsabp_context
 enum MAPISTATUS		emsabp_fetch_attrs(TALLOC_CTX *, struct emsabp_context *, struct SRow *, uint32_t, uint32_t, struct SPropTagArray *);
 enum MAPISTATUS		emsabp_table_fetch_attrs(TALLOC_CTX *, struct emsabp_context *, struct SRow *, uint32_t, struct PermanentEntryID *, 
 						 struct PermanentEntryID *, struct ldb_message *, bool);
-enum MAPISTATUS		emsabp_search(TALLOC_CTX *, struct emsabp_context *, struct SPropTagArray *, struct Restriction_r *, struct STAT *, uint32_t);
+enum MAPISTATUS		emsabp_search(TALLOC_CTX *, struct emsabp_context *, struct PropertyTagArray_r *, struct Restriction_r *, struct STAT *, uint32_t);
 enum MAPISTATUS		emsabp_search_dn(struct emsabp_context *, const char *, struct ldb_message **);
 enum MAPISTATUS		emsabp_search_legacyExchangeDN(struct emsabp_context *, const char *, struct ldb_message **, bool *);
 enum MAPISTATUS		emsabp_ab_container_by_id(TALLOC_CTX *, struct emsabp_context *, uint32_t, struct ldb_message **);

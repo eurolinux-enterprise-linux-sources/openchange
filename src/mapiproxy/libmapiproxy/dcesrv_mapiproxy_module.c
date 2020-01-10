@@ -3,7 +3,7 @@
 
    OpenChange Project
 
-   Copyright (C) Julien Kerihuel 2008
+   Copyright (C) Julien Kerihuel 2008-2011
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <mapiproxy/dcesrv_mapiproxy.h>
+#include "mapiproxy/dcesrv_mapiproxy.h"
 #include "libmapiproxy.h"
 #include <util/debug.h>
 
@@ -152,14 +152,14 @@ NTSTATUS mapiproxy_module_unbind(struct server_id server_id, uint32_t context_id
 
 extern NTSTATUS mapiproxy_module_register(const void *_mp_module)
 {
-	const struct mapiproxy_module	*mp_module =_mp_module;
+	const struct mapiproxy_module	*mp_module = (const struct mapiproxy_module *) _mp_module;
 
 	mp_modules = realloc_p(mp_modules, struct mp_module, num_mp_modules + 1);
 	if (!mp_modules) {
 		smb_panic("out of memory in mapiproxy_register");
 	}
 
-	mp_modules[num_mp_modules].mp_module = smb_xmemdup(mp_module, sizeof (*mp_module));
+	mp_modules[num_mp_modules].mp_module = (struct mapiproxy_module *) smb_xmemdup(mp_module, sizeof (*mp_module));
 	mp_modules[num_mp_modules].mp_module->name = smb_xstrdup(mp_module->name);
 
 	num_mp_modules++;
@@ -178,7 +178,7 @@ static NTSTATUS mapiproxy_module_load(struct dcesrv_context *dce_ctx)
 	NTSTATUS			status;
 
 	/* Fetch the module list from smb.conf */
-	modules = str_list_make(dce_ctx, lp_parm_string(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "modules"), NULL);
+	modules = str_list_make(dce_ctx, lpcfg_parm_string(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "modules"), NULL);
 
 	/* Add modules to the list */
 	for (i = 0; modules[i]; i++) {
@@ -206,14 +206,18 @@ static NTSTATUS mapiproxy_module_load(struct dcesrv_context *dce_ctx)
 
 _PUBLIC_ NTSTATUS mapiproxy_module_init(struct dcesrv_context *dce_ctx)
 {
-	init_module_fn			*mpm;
+	openchange_plugin_init_fn *mpm;
 	NTSTATUS			ret;
 
-	mpm = load_samba_modules(NULL, dce_ctx->lp_ctx, "dcerpc_mapiproxy");
+	mpm = load_openchange_plugins(NULL, "dcerpc_mapiproxy");
 
-	run_init_functions(mpm);
+	if (mpm != NULL) {
+		int i;
+		for (i = 0; mpm[i]; i++) { mpm[i](); }
+	}
+
 	talloc_free(mpm);
-	
+
 	ret = mapiproxy_module_load(dce_ctx);
 
 	return ret;

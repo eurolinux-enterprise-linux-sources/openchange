@@ -1,7 +1,7 @@
 /*
    OpenChange MAPI implementation.
 
-   Copyright (C) Julien Kerihuel 2007-2008.
+   Copyright (C) Julien Kerihuel 2007-2011.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,10 +17,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/mapi_nameid.h>
-#include <libmapi/mapi_nameid_private.h>
-#include <libmapi/proto_private.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/mapi_nameid.h"
+#include "libmapi/mapi_nameid_private.h"
+#include "libmapi/libmapi_private.h"
 
 
 /**
@@ -103,7 +103,7 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_OOM_add(struct mapi_nameid *mapi_nameid,
 
 			mapi_nameid->entries[count] = mapi_nameid_tags[i];
 
-			mapi_nameid->nameid[count].ulKind = mapi_nameid_tags[i].ulKind;
+			mapi_nameid->nameid[count].ulKind = (enum ulKind)mapi_nameid_tags[i].ulKind;
 			GUID_from_string(mapi_nameid_tags[i].OLEGUID,
 					 &(mapi_nameid->nameid[count].lpguid));
 			switch (mapi_nameid_tags[i].ulKind) {
@@ -112,7 +112,7 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_OOM_add(struct mapi_nameid *mapi_nameid,
 				break;
 			case MNID_STRING:
 				mapi_nameid->nameid[count].kind.lpwstr.Name = mapi_nameid_tags[i].Name;
-				mapi_nameid->nameid[count].kind.lpwstr.NameSize = strlen(mapi_nameid_tags[i].Name) * 2 + 2;
+				mapi_nameid->nameid[count].kind.lpwstr.NameSize = get_utf8_utf16_conv_length(mapi_nameid_tags[i].Name);
 				break;
 			}
 			mapi_nameid->count++;
@@ -168,7 +168,7 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_lid_add(struct mapi_nameid *mapi_nameid,
 
 			mapi_nameid->entries[count] = mapi_nameid_tags[i];
 
-			mapi_nameid->nameid[count].ulKind = mapi_nameid_tags[i].ulKind;
+			mapi_nameid->nameid[count].ulKind = (enum ulKind) mapi_nameid_tags[i].ulKind;
 			GUID_from_string(mapi_nameid_tags[i].OLEGUID,
 					 &(mapi_nameid->nameid[count].lpguid));
 			switch (mapi_nameid_tags[i].ulKind) {
@@ -177,7 +177,7 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_lid_add(struct mapi_nameid *mapi_nameid,
 				break;
 			case MNID_STRING:
 				mapi_nameid->nameid[count].kind.lpwstr.Name = mapi_nameid_tags[i].Name;
-				mapi_nameid->nameid[count].kind.lpwstr.NameSize = strlen(mapi_nameid_tags[i].Name) * 2 + 2;
+				mapi_nameid->nameid[count].kind.lpwstr.NameSize = get_utf8_utf16_conv_length(mapi_nameid_tags[i].Name);
 				break;
 			}
 			mapi_nameid->count++;
@@ -235,7 +235,7 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_string_add(struct mapi_nameid *mapi_nameid,
 
 			mapi_nameid->entries[count] = mapi_nameid_tags[i];
 
-			mapi_nameid->nameid[count].ulKind = mapi_nameid_tags[i].ulKind;
+			mapi_nameid->nameid[count].ulKind = (enum ulKind) mapi_nameid_tags[i].ulKind;
 			GUID_from_string(mapi_nameid_tags[i].OLEGUID,
 					 &(mapi_nameid->nameid[count].lpguid));
 			switch (mapi_nameid_tags[i].ulKind) {
@@ -244,7 +244,7 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_string_add(struct mapi_nameid *mapi_nameid,
 				break;
 			case MNID_STRING:
 				mapi_nameid->nameid[count].kind.lpwstr.Name = mapi_nameid_tags[i].Name;
-				mapi_nameid->nameid[count].kind.lpwstr.NameSize = strlen(mapi_nameid_tags[i].Name) * 2 + 2;
+				mapi_nameid->nameid[count].kind.lpwstr.NameSize = get_utf8_utf16_conv_length(mapi_nameid_tags[i].Name);
 				break;
 			}
 			mapi_nameid->count++;
@@ -353,7 +353,7 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_custom_string_add(struct mapi_nameid *mapi_
 	mapi_nameid->nameid[count].ulKind = MNID_STRING;
 	GUID_from_string(OLEGUID, &(mapi_nameid->nameid[count].lpguid));
 	mapi_nameid->nameid[count].kind.lpwstr.Name = Name;
-	mapi_nameid->nameid[count].kind.lpwstr.NameSize = strlen(Name) * 2 + 2;
+	mapi_nameid->nameid[count].kind.lpwstr.NameSize = get_utf8_utf16_conv_length(Name);
 
 	mapi_nameid->count++;
 	return MAPI_E_SUCCESS;
@@ -399,7 +399,7 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_canonical_add(struct mapi_nameid *mapi_name
 
 			mapi_nameid->entries[count] = mapi_nameid_tags[i];
 
-			mapi_nameid->nameid[count].ulKind = mapi_nameid_tags[i].ulKind;
+			mapi_nameid->nameid[count].ulKind = (enum ulKind) mapi_nameid_tags[i].ulKind;
 			GUID_from_string(mapi_nameid_tags[i].OLEGUID,
 					 &(mapi_nameid->nameid[count].lpguid));
 			switch (mapi_nameid_tags[i].ulKind) {
@@ -408,10 +408,32 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_canonical_add(struct mapi_nameid *mapi_name
 				break;
 			case MNID_STRING:
 				mapi_nameid->nameid[count].kind.lpwstr.Name = mapi_nameid_tags[i].Name;
-				mapi_nameid->nameid[count].kind.lpwstr.NameSize = strlen(mapi_nameid_tags[i].Name) * 2 + 2;
+				mapi_nameid->nameid[count].kind.lpwstr.NameSize = get_utf8_utf16_conv_length(mapi_nameid_tags[i].Name);
 				break;
 			}
 			mapi_nameid->count++;
+			return MAPI_E_SUCCESS;
+		}
+	}
+
+	return MAPI_E_NOT_FOUND;
+}
+
+
+/**
+   \details Search for a given referenced unmapped named property and
+   return whether it was found or not.
+
+   \param proptag the unmapped property tag to lookup
+
+   \return MAPI_E_SUCCESS on success otherwise MAPI_E_NOT_FOUND
+ */
+_PUBLIC_ enum MAPISTATUS mapi_nameid_property_lookup(uint32_t proptag)
+{
+	uint32_t	i;
+
+	for (i = 0; mapi_nameid_tags[i].proptag; i++) {
+		if (mapi_nameid_tags[i].proptag == proptag) {
 			return MAPI_E_SUCCESS;
 		}
 	}
@@ -494,6 +516,43 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_lid_lookup(uint16_t lid, const char *OLEGUI
 
 
 /**
+   \details Search for a given lid,OLEGUID couple and return the
+   associated canonical propTag.
+
+   \param lid the named property light ID
+   \param OLEGUID the named property GUID for this entry
+   \param propTag pointer on returned named canonical property tag
+
+   \return MAPI_E_SUCCESS on success, otherwise MAPI_E_NOT_FOUND.
+
+   \note Developers may also call GetLastError() to retrieve the last
+   MAPI error code. Possible MAPI error codes are:
+   - MAPI_E_INVALID_PARAMETER: one of the parameter was not set properly.
+   - MAPI_E_NOT_FOUND: no named property found
+ */
+_PUBLIC_ enum MAPISTATUS mapi_nameid_lid_lookup_canonical(uint16_t lid, const char *OLEGUID,
+							  uint32_t *propTag)
+{
+	uint32_t	i;
+
+	/* Sanity checks */
+	OPENCHANGE_RETVAL_IF(!lid, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!OLEGUID, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!propTag, MAPI_E_INVALID_PARAMETER, NULL);
+
+	for (i = 0; mapi_nameid_tags[i].OLEGUID; i++) {
+		if (mapi_nameid_tags[i].lid == lid &&
+		    !strcmp(mapi_nameid_tags[i].OLEGUID, OLEGUID)) {
+			*propTag = mapi_nameid_tags[i].proptag;
+			return MAPI_E_SUCCESS;
+		}
+	}
+
+	OPENCHANGE_RETVAL_ERR(MAPI_E_NOT_FOUND, NULL);
+}
+
+
+/**
    \details Search for a given Name,OLEGUID couple and return the
    associated propType.
 
@@ -532,6 +591,45 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_string_lookup(const char *Name,
 
 
 /**
+   \details Search for a given Name,OLEGUID couple and return the
+   associated canonical propTag.
+
+   \param Name the named property name
+   \param OLEGUID the named property GUID for this entry
+   \param propTag pointer on returned named canonical property tag
+
+   \return MAPI_E_SUCCESS on success, otherwise MAPI_E_NOT_FOUND.
+
+   \note Developers may also call GetLastError() to retrieve the last
+   MAPI error code. Possible MAPI error codes are:
+   - MAPI_E_INVALID_PARAMETER: one of the parameter was not set properly.
+   - MAPI_E_NOT_FOUND: no named property found
+ */
+_PUBLIC_ enum MAPISTATUS mapi_nameid_string_lookup_canonical(const char *Name, 
+							     const char *OLEGUID,
+							     uint32_t *propTag)
+{
+	uint32_t	i;
+
+	/* Sanity checks */
+	OPENCHANGE_RETVAL_IF(!Name, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!OLEGUID, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!propTag, MAPI_E_INVALID_PARAMETER, NULL);
+
+	for (i = 0; mapi_nameid_tags[i].OLEGUID; i++) {
+		if (mapi_nameid_tags[i].Name &&
+		    !strcmp(mapi_nameid_tags[i].Name, Name) &&
+		    !strcmp(mapi_nameid_tags[i].OLEGUID, OLEGUID)) {
+			*propTag = mapi_nameid_tags[i].proptag;
+			return MAPI_E_SUCCESS;
+		}
+	}
+
+	OPENCHANGE_RETVAL_ERR(MAPI_E_NOT_FOUND, NULL);
+}
+
+
+/**
    \details set SPropTagArray ulPropTag property types from
    mapi_nameid returned by GetIDsFromNames()
 
@@ -559,8 +657,8 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_SPropTagArray(struct mapi_nameid *mapi_name
 
 	for (i = 0; i < mapi_nameid->count; i++) {
 		if (mapi_nameid->entries[i].propType) {
-			SPropTagArray->aulPropTag[i] = (SPropTagArray->aulPropTag[i] & 0xFFFF0000) | 
-				mapi_nameid->entries[i].propType;
+		  SPropTagArray->aulPropTag[i] = (enum MAPITAGS)(((int)SPropTagArray->aulPropTag[i] & 0xFFFF0000) | 
+								 mapi_nameid->entries[i].propType);
 		}
 	}
 	
@@ -601,9 +699,9 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_map_SPropTagArray(struct mapi_nameid *mapi_
 
 	for (i = 0; i < SPropTagArray->cValues; i++) {
 		for (j = 0; j < mapi_nameid->count; j++) {
-			if (mapi_nameid->entries[j].proptag == SPropTagArray->aulPropTag[i]) {
-				SPropTagArray->aulPropTag[i] = (SPropTagArray2->aulPropTag[j] & 0xFFFF0000) |
-					mapi_nameid->entries[j].propType;
+		  if ((enum MAPITAGS)mapi_nameid->entries[j].proptag == SPropTagArray->aulPropTag[i]) {
+			  SPropTagArray->aulPropTag[i] = (enum MAPITAGS)(((int)SPropTagArray2->aulPropTag[j] & 0xFFFF0000) |
+									  mapi_nameid->entries[j].propType);
 				mapi_nameid->entries[j].position = i;
 			}
 		}
@@ -641,7 +739,7 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_unmap_SPropTagArray(struct mapi_nameid *map
 	
 	for (i = 0; i < mapi_nameid->count; i++) {
 		if (mapi_nameid->entries[i].position <= SPropTagArray->cValues) {
-			SPropTagArray->aulPropTag[mapi_nameid->entries[i].position] = mapi_nameid->entries[i].proptag;
+		  SPropTagArray->aulPropTag[mapi_nameid->entries[i].position] = (enum MAPITAGS) mapi_nameid->entries[i].proptag;
 		}
 	}
 
@@ -685,9 +783,9 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_map_SPropValue(struct mapi_nameid *mapi_nam
 
 	for (i = 0; i < PropCount; i++) {
 		for (j = 0; j < mapi_nameid->count; j++) {
-			if (mapi_nameid->entries[j].proptag == lpProps[i].ulPropTag) {
-				lpProps[i].ulPropTag = (SPropTagArray->aulPropTag[j] & 0xFFFF0000) |
-					mapi_nameid->entries[j].propType;
+		  if ((enum MAPITAGS)mapi_nameid->entries[j].proptag == lpProps[i].ulPropTag) {
+			  lpProps[i].ulPropTag = (enum MAPITAGS)(((int)SPropTagArray->aulPropTag[j] & 0xFFFF0000) |
+								 mapi_nameid->entries[j].propType);
 				mapi_nameid->entries[j].position = i;
 			}
 		}
@@ -728,7 +826,7 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_unmap_SPropValue(struct mapi_nameid *mapi_n
 
 	for (i = 0; i < mapi_nameid->count; i++) {
 		if (mapi_nameid->entries[i].position <= PropCount) {
-			lpProps[mapi_nameid->entries[i].position].ulPropTag = mapi_nameid->entries[i].proptag;
+		  lpProps[mapi_nameid->entries[i].position].ulPropTag = (enum MAPITAGS) mapi_nameid->entries[i].proptag;
 		}
 	}
 
@@ -760,7 +858,6 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_lookup_SPropTagArray(struct mapi_nameid *na
 {
 	enum MAPISTATUS	retval;
 	uint32_t	i;
-	uint16_t	proptype;
 	bool		status = false;
 
 	/* Sanity checks */
@@ -768,9 +865,7 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_lookup_SPropTagArray(struct mapi_nameid *na
 	OPENCHANGE_RETVAL_IF(!SPropTagArray, MAPI_E_INVALID_PARAMETER, NULL);
 
 	for (i = 0; i < SPropTagArray->cValues; i++) {
-		proptype = (SPropTagArray->aulPropTag[i] & 0xFFFF0000) >> 16;
-		if (((proptype >= 0x8000) && (proptype <= 0x8FFF)) ||
-		    ((proptype >= 0xa000) && (proptype <= 0xaFFF))) {
+		if (mapi_nameid_property_lookup(SPropTagArray->aulPropTag[i]) == MAPI_E_SUCCESS) {
 			retval = mapi_nameid_canonical_add(nameid, SPropTagArray->aulPropTag[i]);
 			if (retval == MAPI_E_SUCCESS) {
 				status = true;
@@ -862,9 +957,61 @@ _PUBLIC_ enum MAPISTATUS mapi_nameid_GetIDsFromNames(struct mapi_nameid *mapi_na
 	OPENCHANGE_RETVAL_IF(retval, GetLastError(), NULL);
 
 	for (i = 0; i < SPropTagArray->cValues; i++) {
-		SPropTagArray->aulPropTag[i] = (SPropTagArray->aulPropTag[i] & 0xFFFF0000) | 
-			mapi_nameid->entries[i].propType;
+	  SPropTagArray->aulPropTag[i] = (enum MAPITAGS)(((int)SPropTagArray->aulPropTag[i] & 0xFFFF0000) | 
+							 mapi_nameid->entries[i].propType);
 	}
 
 	return MAPI_E_SUCCESS;
+}
+
+_PUBLIC_ const char *get_namedid_name(uint32_t proptag)
+{
+	uint32_t idx;
+
+	for (idx = 0; mapi_nameid_names[idx].proptag; idx++) {
+		if (mapi_nameid_names[idx].proptag == proptag) { 
+			return mapi_nameid_names[idx].propname;
+		}
+	}
+	if (((proptag & 0xFFFF) == PT_STRING8) ||
+	    ((proptag & 0xFFFF) == PT_MV_STRING8)) {
+		proptag += 1; /* try as _UNICODE variant */
+	}
+	for (idx = 0; mapi_nameid_names[idx].proptag; idx++) {
+		if (mapi_nameid_names[idx].proptag == proptag) { 
+			return mapi_nameid_names[idx].propname;
+		}
+	}
+	return NULL;
+}
+
+_PUBLIC_ uint32_t get_namedid_value(const char *propname)
+{
+	uint32_t idx;
+
+	for (idx = 0; mapi_nameid_names[idx].proptag; idx++) {
+		if (!strcmp(mapi_nameid_names[idx].propname, propname)) { 
+			return mapi_nameid_names[idx].proptag;
+		}
+	}
+
+	return 0;
+}
+
+_PUBLIC_ uint16_t get_namedid_type(uint16_t untypedtag)
+{
+	uint32_t	idx;
+	uint16_t	current_type;
+
+	for (idx = 0; mapi_nameid_names[idx].proptag; idx++) {
+		if ((mapi_nameid_names[idx].proptag >> 16) == untypedtag) {
+			current_type = mapi_nameid_names[idx].proptag & 0xFFFF;
+			if (current_type != PT_ERROR && current_type != PT_STRING8) {
+				return current_type;
+			}
+		}
+	}
+
+	DEBUG(5, ("%s: type for property '%x' could not be deduced\n", __FUNCTION__, untypedtag));
+	return 0;
 }

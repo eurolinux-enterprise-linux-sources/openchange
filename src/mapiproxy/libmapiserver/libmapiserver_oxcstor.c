@@ -22,7 +22,7 @@
 /**
    \file libmapiserver_oxcstor.c
 
-   \brief OXCSTOR Rops
+   \brief OXCSTOR ROP Response size calculations
  */
 
 #include "libmapiserver.h"
@@ -48,18 +48,26 @@ _PUBLIC_ uint16_t libmapiserver_RopLogon_size(struct EcDoRpc_MAPI_REQ *request,
 	if (response->error_code == ecWrongServer) {
 		size += SIZE_DFLT_ROPLOGON_REDIRECT;
 		size += strlen (response->us.mapi_Logon.ServerName) + 1;
-		return size;
-	}
-
-	switch (request->u.mapi_Logon.LogonFlags) {
-	case LogonPrivate:
+	} else if (request->u.mapi_Logon.LogonFlags & LogonPrivate) {
 		size += SIZE_DFLT_ROPLOGON_MAILBOX;
-		break;
-	default:
-		break;
+	} else {
+		size += SIZE_DFLT_ROPLOGON_PUBLICFOLDER;
 	}
-
 	return size;
+}
+
+
+/**
+   \details Calculate SetReceiveFolder (0x26) Rop size
+
+   \param response pointer to the SetReceiveFolder EcDoRpc_MAPI_REPL
+   structure
+
+   \return Size of SetReceiveFolder response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopSetReceiveFolder_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	return SIZE_DFLT_MAPI_RESPONSE;
 }
 
 
@@ -80,6 +88,163 @@ _PUBLIC_ uint16_t libmapiserver_RopGetReceiveFolder_size(struct EcDoRpc_MAPI_REP
 
 	size += SIZE_DFLT_ROPGETRECEIVEFOLDER;
 	size += strlen(response->u.mapi_GetReceiveFolder.MessageClass) + 1;
+
+	return size;
+}
+
+/**
+   \details Calculate LongTermIdFromId Rop size
+
+   \param response pointer to the LongTermIdFromId EcDoRpc_MAPI_REPL structure
+
+   \return Size of LongTermIdFromId response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopLongTermIdFromId_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPLONGTERMIDFROMID;
+
+	return size;
+}
+
+/**
+   \details Calculate IdFromLongTermId Rop size
+
+   \param response pointer to the IdFromLongTermId EcDoRpc_MAPI_REPL structure
+
+   \return Size of IdFromLongTermId response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopIdFromLongTermId_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPIDFROMLONGTERMID;
+
+	return size;	
+}
+
+/**
+   \details Calculate GetPerUserLongTermIds Rop size
+
+   \param response pointer to the GetPerUserLongTermIds EcDoRpc_MAPI_REPL structure
+
+   \return Size of GetPerUserLongTermIds response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopGetPerUserLongTermIds_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+	uint16_t	i;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPGETPERUSERLONGTERMIDS;
+
+	for (i = 0; i < response->u.mapi_GetPerUserLongTermIds.LongTermIdCount; i++) {
+		size += libmapiserver_LongTermId_size();
+	}
+	
+
+	return size;
+}
+
+/**
+   \details Calculate ReadPerUserInformation Rop size
+
+   \param response pointer to the ReadPerUserInformation EcDoRpc_MAPI_REPL structure
+
+   \return Size of ReadPerUserInformation response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopReadPerUserInformation_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPREADPERUSERINFORMATION;
+
+	if (response->u.mapi_ReadPerUserInformation.DataSize) {
+		size += response->u.mapi_ReadPerUserInformation.DataSize;
+	}
+
+	return size;
+}
+
+/**
+   \details Calculate GetPerUserLongTermIds Rop size
+
+   \param response pointer to the GetPerUserLongTermIds EcDoRpc_MAPI_REPL structure
+
+   \return Size of GetPerUserLongTermIds response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopGetPerUserGuid_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPGETPERUSERGUID;
+
+	return size;
+}
+
+/**
+   \details Calculate GetStoreState Rop size
+
+   \param response pointer to the GetStoreState EcDoRpc_MAPI_REPL structure
+
+   \return Size of GetStoreState response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopGetStoreState_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += SIZE_DFLT_ROPGETSTORESTATE;
+
+	return size;
+}
+
+/**
+   \details Calculate GetReceiveFolderTable ROP size
+
+   \param response pointer to the GetReceiveFolderTable EcDoRpc_MAPI_REPL structure
+
+   \return Size of GetPerUserLongTermIds response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopGetReceiveFolderTable_size(struct EcDoRpc_MAPI_REPL *response)
+{
+	int 		i = 0;
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+
+	if (!response || response->error_code) {
+		return size;
+	}
+
+	size += sizeof(uint32_t); /* cValues */
+	for (i = 0; i < response->u.mapi_GetReceiveFolderTable.cValues; ++i) {
+		size += sizeof(uint8_t); /* flag */
+		size += sizeof(uint64_t); /* fid */
+		size += strlen(response->u.mapi_GetReceiveFolderTable.entries[i].lpszMessageClass) + 1;
+		size += sizeof(struct FILETIME); /* modiftime */
+	}
 
 	return size;
 }

@@ -17,8 +17,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/proto_private.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
 
 
 /**
@@ -36,7 +36,7 @@
    monitored in as a bitmask.
 
    \param obj the object to get notifications for
-   \param connection connection identifier for callabck function
+   \param connection connection identifier for callback function
    \param NotificationFlags mask for events to provide notifications
    for (see below)
    \param WholeStore whether the scope for this notification is whole
@@ -91,7 +91,6 @@ _PUBLIC_ enum MAPISTATUS Subscribe(mapi_object_t *obj, uint32_t	*connection,
 	uint8_t 			logon_id = 0;
 
 	/* Sanity Checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!connection, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!obj, MAPI_E_INVALID_PARAMETER, NULL);
 
@@ -102,7 +101,7 @@ _PUBLIC_ enum MAPISTATUS Subscribe(mapi_object_t *obj, uint32_t	*connection,
 	if ((retval = mapi_object_get_logon_id(obj, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "Subscribe");
+	mem_ctx = talloc_named(session, 0, "Subscribe");
 
 	/* Fill the Subscribe operation */
 	request.handle_idx = 0x1;
@@ -138,7 +137,7 @@ _PUBLIC_ enum MAPISTATUS Subscribe(mapi_object_t *obj, uint32_t	*connection,
 	mapi_request->handles[0] = mapi_object_get_handle(obj);
 	mapi_request->handles[1] = 0xffffffff;
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -203,7 +202,6 @@ _PUBLIC_ enum MAPISTATUS Unsubscribe(struct mapi_session *session, uint32_t ulCo
 	struct notifications	*notification;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!session->notify_ctx, MAPI_E_INVALID_PARAMETER, NULL);
 
@@ -230,7 +228,8 @@ enum MAPISTATUS ProcessNotification(struct mapi_notify_ctx *notify_ctx,
 	void			*NotificationData;
 	uint32_t		i;
 
-	if (!mapi_response || !mapi_response->mapi_repl) return MAPI_E_INVALID_PARAMETER;
+	OPENCHANGE_RETVAL_IF(!mapi_response, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_SUCCESS, NULL);
 
 	for (i = 0; mapi_response->mapi_repl[i].opnum; i++) {
 		if (mapi_response->mapi_repl[i].opnum == op_MAPI_Notify) {
@@ -348,7 +347,6 @@ _PUBLIC_ enum MAPISTATUS DispatchNotifications(struct mapi_session *session)
 	NTSTATUS		status;
 
 	/* sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!session->notify_ctx, MAPI_E_INVALID_PARAMETER, NULL);
 
@@ -403,23 +401,24 @@ _PUBLIC_ enum MAPISTATUS MonitorNotification(struct mapi_session *session, void 
         mapi_notify_continue_callback_t callback;
 	void                    *data;
 	struct timeval          *tv;
+	struct timeval          tvi;
 	enum MAPISTATUS		retval;
 
 	/* sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!session->notify_ctx, MAPI_E_INVALID_PARAMETER, NULL);
 
 	notify_ctx = session->notify_ctx;
 	callback = cb_data ? cb_data->callback : NULL;
 	data = cb_data ? cb_data->data : NULL;
-	tv = cb_data ? &cb_data->tv : NULL;
+	tv = cb_data ? &tvi : NULL;
 
 	nread = 0;
 	is_done = 0;
 	while (!is_done) {
-	        FD_ZERO(&read_fds);
+		FD_ZERO(&read_fds);
 		FD_SET(notify_ctx->fd, &read_fds);
+		if( cb_data ) tvi = cb_data->tv;
 
 		err = select(notify_ctx->fd + 1, &read_fds, NULL, NULL, tv);
 		if (FD_ISSET(notify_ctx->fd, &read_fds)) {

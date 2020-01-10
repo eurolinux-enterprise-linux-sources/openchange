@@ -35,10 +35,10 @@
 #include <talloc.h>
 #include <dcerpc.h>
 
-#include <gen_ndr/exchange.h>
+#include "gen_ndr/exchange.h"
 
 #include <dcerpc_server.h>
-#include <util.h>
+#include <samba_util.h>
 #include <param.h>
 
 #include "gen_ndr/ndr_exchange.h"
@@ -748,10 +748,10 @@ void dcesrv_EcRNetGetDCName(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_
 /* 
   EcDoRpcExt 
 */
-void dcesrv_EcDoRpcExt(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
-		       struct EcDoRpcExt *r)
+enum MAPISTATUS dcesrv_EcDoRpcExt(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
+				  struct EcDoRpcExt *r)
 {
-	DCESRV_FAULT_VOID(DCERPC_FAULT_OP_RNG_ERROR);
+	DCESRV_FAULT(DCERPC_FAULT_OP_RNG_ERROR);
 }
 
 /* 
@@ -768,6 +768,42 @@ enum MAPISTATUS dcesrv_EcDoConnectEx(struct dcesrv_call_state *dce_call, TALLOC_
  */
 enum MAPISTATUS dcesrv_EcDoRpcExt2(struct dcesrv_call_state  *dce_call, TALLOC_CTX *mem_ctx,
 				   struct EcDoRpcExt2 *r)
+{
+	DCESRV_FAULT(DCERPC_FAULT_OP_RNG_ERROR);
+}
+
+/*
+  EcDoUnknown0xc
+ */
+void dcesrv_EcUnknown0xC(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
+			struct EcUnknown0xC *r)
+{
+	DCESRV_FAULT_VOID(DCERPC_FAULT_OP_RNG_ERROR);
+}
+
+/*
+  EcDoAsyncConnectEx
+ */
+void dcesrv_EcUnknown0xD(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
+			 struct EcUnknown0xD *r)
+{
+	DCESRV_FAULT_VOID(DCERPC_FAULT_OP_RNG_ERROR);
+}
+
+/*
+  EcDoAsyncConnectEx
+ */
+enum MAPISTATUS dcesrv_EcDoAsyncConnectEx(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
+					  struct EcDoAsyncConnectEx *r)
+{
+	DCESRV_FAULT(DCERPC_FAULT_OP_RNG_ERROR);
+}
+
+/*
+  endpoint server for the exchange_async_emsmdb pipe
+ */
+enum MAPISTATUS dcesrv_EcDoAsyncWaitEx(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
+				       struct EcDoAsyncWaitEx *r)
 {
 	DCESRV_FAULT(DCERPC_FAULT_OP_RNG_ERROR);
 }

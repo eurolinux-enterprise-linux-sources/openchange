@@ -19,7 +19,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
 #include "utils/mapitest/mapitest.h"
 #include "utils/mapitest/proto.h"
 
@@ -31,11 +30,12 @@
 
 
 /**
-   \details Test the AddressTypes (0x49) operation
+   \details Test the AddressTypes (0x49) and OptionsData (0x6f) operations
 
    This function:
    -# Log on the user private mailbox
    -# Call the AddressTypes operation
+   -# Call the OptionsData operation on each address type
 
    \param mt pointer on the top-level mapitest structure
 
@@ -48,6 +48,16 @@ _PUBLIC_ bool mapitest_oxomsg_AddressTypes(struct mapitest *mt)
 	uint16_t		cValues;
 	struct mapi_LPSTR	*transport = NULL;
 	uint32_t		i;
+	uint8_t			*optData;
+	uint16_t		OptionsDataLength;
+	uint8_t			*helpData;
+	uint16_t		HelpFileLength;
+	const char*		HelpFileName;
+	bool                    result = true;
+	/* 
+	uint8_t			txt[1024];
+	uint32_t		j;
+	*/
 
 	/* Step 1. Logon */
 	mapi_object_init(&obj_store);
@@ -64,12 +74,42 @@ _PUBLIC_ bool mapitest_oxomsg_AddressTypes(struct mapitest *mt)
 	
 	for (i = 0; i < cValues; i++) {
 		mapitest_print(mt, "* Recipient Type: %s\n", transport[i].lppszA);
+		retval = OptionsData(&obj_store, transport[i].lppszA, &optData, &OptionsDataLength,
+				     &helpData, &HelpFileLength, &HelpFileName);
+		mapitest_print_retval(mt, "OptionsData");
+		if (retval != MAPI_E_SUCCESS) {
+			result = false;
+		}
+
+		mapitest_print(mt, "** Size of Options Data: %i\n", OptionsDataLength);
+
+		/* Just noise to print this out */
+		/*
+		for (j = 0; j < OptionsDataLength; ++j) {
+			printf("0x%02x ", optData[j]);
+			if (isprint(optData[j])) {
+				txt[j%16] = optData[j];
+			} else {
+				txt[j%16] = '.';
+			}
+			txt[16] = '\0';
+			if (((j+1) % 16) == 0) { 
+				printf("   %s\n", txt);
+			}
+		}
+		txt[(j%16)+1] = '\0';
+		printf(" %s\n", txt);
+		*/
+		mapitest_print(mt, "** Size of Help Data: %i\n", HelpFileLength);
+
+		mapitest_print(mt, "** Help Data file name: %s\n", HelpFileName);
+
 	}
 
 	/* Release */
 	mapi_object_release(&obj_store);
 
-	return true;
+	return result;
 }
 
 
@@ -90,7 +130,6 @@ _PUBLIC_ bool mapitest_oxomsg_AddressTypes(struct mapitest *mt)
  */
 _PUBLIC_ bool mapitest_oxomsg_SubmitMessage(struct mapitest *mt)
 {
-	enum MAPISTATUS		retval;
 	mapi_object_t		obj_store;
 	mapi_object_t		obj_folder;
 	mapi_object_t		obj_message;
@@ -100,19 +139,19 @@ _PUBLIC_ bool mapitest_oxomsg_SubmitMessage(struct mapitest *mt)
 	
 	/* Step 1. Logon */
 	mapi_object_init(&obj_store);
-	retval = OpenMsgStore(mt->session, &obj_store);
+	OpenMsgStore(mt->session, &obj_store);
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
 	}
 
 	/* Step 2. Open Outbox folder */
-	retval = GetDefaultFolder(&obj_store, &id_folder, olFolderOutbox);
+	GetDefaultFolder(&obj_store, &id_folder, olFolderOutbox);
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
 	}
 
 	mapi_object_init(&obj_folder);
-	retval = OpenFolder(&obj_store, id_folder, &obj_folder);
+	OpenFolder(&obj_store, id_folder, &obj_folder);
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
 	}
@@ -125,7 +164,7 @@ _PUBLIC_ bool mapitest_oxomsg_SubmitMessage(struct mapitest *mt)
 	}
 
 	/* Step 4. Submit Message */
-	retval = SubmitMessage(&obj_message);
+	SubmitMessage(&obj_message);
 	mapitest_print_retval(mt, "SubmitMessage");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
@@ -133,7 +172,7 @@ _PUBLIC_ bool mapitest_oxomsg_SubmitMessage(struct mapitest *mt)
 
 	/* Step 5. Delete Message */
 	id_msgs[0] = mapi_object_get_id(&obj_message);
-	retval = DeleteMessage(&obj_folder, id_msgs, 1);
+	DeleteMessage(&obj_folder, id_msgs, 1);
 	mapitest_print_retval(mt, "DeleteMessage");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
@@ -192,6 +231,9 @@ _PUBLIC_ bool mapitest_oxomsg_AbortSubmit(struct mapitest *mt)
 	
 	/* Step 1. Logon */
 	mapi_object_init(&obj_store);
+	mapi_object_init(&obj_folder);
+	mapi_object_init(&obj_message);
+
 	retval = OpenMsgStore(mt->session, &obj_store);
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		ret = false;
@@ -205,7 +247,6 @@ _PUBLIC_ bool mapitest_oxomsg_AbortSubmit(struct mapitest *mt)
 		goto cleanup;
 	}
 
-	mapi_object_init(&obj_folder);
 	retval = OpenFolder(&obj_store, id_folder, &obj_folder);
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		ret = false;
@@ -213,7 +254,6 @@ _PUBLIC_ bool mapitest_oxomsg_AbortSubmit(struct mapitest *mt)
 	}
 
 	/* Step 3. Create the sample message */
-	mapi_object_init(&obj_message);
 	ret = mapitest_common_message_create(mt, &obj_folder, &obj_message, MT_MAIL_SUBJECT);
 	if (ret == false) {
 		goto cleanup;
@@ -281,18 +321,17 @@ mapitest_oxomsg_AbortSubmit_bailout:
  */
 _PUBLIC_ bool mapitest_oxomsg_SetSpooler(struct mapitest *mt)
 {
-	enum MAPISTATUS		retval;
 	mapi_object_t		obj_store;
 	
 	/* Step 1. Logon */
 	mapi_object_init(&obj_store);
-	retval = OpenMsgStore(mt->session, &obj_store);
+	OpenMsgStore(mt->session, &obj_store);
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
 	}
 
 	/* Step 2. SetSpooler */
-	retval = SetSpooler(&obj_store);
+	SetSpooler(&obj_store);
 	mapitest_print_retval(mt, "SetSpooler");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
@@ -460,14 +499,14 @@ _PUBLIC_ bool mapitest_oxomsg_TransportSend(struct mapitest *mt)
 	}
 
 	/* Step 6. Dump the properties */
-	if (&lpProps != NULL) {
+	if (lpProps.lpProps != NULL) {
 		uint32_t		i;
 		struct SPropValue	lpProp;
 
 		lpProp.dwAlignPad = 0;
 		for (i = 0; i < lpProps.cValues; i++) {
-			cast_SPropValue(&lpProps.lpProps[i], &lpProp);
-			mapidump_SPropValue(lpProp, "\t* ");
+			cast_SPropValue(mt->mem_ctx, &lpProps.lpProps[i], &lpProp);
+			mapitest_print_SPropValue(mt, lpProp, "\t* ");
 		}
 		MAPIFreeBuffer(lpProps.lpProps);
 	}
@@ -526,10 +565,13 @@ _PUBLIC_ bool mapitest_oxomsg_TransportNewMail(struct mapitest *mt)
 
 	context = mt->priv;
 
+	retval = SetSpooler(&(context->obj_store));
+
 	/* Perform the TransportNewMail operation */
 	for (i = 0; i<10; ++i) {
-		retval = TransportNewMail(&(context->obj_test_folder), &(context->obj_test_msg[i]), "IPM.Note", MSGFLAG_SUBMIT);
-		mapitest_print_retval(mt, "TransportNewMail");
+		retval = TransportNewMail(&(context->obj_store), &(context->obj_test_folder), &(context->obj_test_msg[i]),
+					  "IPM.Note", 0x00000008);
+		mapitest_print_retval_clean(mt, "TransportNewMail", retval);
 		if (retval != MAPI_E_SUCCESS) {
 			ret = false;
 		}
@@ -558,7 +600,7 @@ _PUBLIC_ bool mapitest_oxomsg_GetTransportFolder(struct mapitest *mt)
 {
 	enum MAPISTATUS		retval;
 	mapi_object_t		obj_store;
-	mapi_id_t		folder_id;
+	mapi_id_t		folder_id = 0;
 
 	/* Step 1. Logon */
 	mapi_object_init(&obj_store);
@@ -571,7 +613,8 @@ _PUBLIC_ bool mapitest_oxomsg_GetTransportFolder(struct mapitest *mt)
 	/* Step 2. Get the transport folder */
 	retval = GetTransportFolder(&obj_store, &folder_id);
 	mapitest_print_retval_fmt(mt, "GetTransportFolder", "(0x%llx)", folder_id);
-	if (GetLastError() != MAPI_E_SUCCESS) {
+	if (retval != MAPI_E_SUCCESS) {
+		mapi_object_release(&obj_store);
 		return false;
 	}
 

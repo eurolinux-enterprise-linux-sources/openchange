@@ -1,7 +1,7 @@
 /*
    OpenChange OCPF (OpenChange Property File) implementation.
 
-   Copyright (C) Julien Kerihuel 2008.
+   Copyright (C) Julien Kerihuel 2008-2010.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 #ifndef __OCPF_API_H_
 #define	__OCPF_API_H_
 
-#include <libmapi/libmapi.h>
+#include "libmapi/libmapi.h"
 
 struct ocpf_var
 {
@@ -76,53 +76,71 @@ struct ocpf_nproperty
 	const void		*value;
 };
 
-enum ocpf_recipClass {
-	OCPF_MAPI_TO = 0x1,
-	OCPF_MAPI_CC,
-	OCPF_MAPI_BCC
-};
-
-struct ocpf_recipients
-{
-	struct ocpf_recipients	*prev;
-	struct ocpf_recipients	*next;
-	char			*name;
-	enum ocpf_recipClass	class;
-};
-
-struct ocpf
-{
-	TALLOC_CTX		*mem_ctx;
-	const char		*type;
-	struct ocpf_var		*vars;
-	struct ocpf_oleguid    	*oleguid;
-	struct ocpf_property	*props;
-	struct ocpf_nproperty	*nprops;
-	struct ocpf_recipients	*recipients;
-	const char		*filename;
-	struct SPropValue	*lpProps;
-	uint32_t		cValues;
-	uint64_t		folder;
-};
-
-
 struct ocpf_olfolder
 {
 	int			id;
 	const char		*name;
 };
 
-#include <libocpf/proto_private.h>
+struct ocpf_context
+{
+	/* lexer internal data */
+	int			typeset;
+	bool			folderset;
+	uint8_t			recip_type;
+	uint16_t		ltype;
+	union SPropValue_CTR	lpProp;
+	struct Binary_r		bin;
+	struct ocpf_nprop	nprop;
+	unsigned int		lineno;
+	int			result;
+	/* ocpf */
+	const char		*type;
+	struct ocpf_var		*vars;
+	struct ocpf_oleguid    	*oleguid;
+	struct ocpf_property	*props;
+	struct ocpf_nproperty	*nprops;
+	struct SRowSet		*recipients;
+	struct SPropValue	*lpProps;
+	uint32_t		cValues;
+	uint64_t		folder;
+	/* context */
+	FILE			*fp;
+	const char		*filename;
+	uint32_t		ref_count;
+	uint32_t		context_id;
+	uint8_t			flags;
+	struct ocpf_context	*prev;
+	struct ocpf_context	*next;
+};
+
+struct ocpf_freeid
+{
+	uint32_t		context_id;
+	struct ocpf_freeid	*prev;
+	struct ocpf_freeid	*next;
+};
+
+struct ocpf
+{
+	TALLOC_CTX		*mem_ctx;
+	struct ocpf_context	*context;
+	struct ocpf_freeid	*free_id;
+	uint32_t		last_id;
+};
+
+
+#include "libocpf/ocpf_private.h"
 
 /**
  * Defines
  */
-#define	OCPF_WARN(x) (ocpf_do_debug x)				
+#define	OCPF_WARN(c,x) (ocpf_do_debug(c, x))				
 
-#define	OCPF_RETVAL_IF(x, msg, mem_ctx)  		       	\
+#define	OCPF_RETVAL_IF(x, c, msg, mem_ctx)  		       	\
 do {								\
 	if (x) {						\
-		OCPF_WARN(("%s", msg));				\
+		ocpf_do_debug(c, "%s", msg);			\
 		if (mem_ctx) {					\
 			talloc_free(mem_ctx);			\
 		}						\
@@ -130,13 +148,26 @@ do {								\
 	}							\
 } while (0);
 
+#define	OCPF_RETVAL_TYPE(x, c, msg, t, mem_ctx)			\
+do {								\
+	if (x) {						\
+		ocpf_do_debug(c, "%s", msg);			\
+		if (mem_ctx) {					\
+			talloc_free(mem_ctx);			\
+		}						\
+		return t;					\
+	}							\
+} while (0);
+
 #define	OCPF_INITIALIZED		"OCPF context has already been initialized"
 #define	OCPF_NOT_INITIALIZED		"OCPF context has not been initialized"
+#define	OCPF_INVALID_CONTEXT		"Invalid OCPF context"
 
 #define	OCPF_WRITE_NOT_INITIALIZED	"OCPF write context has not been initialized"
 
 #define	OCPF_FATAL_ERROR		"Fatal error encountered"
 #define	OCPF_WARN_FILENAME_INVALID	"Invalid filename"
+#define	OCPF_WARN_FILENAME_EXIST	"filename already exists"
 #define	OCPF_WARN_FILENAME_STAT		"Unable to stat file"
 
 #define	OCPF_WARN_PROP_REGISTERED	"Property already registered"
@@ -169,14 +200,16 @@ do {								\
 #define	OCPF_INVALID_PROPARRAY		"Invalid property array"
 #define	OCPF_INVALID_FILEHANDLE		"Invalid file handle"
 
+#define	OCPF_INVALID_RECIPIENTS		"Invalid recipients"
 
 #define	OCPF_PROPERTY_BEGIN		"PROPERTY {\n"
 #define	OCPF_NPROPERTY_BEGIN		"NPROPERTY {\n"
 #define	OCPF_END			"};\n"
 #define	OCPF_NEWLINE			"\n"
-#define	OCPF_RECIPIENT_TO		"RECIPIENT TO "
-#define	OCPF_RECIPIENT_CC		"RECIPIENT CC "
-#define	OCPF_RECIPIENT_BCC		"RECIPIENT BCC "
+#define	OCPF_RECIPIENT_BEGIN		"RECIPIENT {\n"
+#define	OCPF_RECIPIENT_TO		"TO {\n"
+#define	OCPF_RECIPIENT_CC		"CC {\n"
+#define	OCPF_RECIPIENT_BCC		"BCC {\n"
 
 #define	DATE_FORMAT     "%Y-%m-%d %H:%M:%S"
 

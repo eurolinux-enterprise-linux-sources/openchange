@@ -1,7 +1,7 @@
 /*
    OpenChange MAPI implementation.
 
-   Copyright (C) Julien Kerihuel 2007-2008.
+   Copyright (C) Julien Kerihuel 2007-2011.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,8 +17,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/proto_private.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
 
 
 /**
@@ -30,7 +30,8 @@
 
 /**
    \details Allocate memory using the MAPI memory context
-
+   
+   \param mapi_ctx pointer to the MAPI context
    \param size the number of bytes to allocate
    \param ptr pointer to the allocated byte region
 
@@ -46,15 +47,15 @@
 
    \sa MAPIFreeBuffer, GetLastError
 */
-_PUBLIC_ enum MAPISTATUS MAPIAllocateBuffer(uint32_t size, void **ptr)
+_PUBLIC_ enum MAPISTATUS MAPIAllocateBuffer(struct mapi_context *mapi_ctx, uint32_t size, void **ptr)
 {
 	TALLOC_CTX	*mem_ctx;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
+	OPENCHANGE_RETVAL_IF(!mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!size, MAPI_E_INVALID_PARAMETER, NULL);
 
-	mem_ctx = (TALLOC_CTX *) global_mapi_ctx->mem_ctx;
+	mem_ctx = (TALLOC_CTX *) mapi_ctx->mem_ctx;
 
 	*ptr = talloc_size(mem_ctx, size);
 	OPENCHANGE_RETVAL_IF(!ptr, MAPI_E_NOT_ENOUGH_RESOURCES, NULL);
@@ -122,14 +123,13 @@ _PUBLIC_ enum MAPISTATUS Release(mapi_object_t *obj)
 	uint8_t 		logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	session = mapi_object_get_session(obj);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 
 	if ((retval = mapi_object_get_logon_id(obj, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "Release");
+	mem_ctx = talloc_named(session, 0, "Release");
 
 	/* Fill the MAPI_REQ request */
 	mapi_req = talloc_zero(mem_ctx, struct EcDoRpc_MAPI_REQ);
@@ -146,10 +146,12 @@ _PUBLIC_ enum MAPISTATUS Release(mapi_object_t *obj)
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 
-	OPENCHANGE_CHECK_NOTIFICATION(session, mapi_response);
+	if (mapi_response->mapi_repl) {
+		OPENCHANGE_CHECK_NOTIFICATION(session, mapi_response);
+	}
 
 	talloc_free(mapi_response);
 	talloc_free(mem_ctx);
@@ -165,12 +167,13 @@ _PUBLIC_ enum MAPISTATUS Release(mapi_object_t *obj)
    This function returns the error code set by a previous function
    call.
 
-   \note Calls to the function won't work in multi-threaded or
-   multisession code.
+   \note Calls to this function may not work reliably in multi-threaded or
+   multisession code. We suggest you capture the return value of the call,
+   and check that instead.
 */
 _PUBLIC_ enum MAPISTATUS GetLastError(void)
 {
-	return errno;
+  return (enum MAPISTATUS)errno;
 }
 
 
@@ -210,7 +213,6 @@ _PUBLIC_ enum MAPISTATUS GetLongTermIdFromId(mapi_object_t *obj, mapi_id_t id,
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
@@ -218,7 +220,7 @@ _PUBLIC_ enum MAPISTATUS GetLongTermIdFromId(mapi_object_t *obj, mapi_id_t id,
 	if ((retval = mapi_object_get_logon_id(obj, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "LongTermIdFromId");
+	mem_ctx = talloc_named(session, 0, "LongTermIdFromId");
 
 	/* Fill the LongTermIdFromId operation */
 	request.Id = id;
@@ -240,7 +242,7 @@ _PUBLIC_ enum MAPISTATUS GetLongTermIdFromId(mapi_object_t *obj, mapi_id_t id,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -297,7 +299,6 @@ _PUBLIC_ enum MAPISTATUS GetIdFromLongTermId(mapi_object_t *obj, struct LongTerm
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
@@ -305,7 +306,7 @@ _PUBLIC_ enum MAPISTATUS GetIdFromLongTermId(mapi_object_t *obj, struct LongTerm
 	if ((retval = mapi_object_get_logon_id(obj, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "IdFromLongTermId");
+	mem_ctx = talloc_named(session, 0, "IdFromLongTermId");
 	size = 0;
 
 	/* Fill the IdFromLongTermId operation */
@@ -328,7 +329,7 @@ _PUBLIC_ enum MAPISTATUS GetIdFromLongTermId(mapi_object_t *obj, struct LongTerm
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;

@@ -1,5 +1,1878 @@
+2010-08-29
+    jkerihuel
+	[r2144]
+		Add CopyProfile and DuplicateProfile to IProfAdmin interface
+
+2010-08-27
+    jkerihuel
+	[r2142]
+		Add the localaddress patch prior Samba4 integration. Pending new
+		Samba4 localaddress patch fixing memory leaks in the pipe.
+	[r2141]
+		Include a mapitest test suite / challenge for lzxpress
+		
+		The idea of this test is to check if lzxpress compressed blobs
+		provided by OpenChange are the same than Outlook ones. The test takes
+		a Outlook->Exchange capture file with compressed blob, pull the
+		content, decompressed the content, recompress the content and check
+		the output for differing bytes.
+		
+		This challenge code should give us good information when lzxpress
+		compress code is fixed. Additionally you can uncomment the compression
+		code in libmapi/emsmdb.c to do further testing.
+	[r2140]
+		- Add implementation for EcDoRpcExt2 (0xB) RPC opnum. Current code
+		  doesn't provide compression for request and use obfuscation
+		  instead. However mapi_response makes use of xpress and are
+		  decompressed properly.
+		
+		- EcDoRpcExt2 implemented without subcontexts but uint8_t array
+		
+		- add a wrapper for emsmdb transaction to switch between
+		  EcDoConnect/EcDoRpc and EcDoConnectEx/EcDoRpcExt2 depending on MAPI
+		  profile 'exchange version' attribute.
+		
+		NOTE: emsmdb.c implements the logic for using compressed blob and
+		checks whether compressed or obfuscation should be used depending on
+		blob length. However this behavior has been commented out because
+		comrpessed blobs are rejected by Exchange (ecRpcFormat 0x4B6 error).
+2010-08-26
+    jkerihuel
+	[r2139]
+		Reference profile structure in mapitest structure.
+		
+		Use profile->mailbox instead of szDisplayName for sending mapitest
+		emails. This also fix ResolveNames mapitest issues when conflicts
+		between usernames exist (e.g. user1, user11, user100).
+    bradh
+	[r2137]
+		Prevent segfault if we don't have any appointments.
+		
+		Resolves issue #284.
+		
+		Also prevent leaking talloc context in a couple of error cases.
+	[r2136]
+		Merge Rev 2133 from branches/current-samba4 to trunk.
+		
+		I inadvertently committed this to the wrong branch.
+		
+		This pushes the fix for #229 into trunk.
+
+2010-08-23
+    jelmer
+	[r2134]
+		Update bzr ignores.
+
+2010-08-18
+    jkerihuel
+	[r2131]
+		Add a git update case in installsamba.sh script and make it available
+		within OpenChange Makefile.
+
+2010-08-17
+    jkerihuel
+	[r2127]
+		Manually commit remaining changes from current-samba4 into trunk
+	[r2126]
+		Merge current-samba4 branch back into trunk
+
+2010-08-11
+    bradh
+	[r2117]
+		Microsoft confirmed that RopGetValidAttachments isn't supported in Exchange 2010.
+	[r2114]
+		fix missing part of r2113.
+	[r2113]
+		Fixes to better work with Exchange 2010.
+		
+		Still some open issues to resolving bug 227.
+	[r2112]
+		Fix handling of "not applicable" tests when using --mapi-calls
+		
+		Prior to this, if you asked for a test that was after a test that was
+		flagged as suppressed, the test you asked for didn't get run, and the
+		flagged test was reported instead.
+2010-08-10
+    bradh
+	[r2111]
+		Correctly handle cases where the start date of the range is after the first calendar appointment.
+		
+		Resolves bug:272.
+		
+		Thanks to Eric Reischer for reporting the problem and testing the fix.
+
+2010-08-03
+    bradh
+	[r2107]
+		trivial comment cleanup.
+
+2010-08-01
+    jkerihuel
+	[r2105]
+		Move from auto-generated mapicode.h to static code.
+	[r2104]
+		Add configure.ac support for gthread implementation but give preferences to pthread
+		Add THREAD_CFLAGS to config.mk.in
+		ifdef between pthread and gthread in libmapi_private.h
+	[r2103]
+		Check for libpthread in configure.ac and make this lib optional
+		Add references to config.h in libmapi_private.h
+		Replace references to config.h with libmapi_private.h
+
+2010-07-31
+    jkerihuel
+	[r2101]
+		- Add an exchange-version parameter to mapiprofile structure and tool
+		  which let user choose between 0x0/0x2 or 0xA/0xB
+		- Tweak libmapi implementation to allow EcDoConnectEx usage
+		- Improve mapiprofile --dump to show more useful parameters
+	[r2100]
+		- Add custom NDR implementation for EcDoConnectEx to bypass pointers/array problems
+		- make use of mapi2k7_AuxInfo structure for rgbAuxOut
+		
+		- Create a subcontext for AUX_HEADER structures to jump over unknown cases properly.
+	[r2099]
+		Handle the no obfuscation nor compression RPC_HEADER_EXT flags case 
+    bradh
+	[r2098]
+		Trivial api documentation change.
+
+2010-07-29
+    bradh
+	[r2095]
+		Another trivial API documentation fix.
+	[r2094]
+		More trivial API documentation fixes.
+	[r2093]
+		Minor API documentation fix.
+	[r2092]
+		Implement some null pointer checks.
+		
+		Also rewords some API documentation.
+		
+		Original issue and patch by Erik Hovland - thanks again. I implemented it
+		with some slight changes.
+
+2010-07-28
+    bradh
+	[r2090]
+		Fix RecipientRow IDL to match MS-OXCDATA 2.9.3
+		
+		This allows handling of addresses that contain X400 format content.
+		
+		Patch by Samuel Sieb and I, resolves ticket #250.
+
+2010-07-26
+    jkerihuel
+	[r2087]
+		Fix a crash in openchangeclient vs Exchange 2010:
+		When Queryrows is called on Exchange 2010 and no rows are available, QueryRows returns MAPI_E_NOT_IMPLEMENTED error (0x8004FFFF).
+		Ensure we have at least one message to fetch in openchangeclient --fetchmail prior calling QueryRows.
+
+2010-07-24
+    jkerihuel
+	[r2079]
+		Very basic use of OpenUserMailbox in openchangeclient.
+		Doesn't handle clustered Exchange servers.
+    bradh
+	[r2077]
+		Rename a few function arguments to avoid doxygen warnings.
+		
+		This is a workaround, but will allow easier checking for the future.
+	[r2076]
+		Update doxygen configuration to match latest version
+	[r2075]
+		Add missing doxygen parameter information.
+	[r2074]
+		Fix a couple of doxygen issues.
+
+2010-07-23
+    jkerihuel
+	[r2072]
+		Use sed in Makefile to replace local headers reference in installed headers
+	[r2071]
+		Use local headers rather than installed ones
+		Propagate this behavior to torture test suites and bindings
+	[r2070]
+		Remove libmapi/defs_private.h
+		Remove references to libmapi/defs_private.h in OpenChange tree
+	[r2069]
+		Remove auto-generated headers for libmapi:
+		- Add libmapi_private.h for private definitions
+		- Use libmapi.h for public definitions
+		
+		- Merge libmapi_private.h and defs_private.h
+		
+		Use local headers rather than installed ones
+		
+		Change libmapi compilation list to have ndr_exchange_c.h 
+		available for other libmapi C files.
+		
+		Remove references to libmapi/proto_private.h in OpenChange tree
+		Remove references to libmapi/defs_private.h in OpenChange tree
+
+2010-07-20
+    bradh
+	[r2065]
+		Modify the samba build script to make it more flexible.
+		
+		Heavily based on changes provided by Andrew Tridgell. Thanks!
+
+2010-07-15
+    jkerihuel
+	[r2063]
+		Use local includes rather than installed ones for openchange tools/utils
+	[r2062]
+		Use local includes rather than installed ones for mparse.pl
+	[r2061]
+		Use local includes rather than installed ones for mapiproxy and server components
+	[r2060]
+		Use local includes rather than installed ones
+	[r2059]
+		Use local includes rather than installed ones for libexchange2ical
+		Sanitize function declarations
+	[r2058]
+		Remove proto and proto_private.h from ignore list
+	[r2057]
+		Remove auto-generated headers for libmapiadmin
+		Use local includes rather than installed ones for libmapiadmin
+	[r2056]
+		Remove proto and proto_private.h from ignore list
+	[r2055]
+		Remove auto-generated headers for libocpf
+		Use local includes rather than installed ones for libocpf
+	[r2054]
+		Fix bug #248 misnamed PR_RECIPIENTS_FLAGS
+	[r2053]
+		Add IDL implementation for WritePerUserInformation.
+		
+		Note: This IDL suffers from the same problems than SetMessageReadFlags. It depends on logon_id and Logon flags.
+
+2010-07-14
+    jkerihuel
+	[r2051]
+		Add server-side preliminary ReloadCachedInformation implementation.
+		The Rop only support a specific case and it is expected to work better after
+		integration of the OCPF contexts for message transaction.
+	[r2050]
+		Missing header for stat()
+
+2010-07-06
+    bradh
+	[r2048]
+		Implement RopSetReceiveFolder
+		
+		There is a part of this missing (relating to modification times) that will be implemented
+		as part of the RopGetReceiveFolderTable implementation.
+		
+		This updates the mapitest code, including a change to the function signature for the
+		mapitest_print_retval_step() function to take an explicit MAPISTATUS value instead of
+		relying on GetLastError().
+
+2010-07-04
+    bradh
+	[r2046]
+		Enhance the GetReceiveFolder ROP.
+		
+		This now tries all available MessageClass entries.
+	[r2045]
+		Enhance GetReceiveFolder mapitest.
+
+2010-07-03
+    bradh
+	[r2043]
+		Make sure objects are correctly init()'d and release()'d even in fault condition.
+	[r2042]
+		Make sure objects are correctly init()'d and release()'d even in failure case.
+	[r2041]
+		Make sure all objects are initialised, even in failure cases.
+	[r2040]
+		Trivial comment change.
+	[r2039]
+		Add a few more null pointer protections into fsocpf backend.
+		
+		Trying to get mapitest running...
+
+2010-07-02
+    bradh
+	[r2037]
+		Add mapitest unit test for DeleteMessages with multiple messages.
+	[r2036]
+		Implement DeleteMessages ROP.
+		
+		Adds message deletion support to mapistore core and fsocpf backend.
+		
+		I've been testing this with OXCMSG-SAVE-CHANGES-MESSAGE from mapitest. 
+	[r2035]
+		Make it a bit easier to use alternative GIT tree.
+	[r2034]
+		Ensure we return the correct MID from SaveChangesMessage
+
+2010-06-28
+    jkerihuel
+	[r2031]
+		Fix a segfault when releasing handles. We kept 
+		processing the handles list after releasing the element.
+    bradh
+	[r2030]
+		Add some simple tests for openchangeclient.
+	[r2029]
+		Unbreak compilation problems from previous commit.
+	[r2028]
+		Ensure we don't duplicate folder names.
+		
+		This adds appropriate checks for both system (openchangedb) and normal (mapistore)
+		folders. The mapitest code also checks that the OPEN_IF_EXISTS flag works. 
+		
+		I had to add an additional mapitest_print_retval() variation, since successful operations
+		don't reset errno.
+
+2010-06-26
+    jkerihuel
+	[r2026]
+		add support for PT_CLSID and PT_SVREID in cast_mapi_SPropValue
+	[r2024]
+		Add a memory context argument to cast_mapi_SPropValue to be less
+		dependent to libmapi and allow better memory allocation handling.
+		
+		Propagate API change among OpenChange source tree
+		
+		Add doxygen documentation for cast_mapi_SPropValue
+    bradh
+	[r2025]
+		Make sure we always set the opnum and handle, even for error cases.
+	[r2023]
+		Suppress compilation noise in a few places for consistency with the rest of the Makefile
+2010-06-25
+    jkerihuel
+	[r2022]
+		Add ocpf_write support for PT_MV_STRING8, PT_MV_UNICODE, PR_MV_BINARY
+		and PT_MV_LONG
+	[r2021]
+		- Add documentation for PT_MV_LONG
+		- Update PT_BINARY section
+	[r2020]
+		- Fix PT_BINARY to now parse uint8_t 0x00 - 0xFF instead of previous
+		  (and incorrect) long items
+		
+		- Add implementation for PT_MV_LONG
+		- Clean up useless code
+	[r2018]
+		Add  mapidump_SPropValue for PT_MV_LONG
+	[r2017]
+		Add support for PT_MV_UNICODE type
+	[r2016]
+		Add  mapidump_SPropValue for PT_MV_UNICODE
+	[r2015]
+		Add support for PT_MV_BINARY type
+		
+		This implementation required to add a Binary_r within ocpf_context to
+		union SPropValue_CTR content consistent among recursive parsing.
+	[r2014]
+		Add PT_MV_BINARY support in cast_SPropValue
+	[r2013]
+		Add mapidump_SPropValue entry for PT_MV_BINARY
+	[r2012]
+		Do not search context if context_id is NULL
+	[r2011]
+		- Add a function to synchronize data on filesystem after a write
+		  commit (close/fopen) and change open and context flags depending on
+		  their previous value.
+		
+		- If PR_MESSAGE_CLASS or PR_MESSAGE_CLASS_UNICODE is used for
+		  set_SPropValue, update context type.
+
+2010-06-23
+    jkerihuel
+	[r2009]
+		Fix warnings generating by the incorrect .tp_new first argument type
+	[r2007]
+		- Implement server-side skeleton for ReadPerUserInformation (0x63)
+	[r2006]
+		- Use external TALLOC context for cast_SPropValue rather than
+		global_mapi_ctx->mem_ctx. This was preventing from using this function
+		properly in a context different from libmapi based application
+		(server).
+		
+		- Add cast_SPropValue support for PT_CLSID and PT_MV_LONG
+		
+		- add message path + id in the indexing database for mapistore case in
+		  SaveChangesMessage
+	[r2005]
+		Add default owner/full rights to new root folders created. Works with
+		Outlook 2003 (shift + delete for hard delete)
+	[r2004]
+		Add PT_SRVEID support in SPropValue (0xFB proptype)
+	[r2003]
+		Add owner / full-access rights for mailbox folders. It introduces less
+		stabilitity but offers wider range of available features.
+	[r2002]
+		Generate PidTagRights for PR_RIGHTS (used in openchangedb)
+2010-06-22
+    jkerihuel
+	[r2001]
+		- Complete fsocpf_get_path implementation
+		- Register message into indexing.tdb after SubmitMessage
+	[r2000]
+		Add ocpf_server_set_type python bindings.
+		
+		Ohhh looks like we have reached r2000 ;-)
+		
+		 .-.                ,                                                     
+		`._ ,                           
+		   \ \                 o         
+		    \ `-,.                        
+		   .'o .  `.[]           o        
+		<~- - , ,[].'.[] ~>     ___                                               
+		 :               :     (-~.)    
+		  `             '       `|'     
+		   `           '         |      
+		    `-.     .-'          |      
+		-----{. _ _ .}-------------------                                         
+	[r1998]
+		- Add SetProps server side implementation for mapistore messages
+		
+		- Add a preliminary set of properties within CreateMessage (not
+		  complete yet) as stated in MS-OXCMSG 3.2.5.2
+		
+		- Add SaveChangeMessages preliminary server side implementation
+		- Add SubmitMessage preliminary server side implementation
+		
+		- add mapistore and fsocpf backend implementation for
+		  SaveChangeMessages and SubmitMessage. Note: SubmitMesage is just a
+		  hack for now.
+	[r1997]
+		- Add a wrapper to set OCPF file TYPE
+		- Free/Allocate type on purpose
+	[r1996]
+		storing a mapistore_message within the message object is useless for
+		the moment. Clean-up this bit introduced with last commit.
+	[r1995]
+		- Add preliminary OCPF API for server purposes (used by
+		  mapistore_fsocpf)
+		
+		- ocpf_server API now allows caller to dynamically update
+		  properties. If the properties was already existing, updates its
+		  value.
+		
+		- Update ocpf_test.py to reflect this behavior
+		
+		- Add preliminary server side implementation for CreateMessage (server
+		  + mapistore + fsocpf backedn)
+		
+		- Add preliminary mapistore + fsocpf backend skeleton for SetProps
+		  operation
+    bradh
+	[r1994]
+		Typo fix in constant name.
+2010-06-21
+    jkerihuel
+	[r1993]
+		- Only prevent file opened in read-only to use write_commit
+		- Position the stream at the beginning of the file before writing
+	[r1992]
+		Defer ocpf file creation (fopen with w+) to ocpf_write_commit
+	[r1990]
+		Add rmdir support to mapistore python bindings
+	[r1989]
+		- Add mapistore python C/API support for:
+		  - add_context_indexing
+		  - add_context_ref_count
+		  - opendir
+		  - closedir
+		  - mkdir
+		  - errstr MAPISTORE error to string conversion
+		
+		- Update mapistore python test script to demonstrate
+		how to create a new folder using mapistore 
+	[r1988]
+		I may be wrong here, but that was the only way I could pass
+		a folderID from python's layer to mapistore C/API
+	[r1987]
+		If context is manually deleted using public API, we need to remove the destructor
+		we set during context init, otherwise talloc_free segfault occurs
+	[r1986]
+		talloc_strdup SPropValue strings
+	[r1985]
+		Add preliminary python bindings for mapistore
+2010-06-20
+    jkerihuel
+	[r1984]
+		Add FILETIME support for SPropValue
+	[r1982]
+		Add TypeCheck on SPropValue rather than blind cast
+	[r1981]
+		Add python binding for ocpf_write
+		Add quick test code to ensure it works as expected
+	[r1980]
+		- Use SPropValue python object in ocpf module
+		- Add a function binding to retrieve SPropValue array from OCPF file
+		- Modify sample to test this behavior
+	[r1979]
+		- Move OCPF python bindings to pyopenchange directory
+		- Install ocpf module within openchange/
+	[r1978]
+		- Check property type for SPropValue
+		- Add auto-generated pyopenchange/pymapi_properties.c to the ignore list
+	[r1977]
+		- Add preliminary OCPF python bindings
+		- Add a new pyopenchange python bindings directory:
+		  - Preliminary handling of SPropValue data structure
+		- Add some python bindings test files
+		- Add a mparse parser to generate python bindings declaration for mapi
+		  properties
+		- Build automatically python bindings ** We need to add Python as a
+		  required dependency **
+    bradh
+	[r1976]
+		Implement EmptyFolder and enhance DeleteFolder.
+		
+		This still has quite a way to go, but it does mostly work for folders, including recursion.
+	[r1975]
+		Add extended test code for folder creation / deletion.
+	[r1974]
+		Add libmapiserver support for EmptyFolder size calculations.
+
+2010-06-19
+    bradh
+	[r1972]
+		Trivial typo fix.
+	[r1971]
+		Fix comment.
+
+2010-06-17
+    jkerihuel
+	[r1969]
+		New test.
+	[r1968]
+		Second test commit.
+	[r1967]
+		Test commit
+
+2010-06-16
+    jkerihuel
+	[r1964]
+		Fix OOM used in sample_appointment.ocpf
+	[r1963]
+		Consolidate PSETID array and rely on libmapi definitions.
+
+2010-06-14
+    jkerihuel
+	[r1958]
+		Add server-side skeleton for WriteStream Rop.
+	[r1957]
+		Add server-side skeleton for SetSearchCriteria and GetSearchCritera
+		Rop.
+		
+		Improve GetSearchCriteria IDL and work around the null restriction
+		response size in GetSearchCriteria reply by tweaking generated code
+		into nopull,nopush,noprint
+		
+		Add generated mapistore ldif file to the ignore list
+	[r1955]
+		- Add preliminary implementation for named properties support in
+		  mapistore. The API is yet very preliminary (init + get mapped
+		  property ID), but is enough to return consistent data to Outlook and
+		  make its behavior more reliable.
+		
+		- mparse.pl now generates a LDIF file for the mapistore namedprops LDB
+		  database which maps named properties within namespaces and store
+		  default values for common/standard named properties Outlook is
+		  using.
+		
+		- add a custom ldb_connect wrapper in mapistore to allow mapistore to
+		  open multiple instances of the same mapi named properties ldb
+		  database.
+		
+		- Complete preliminary implementation of GetIDsFromNames in oxcprpt.c.
+2010-06-13
+    jkerihuel
+	[r1944]
+		- Fix some named properties
+		- Add a referenced propID value once it is mapped.
+		Will be used by mapistore to populate/generate the initial
+		nameid props database
+	[r1938]
+		Fix a bug with unmapped named properties lookup.
+		For convenience purposes GetProps accepts within input SPropTagArray
+		unmapped named properties we internally turn into mapped ones using
+		GetIDsFroNames. This behavior was incorrect cause we were looking for
+		properties within specific ranges. Replace this behavior with a global
+		lookup over named properties we know about.
+		
+		One limitation of this fix is that custom nameid properties (not referenced
+		within libmapi/conf/mapi-named-properties) won't be lookup. However it is
+		acceptable for the moment.
+    bradh
+	[r1943]
+		Fix signed / unsigned issue in openchangebackup utility.
+	[r1942]
+		Fix some signed/unsigned issues in libmapi.
+	[r1941]
+		Fix up signed / unsigned issues with libocpf.
+		
+		This changes the API to allow easy testing of failure vs results.
+	[r1940]
+		make sure that the 0 is interpreted as unsigned.
+	[r1939]
+		Fix a signed / unsigned comparison warning in libmapi.
+	[r1937]
+		Fix some signed / unsigned warnings in torture suite.
+	[r1936]
+		Avoid signed / unsigned comparison in libmapiadmin.
+	[r1935]
+		Avoid signed / unsigned comparison in openchangedb.
+	[r1934]
+		Avoid signed / unsigned comparisions in mapitest
+	[r1933]
+		Avoid signed / unsigned comparisons in FSOCPF backend.
+	[r1932]
+		Fill in initialisers.
+		
+		Avoids warning with gcc's -Wmissing-field-initializers option.
+    jelmer
+	[r1947]
+		Fix imports, clean up.
+	[r1946]
+		Raise exception on invalid arguments to openchange_mapistore_url.
+2010-06-12
+    jkerihuel
+	[r1931]
+		Fix duplicate
+    bradh
+	[r1930]
+		Use calculated len inside the loop, instead of calling strlen each time.
+2010-06-11
+    jkerihuel
+	[r1929]
+		Add new properties and PSETID
+2010-06-10
+    bradh
+	[r1928]
+		Change variable name to avoid shadowed variable name warning with ICC.
+	[r1927]
+		Add newline at end of file to avoid compiler warning with ICC.
+2010-06-09
+    bradh
+	[r1922]
+		Ensure server modules work when building with coverage enabled.
+    jelmer
+	[r1925]
+		Consistently use spaces rather than tabs.
+	[r1924]
+		Remove string exception.
+	[r1923]
+		Remove duplication of openchange name in namespace.
+2010-06-08
+    jkerihuel
+	[r1921]
+		We didn't set a valid error_code for FindRow skeleton.
+	[r1920]
+		- Add server-side skeleton for ReadStream ROP.
+		- Add preliminary sanity checks on server-side FindRow
+2010-06-07
+    jkerihuel
+	[r1919]
+		Activate correct handling of retval in CreateFolder, despite Outlook
+		2007 bad behavior. Currently working on fixing this.
+	[r1918]
+		My small Outlook 2007 'Search missing ROP implementation' shouldn't
+		have been pushed ;-)
+	[r1917]
+		Add server-side skeleton for DeleteProperties Rop.
+	[r1916]
+		Implement server-size skeleton for GetPerUserGuid Rop.
+	[r1915]
+		Add server-side skeleton for GetPerUserLongTermIds Rop.
+	[r1914]
+		Add a preliminary stream object implementation
+		Add stream to emsmdbp convenient functions
+		
+		Create a handle in OpenStream
+	[r1913]
+		Add skeleton server side implementation for OpenStream
+	[r1912]
+		Forgot to redo changes here.
+	[r1911]
+		- Undo the SetMessageReadFlag IDL change and add an explanation, so we
+		don't make the same error twice and have pointers when we want to fix
+		it.
+		- Improve OpenMessage IDL and add the Reserved uint16_t bit.  
+		- Replace sizeof() with known types to prevent from IDL mismatch types
+		getting used.
+	[r1910]
+		For single process implementation, this code was fine.
+		For multi-process/contexts, when we need to cache information
+		to limit disk access, we should be using the ocpf element as
+		a memory context.
+		
+		This patch makes it possible.
+	[r1909]
+		Fix SetMessageReadFlag IDL.
+	[r1908]
+		Add server side skeleton for SetMessageReadFlag Rop.
+	[r1907]
+		the previous "or"ed value used in LogonType union was non handled
+		properly by pidl. Replace them with static values instead. This
+		prevent Outlook rom reconnecting in different situations.
+	[r1906]
+		This was causing the ndr push error. Outlook now receive OpenMessage
+		replies.
+2010-06-06
+    jkerihuel
+	[r1905]
+		With current implementation messages loaded and added to the mapistore
+		fsocpf private list were never released/unloaded/free'd.
+		
+		Similar behavior would have occured in the future with folders.  Add a
+		mapistore release_record function which will free/delete
+		information/data associated to a given folder/message.
+	[r1904]
+		- Add a preliminary OpenMessage reply implementation
+		- Add a function to resolve recipients against AD
+		- Add implementation of GetProps for mapistore messages
+		- Add mapistore getprops semantic
+		- Add fsocpf getprops implementation
+		
+		Note: current implementation does not free message object and memory
+		allocation needs to be revised.
+		
+		Note 2: openchangeclient --fetchmail works with this version :-)
+	[r1903]
+		Fix OpenMessage response size calculation. Subcontext size is already
+		calculated when we add the RecipientRow.length size to the global size.
+	[r1902]
+		- Make ocpf_recipClass public
+		- Turn path to headers to local in the lexer
+    bradh
+	[r1901]
+		Avoid leaking file descriptors on error.
+	[r1900]
+		Check return type for vasprintf in libocpf.
+2010-06-05
+    jkerihuel
+	[r1899]
+		Change mapistore openmessage semantics to fetch/retrieve recipients
+		and properties from mapistore. Modify OpenMessage ROP to dump
+		mapistore_message structure contents retrieved from mapistore.
+	[r1898]
+		Add a function to retrieve recipients from a parsed OCPF message.
+	[r1897]
+		This is a wip commit, so there is a lot of DEBUG across the code. This
+		will go away in further commits when the implementation is complete.
+		
+		- Add indexing API to mapistore. This API adds an indexing.tdb file
+		  within user's mapistore private space and associate MID and FID to
+		  their full mapistore path. Current implementation expects folder and
+		  mid are repsented under their hexadecimal representation and using
+		  the 0.16PRIx64 format string. It is not robust, but should do the
+		  trick for the moment. Among features available:
+		  	- create/open the indexing database
+			- search of existing indexing context
+			- ref count assessors
+			- add/delete fid/mid records
+			- retrieve the list of folders pointing to an element (parsing
+		          of the mapistore URI)
+		
+		- Calls to the API have been added to the emsmdb provider
+		  implementation for initialization and automatic attempt to add
+		  entries whenever we open a folder.
+		
+		- Add preliminary code (relying on indexing API) for OpenMessage when
+		  parent handle is the store object. The entire set of cases for
+		  mailbox have been included.
+		
+		- Add mapistore code for op_openmessage operation.
+		- Add message list to the fsocpf context
+		- Add preliminary fsocpf backend code to open a message and store it
+		  within ocpf_context.
+    bradh
+	[r1896]
+		Refactored some of the FSOCPF backend.
+		
+		Basically some Extract Method refactoring to improve code re-use.
+	[r1895]
+		Use PRIx64 macro to avoid compiler warning.
+
+2010-06-03
+    jkerihuel
+	[r1893]
+		Add a new OCPF error OCPF_E_EXIST returned if a context already exist.
+		Prevent ocpf_new_context from adding a context to the list if it
+		already existed
+	[r1892]
+		Clean up debug code introduced while working on new libocpf version
+	[r1891]
+		- Make libocpf reentrant and use contexts/ref_count: No more globals
+		  are used in libocpf, they are all specific to contexts. libOCPF is
+		  now multi-process/thread friendly.
+		
+		- Remove Makefile bison compiling option with a bison %option in
+		  ocpf.y
+		
+		- Propagate libocpf changes to openchange server and utils
+		
+		- Fix a bug in file/folder listing when we have both folders and
+		  files.
+
+2010-06-01
+    jkerihuel
+	[r1889]
+		Untested code:
+		- add libmapiserver calculation for OpenMessage + related OXCDATA structures
+		- add skeleton implementation for server-side OpenMessage ROP
+		- add preliminary emsmdbp_object_message implementation/initialization
+	[r1888]
+		- Flush ocpf output when an error occurs
+		- Fix retrieval of message list in fsocpf backend
+	[r1887]
+		Add QueryRows implementation for mapistore in fsocpf backend.
+	[r1886]
+		- Add implementation for mapistore GetContentsTable
+		- Fix error reply for GetHierarchyTable
+	[r1885]
+		Fix how PT_DOUBLE data is passed among libmapi layers.
+	[r1884]
+		Fix an issue introduced in r1858. PT_DOUBLE patch is valid
+		for EMSMDB, not for NSPI. Rollback change for SPropValue
+	[r1883]
+		Add IPM.Note as a default receive folder for Inbox. This is used by
+		Outlook 2003 in the Send/Receive process.
+	[r1882]
+		Add server-side skeleton for GetAttachmentTable operation.
+	[r1881]
+		Implement SetSpooler server-side function. The function looks like a
+		skeleton ... and is one until we figure out what should be the
+		associated server-side mechanism when clients tells OpenChange server
+		they want to act as a mail spooler.
+	[r1880]
+		The LogonType cases were not handled properly
+	[r1879]
+		Replace existing method to retrieve emsabp_ctx in NSPI server code
+		with mpm session management API and comparison to actual dce_call structure.
+		
+		Replace MAPI_E_LOGON_FAILED rather than MAPI_E_NOT_ENOUGH_RESOURCES in emsmdb server
+		code when session is not found.
+2010-05-31
+    jkerihuel
+	[r1878]
+		Fix commit typo
+	[r1877]
+		We were adding context the list but were never removing them while the
+		context_id was added to the free list. This was causing
+		inconsistencies in mapistore context management + invalid
+		record/pointers to remain and cause OpenChange server to crash.
+		
+		Also add commented code to CreateFolder ROP that will need to be
+		enabled when we understand related Outlook behavior.
+	[r1875]
+		Patch from Bharath Acharya <abharath@gnome.org>:
+		
+		Print calendar items created at half hours
+	[r1874]
+		Minor warning fix - unused variable, not initialized
+	[r1873]
+		Fix a bug with invalid session leading to OpenChange server crash.
+		
+		We are now retrieving the emsmdbp_context pointer from our session
+		management API, after a comparison check vs dcesrv_call_state rather
+		than blindling and directly from dce_call.
+    bradh
+	[r1876]
+		Add better error path handling for the OXCFOLD-CREATE mapitest module.
+2010-05-30
+    jkerihuel
+	[r1872]
+		Extend mapistore API to have a mapistore URI associated to the backend
+		context. We want to limit creation of new contexts to the strict
+		minimum.
+		
+		Propagate this change to emsmdbp_object_folder_init. Only create a new
+		context if the uri intended to be opened is not already associated to
+		an existing context.
+	[r1870]
+		Handle additional LogonFlags cases for mailbox store in Logon_repl
+	[r1869]
+		Fix empty EcDoRpc replies. Outlook 2007 is now happy and stops from
+		disconnecting untimely.
+	[r1868]
+		Add server-side skeleton implementation for GetPermissionsTable
+	[r1867]
+		Pass parent mapi_handles to emsmdbp_object_folder_init rather than
+		specific parameters.
+		
+		Improve emsmdbp_object_folder_init to handle all the different folder
+		creation cases (root folder, mapistore or not, within mapistore or
+		openchangedb etc.) OpenChange server now passes mapistest folder
+		creation test properly.
+		
+		Fix a bug with context_id and mapistore. We were passing the parent
+		context, then deleting it at some point, causing the parent object to
+		be invalid. Now makes use of a reference counter we manage to keep
+		consistency.
+		
+		Add a convenient function to emsmdbp_object API to retrieve the
+		contextID associated to an object.
+		
+		It looks like we still have some issues when running both Outlook 2007
+		and Outlook 2003 at the same time with OpenChange server. There may be
+		some additional session checks to perform in the future.
+	[r1866]
+		Fix a bug in session management API:
+		
+		The mpm_session API uses id, id2, node and context_id from the dcerpc
+		session to uniquely identify a session context. 
+		
+		However when Outlook calls EcDoConnect multiple times, it still uses
+		the same dcerpc session. With previous API we were freeing the session
+		while it was still in used - which lead in unstable and unpredictable
+		crashes.
+		
+		The following patch adds a ref_count to the mpm_session API and server
+		code has been changed for emsmdb and nspi server to increment the
+		ref_count when the session already exists or create a new session if
+		none is already stored.
+		
+		Also the mpm_session code checks for the ref_count value and ensures
+		it is 0 before calling the destructor.
+	[r1865]
+		Call emsmdbp_object_folder_init in any case when creating a
+		folder. The emsmdbp_object function now do required checks and
+		initialize the folder's object properly.
+    bradh
+	[r1871]
+		trivial comment cleanup.
+	[r1864]
+		Minor cleanups for RopCreateFolder in the server.
+		
+		Prefix the mapistore_uri folder name in the path with "0x"
+		
+		Use ulFolderType (the folder) instead of ulType (ansi vs unicode) when
+		deciding which folder type to create.
+	[r1863]
+		Trivial comment fixes.
+2010-05-29
+    jkerihuel
+	[r1862]
+		Complete the opendir implementation for mapistore folders. Outlook
+		doesn't crash anymore when attempting to open mapistore folders.
+	[r1861]
+		was using the wrong function emsmdbp_is_mapistore instead of
+		mailboxstore.
+	[r1860]
+		Commit Brad Hards's implementation for Public Folders support.
+		Personal changes wrt initial patch:
+		
+		- remove mapistore_uri from openchangedb PF record at
+		  provisioning. Only new created folders should be mapistored.
+		- Add a mailboxstore boolean to folder and mailbox emsmdbp so we can
+		  select the correct basedn for searches.
+		- Fix GetProps to provide an accurate answer to Outlook when fetching
+		  public folder's store specific properties.
+		- Use get_PublicFolderId rather than SpecialFolderId when we open a
+		  public folder store.
+
+2010-05-28
+    jkerihuel
+	[r1858]
+		Patch from Milan Crha <mcrha@readhat.com>:
+		
+		Fix PT_DOUBLE support in openchange
+	[r1857]
+		Fix unicode ocpf format in ocpf_write
+	[r1856]
+		- Fix PT_I8 support in libocpf: PT_I8 support was incorrectly
+		processed as PT_DOUBLE and prevented properties with 0x0014 proptag
+		(e.g. PR_PARENT_FID) to be added properly to ocpf files.
+		
+		- Add PR_PARENT_FID to the set of properties when creating folders
+	[r1855]
+		Fix mkdir prototype in sqlite3 backend
+
+2010-05-27
+    jkerihuel
+	[r1853]
+		Outlook uses GetProps with the PidTagSubFolders property to check if a
+		folder has subfolders. Add this property at provisioning (set to
+		FALSE), then set it to true on system/specialfolders if folder
+		creation in mapistore went OK.
+	[r1852]
+		- Implement mkdir operation at mapistore level
+		
+		- Update PidTagFolderChildCount of parent folder when parent is the
+		  root folder of a mapistore context (folder attributes stored in
+		  openchange.ldb)
+		
+		- Improve RopCreateFolder implementation
+		
+		- Clean-up emsmdb_object_folder_init implementation
+		
+		- Add a convenient function to turn ROPs parameters into MAPI
+		  properties. This prevents from having endless number of parameters.
+		
+		- Commit remaining parts of the provision changes
+	[r1851]
+		This TODO doesn't belong here
+	[r1850]
+		Add a convenient function to retrieve the distinguishedName of a
+		folder given its folder identifier. This function is useful when
+		building dn for openchangedb ldb_add operations.
+	[r1849]
+		Add PidTagComment so it can be used in openchange.ldb when root
+		folders are created with a comment CreateFolder parameter.
+	[r1848]
+		Make it possible to retrieve MailboxRoot folder using
+		olFolderMailboxRoot in GetDefaultFolders.
+	[r1847]
+		Outlook 2007 tries to create a To-Do search folder under user
+		mailbox. Creates the folder at provision time to be kind with it.
+		
+		Set PidTagParentFolderId to 0 for mailbox root
+	[r1846]
+		The wrong index in mapi_repl was causing the crash I've investigated
+		over the past 10 hours.
+		
+		Please always use idx for mapi_response->mapi_repl[] index ;-)
+2010-05-26
+    jkerihuel
+	[r1845]
+		In current architecture, we need to retrieve root mapistore folder properties
+		from openchangedb, then use mapistore for operations such as GetHierarchyTable or
+		GetContentsTable. This was not possible with the current design where we only
+		switch between mapistore: true or false.
+		
+		I have introduced a mapistore_root boolean associated to folder object which we
+		set to true if the folder initializes a mapistore context (otherwise false).
+		
+		This boolean is used in GetProps so we retrieve mapistore container properties
+		from openchangedb and not mapistore.
+    bradh
+	[r1844]
+		Add size calculations for public folder RopLogon
+		response.
+2010-05-25
+    jkerihuel
+	[r1843]
+		We'll change CreateFolder to generic code later.
+		For the moment change from sqlite to fsopcf backend for system folders
+	[r1842]
+		Fix handling of flagged property row in GetProps (Mailbox case).
+	[r1841]
+		Missing break added, now makes Outlook 2003 launhes properly.
+	[r1840]
+		Ensure PidTagAttr is valid and prevent ldb layer from segfaulting
+	[r1839]
+		Send a flagged PropertyRow when GetProps is called with mapistore
+		Add a nasty hack and call this fake MAPI_E_NOT_FOUND property value for
+		GetProps if the object doesn't exist.
+		
+		In openchangeclient we are calling get_container_class using the parent object
+		(Mailbox root folder) and the FID of the 2-level down folder. This causes
+		openchange server to crash. The hack exposed above will help temporary workaround
+		this problem while we figure out/remember the real problem: Why do we have
+		to call the parent to retrieve the container class?
+	[r1838]
+		Remove last references to systemfolder in libmapiproxy API 
+	[r1837]
+		release objects properly in the mailbox recursive function
+	[r1836]
+		After we release ocpf_context, strings are destroyed.
+		Prevent from happening by stealing the overall context and
+		talloc_strdup strings.
+		
+		We'll need to find a better/encapsulated way to do this on long term.
+	[r1835]
+		Add a small hack to handle StandardPropertyRow properly
+		StandardPropertyRow have no errors and have a prefixing flag set to 0
+	[r1834]
+		Get ride of the previous way to detect 
+		systemfolder/mailbox/mapistore folders.
+		
+		This was barely understandable and error prone. 
+		
+		It is now replaced by a mapistore boolean set for every object
+		+ a convenient emsmdbp_object function to check mapistore value
+		for given handle quickly.
+2010-05-24
+    jkerihuel
+	[r1833]
+		Add mapistore implementation for QueryRows ROPs relying on
+		GetHierarchyTable objects (folders properties listing).
+		
+		Add fsocpf backend implementation to fetch folders properties from a
+		.properties OCPF file stored within the folder (identified by its
+		PR_FID).
+		
+		Customized emsmdbp table object to have:
+		- a context_id and whether the table is within mapistore or not.
+		- to know if the table comes from GetHierarchyTabke or
+		  GetContentsTable
+		
+		Add a path element to the folder_list structure in fsocpf backend to
+		quickly use the full path and open the .properties file.
+		
+		Note: current code is for developers only. It is known to have bugs
+		(e.g. memory allocation), furthermore there is some manual
+		openchangedb and filesystem operation to perform in order to have the
+		commit intended results.
+	[r1832]
+		Add a convenient function for openchange server that lets build the
+		SPropValue array with known properties.
+	[r1830]
+		Replace the hardcoded fsocpf_ctx->fid with a basic code searching for last elements
+		in mapistore_uri path.
+	[r1829]
+		Fix typo in PidTag name
+	[r1828]
+		Add PidTagFolderChildCount
+	[r1827]
+		Add libocpf as a dependency to mapistore_fsocpf backend
+	[r1826]
+		Add a ulType to emsmdbp table object.
+		We need to make the difference between folders table (hierarchy) and messages ones (contents).
+	[r1825]
+		This is a large work in progress commit:
+		
+		- Do not add mapistore_uri for Mailbox and IPM Subtree. These are only
+		  openchange.ldb containers.
+		
+		- Fix a memory issue with emsmdbp object destruction: use a different
+		  context for folder object. This was preventing from having a valid
+		  DIR * when releasing the object at mapistore layer.
+		
+		- Add preliminary implementation for OpenFolder (GenericFolder) in
+		  emsmdbp server code and mapistore. It can't yet be tested properly
+		  with openchangeclient --mailbox because we need to extend QueryRows
+		  implementation first. This will be achieved in further commits
+		
+		  We are now using mapistore_uri attribute value (valid or NULL) to
+		  detect whether it is a systemfolder (blank container) or if we need
+		  to initialize a mapistore backend context.
+		
+		- Add mapistore implementation of GetHierarchyTable and backend
+		  implementation for fsocpf. Since we don't have a working
+		  Createfolder/mkdir implementation yet, you need to add
+		  PidTagFolderChildCount = 1 to the folder record in openchange.ldb +
+		  manually create the directory on the filesytem.
+	[r1824]
+		Missing mapi_object_release call added
+2010-05-23
+    jkerihuel
+	[r1823]
+		- Add libmapi as a dependency to libmapistore. We need libmapi to
+		  benefit from operations on MAPI properties.
+		
+		- Add a MAPISTORE_RETVAL_IF macro and a MAPISTORE_SANITY_CHECKS one
+		  for common checks.
+		
+		- Refactor the search of the backend context given its context id in a
+		  function and propagate the change to related functions.
+		
+		- Add skeletons for opendir, closedir, mkdir and rmdir. Prototypes of
+		  these function may change in the future.
+	[r1822]
+		Implement create_context and delete_context for fsocpf backend. Patch
+		initially from Brad Hards.
+		
+		Add a double linked list with fid/DIR couples for folders operations
+		to be developed.
+	[r1821]
+		Fix a bug in NSPI server which was preventing NspiGetMatches
+		from retrieving the correct DN from the in-memory tdb database.
+		
+		Should fix the profile creation error users were experiencing.
+		 
+	[r1819]
+		Add a reference to the libocpf documentation for ospf backend
+    bradh
+	[r1820]
+		Add forgotten part of r1818.
+	[r1818]
+		Support provisioning mailboxes with either fsocpf or sqlite backends.
+		
+		fsocpf is the default at this stage.
+		
+		OK'd by Julien.
+2010-05-22
+    jkerihuel
+	[r1817]
+		Fix paths to related pages
+	[r1816]
+		Patch from Brad, fix doc typo, grammar - makes it sound more English.
+2010-05-21
+    jkerihuel
+	[r1815]
+		Add API documentation for init, backend connection contexts
+		Add programming samples
+	[r1814]
+		Install libmapistore pc file
+	[r1813]
+		0.2 version of mapistore documentation. 
+		Merge some of the initial mapistore wiki page content.
+		Add a section on FSOCPF backend
+    bradh
+	[r1812]
+		Various API documentation fixes. All trivial.
+	[r1811]
+		Fix some hard-coded formatting in mapitest common code.
+	[r1810]
+		Add a simple create / delete folder test to mapitest.
+		
+		I've been using this to test the basic operations.
+	[r1809]
+		Enable DeleteFolder rop, now we have a partial implementation.
+	[r1808]
+		Implement RopDeleteFolder, and handle the case where a folder already exists in RopCreateFolder
+		
+		This still only works for a top level folder.
+	[r1807]
+		Add convenience API to obtain the FID for a given folder (by name).
+		
+		This is useful to tell if a folder exists, which we need to do before
+		we create it.
+		
+		Also fixes a nuisance warning about printf specifiers. 
+	[r1806]
+		Extend CreateFolder size calculations to handle some of the optional elements
+		
+		We still don't properly handle the variable length server element.
+2010-05-20
+    jkerihuel
+	[r1805]
+		Add general overview of what mapistore is and 
+		how it can be used from a user perspective
+	[r1804]
+		Fix doxygen warnings
+	[r1803]
+		Refactor mapiproxy documentation into a global mapiproxy / openchange server doc.
+		- Add a mapistore documentation skeleton
+		- Add related pictures
+2010-05-19
+    jkerihuel
+	[r1801]
+		Add folder atomic operation to mapistore and skeleton to backends:
+		mkdir,rmdir,opendir,closedir,readdir
+    bradh
+	[r1802]
+		API documentation typo fix.
+
+2010-05-18
+    jkerihuel
+	[r1799]
+		- Push Brad's CreateFolder implementation after turning hardcoded fields to generic one.
+		
+		Note: current implementation is incorrect as it states that any folder is referenced
+		within openchange.ldb while only system/top folders are. We have a mapistore URI for
+		system/top folders, not for subfolders which are stored directly within specified
+		mapistore backend.
+		
+		However the implementation is almost correct when it comes to create folders directly
+		under / in the user mailbox.
+	[r1798]
+		- Add a 'fsocpf' mapistore backend skeleton (FileSystem + OCPF)
+		- Fix some doxygen in mapistore sqlite3 backend
+		- Add an op_mkdir skeleton to mapistore
+		- Add fsocpf:// namespace test to mapistore_test
+		- Compile fsocpf only if libocpf gets compiled
+		 
+	[r1797]
+		Add defs_private.h so we can use PRIx64 where appropriate
+	[r1796]
+		It makes more sense to directly return the next available and formated FID rather
+		than the GlobalCount raw value.
+	[r1795]
+		Add exchange username to emsmdbp_ctx structure for convenient purposes
+	[r1794]
+		After openchange_ldb is opened, map attributes of the @ROOTDSE record
+		with ldb_set_opaque so ldb_get_default_basedn and ldb_get_root_basedn work.
+2010-05-17
+    jkerihuel
+	[r1793]
+		Implement a convenient function to retrieve the GlobalCount value from
+		the objectClass=server record in openchangedb - which is the next FID
+		to be available.
+		
+		Note: the function currently lacks locking mechanisms. We should
+		introduce some to prevent from race conditions.
+		
+		This code was originally designed by Brad. I've just refactored it.
+	[r1792]
+		Add a rootDSE entry to openchangedb.
+		This change makes possible to call:
+		     - ldb_get_root_basedn() to retrieve CN=server,DC=domain,DC=ext
+		     - ldb_get_default_basedn() to retrieve CN=firstou,CN=firstorg,CN=server,DC=comain,DC=ext
+	[r1790]
+		Add server-side skeleton for ROPs:
+		    - ModifyRecipients
+		    - DeleteMessage
+		    - SubmitMessage
+		    - GetTransportFolder
+		
+		NOTE: GetTransportFolder is using hardcoded data that will be removed
+		in futher commits.
+	[r1789]
+		Add libmapiserver size calculation for ROPs:
+		    - RopDeleteMessage
+		    - RopModifyRecipients
+		    - RopSubmitMessage
+		    - RopGetTransportFolder
+2010-05-16
+    jkerihuel
+	[r1787]
+		Fix provisioning script and push a master-git samba4 version known to compile
+		and work properly with openchange.
+		
+		There is probably a small typo left in installsamba.sh post_install script to fix
+    bradh
+	[r1788]
+		Update docs for new samba version.
+		
+		Looks like we now have real complexity requirements for passwords...
+2010-05-14
+    bradh
+	[r1786]
+		Fix the container class for the Drafts folder.
+		
+		This is per MS-OXCSFLD
+	[r1785]
+		Add PT_I8 for cast_SPropValue().
+2010-05-13
+    jkerihuel
+	[r1784]
+		  Fix openchange vs latest samba4 git-master branch
+		
+		- Fix OpenChange schema: Had to split our 1-file schema into multiple
+		  files in order to be compliant with Samba4 LDB schema validation
+		  policy/rules.
+		
+		- Fix openchange provision script
+		- Fix calls to smb_iconv_convenience_init
+		- Fix the copied libmapi/socket code to work with latest samba4 code
+		- Fix openchange server SIGSEGV when EcDoConnectEx is called
+		
+		I have tested the following to ensure nothing is broken:
+		- mapitest with Exchange 2003. All tests are OK
+		- openchangepfadmin (user creation/deletion OK)
+		- openchange server provisioning
+		- openchange server vs Outlook 2003:
+		  - profile creation OK
+		  - Outlook can open the user mailbox and display it properly
+2010-05-10
+    jkerihuel
+	[r1783]
+		Skeleton server code for DeleteFolder ROP
+	[r1782]
+		Just add more skeleton code to select between available folder types
+	[r1781]
+		Server side skeleton for CreateFolder operation
+
+2010-05-08
+    bradh
+	[r1779]
+		Implement some more properties for cast_mapi_SPropValue().
+		
+		Patch mostly by Milan Crha, some changes by me.
+	[r1778]
+		Use retval instead of GetLastError() in a couple of places.
+	[r1777]
+		Add missing failure path handling.
+	[r1776]
+		Avoid assigning a boolean result to an enum MAPISTATUS.
+		
+		Fixes problem noted with mapitest on OXCFOLD-MOVECOPY-MESSAGES.
+
+2010-05-06
+    bradh
+	[r1774]
+		Add comment about the number for each ROP in the server.
+
+2010-05-03
+    bradh
+	[r1772]
+		Make sure we can load a server module when it is built with coverage testing enabled.
+
+2010-05-02
+    bradh
+	[r1770]
+		Fix some mapitest issues reported by valgrind.
+		
+		These only occur when running against the openchange server - mostly problems with failure paths.
+	[r1769]
+		Fix up a few segfaults found when running against openchange server.
+
+2010-05-01
+    bradh
+	[r1767]
+		Add support for EcDoRpc GetAddressTypes (0x49) and OptionsData (0x6f) to server.
+		
+		This is completely driven by the server provisioning - no hard coding.
+		
+		This makes a binary incompatible change, so if you get crashes, please try a
+		clean rebuild.
+
+2010-04-29
+    bradh
+	[r1765]
+		Add PT_DOUBLE support for set_SPropValue().
+
+2010-04-28
+    bradh
+	[r1763]
+		Add support for PT_ERROR in mapi_SPropValue casting function.
+	[r1762]
+		Add support for a couple more types in the casting code.
+		
+		Also adds a development-version "OPENCHANGE_ASSERT()" that flags incomplete code.
+
+2010-04-23
+    jkerihuel
+	[r1760]
+		Add a convenient function to retrieve the total 
+		number of records in the Global Address List.
+		
+		Modify openchangeclient to expose this change in
+		the --userlist option.
+
+2010-04-20
+    jkerihuel
+	[r1758]
+		Fix OpenChange notification subsystem to handle multiple session properly
+		Patch OpenChange trunk to reflect this API change
+		
+		Add quick and dirty doc/examples/multiple_notif.c to show how to setup
+		multiple sessions + notifications with threads. 
+	[r1757]
+		Add PidTag for transport message headers
+
+2010-03-04
+    bradh
+	[r1755]
+		One more server API documentation fix.
+	[r1754]
+		More server side api documentation work.
+
+2010-03-03
+    bradh
+	[r1752]
+		Mix of api documentation fixes for server side.
+	[r1751]
+		Add MAPI_E_NOT_IMPLEMENTED.
+		
+		This is based on information at 
+		http://social.msdn.microsoft.com/Forums/en-US/os_exchangeprotocols/thread/d3c860a8-f131-4c7a-aa11-b9ec328d06c4
+
+2010-03-02
+    bradh
+	[r1749]
+		Implement RopOptionsData (0x6F).
+		
+		Updates IDL, adds implementation and mapitest coverage.
+		
+		This has no practical use, but might be useful for testing the server.
+
+2010-02-28
+    bradh
+	[r1747]
+		Add talloc leak checking options to mapitest.
+
+2010-02-27
+    bradh
+	[r1745]
+		Update man page for mapiprofile to reflect new --language option format.
+
+2010-02-26
+    bradh
+	[r1743]
+		Add special handling for PS_MAPI property name mapping.
+		
+		This fixes a long-standing mapitest failure.
+		
+		The logic is based on MS-OXCPRPT, section 2.2.12.2.2 PropertyIds.
+	[r1742]
+		Minor API documentation fix.
+
+2010-02-24
+    bradh
+	[r1740]
+		Build fix for example code
+
+2010-02-23
+    jkerihuel
+	[r1738]
+		Fix format string problem #184 ticket
+    bradh
+	[r1737]
+		Add status reporter classes to allow redirecting the progress
+		messages.
+	[r1736]
+		Update man page to reflect mapitest --subunit option.
+	[r1735]
+		Implement basic subunit output protocol format for mapitest.
+		
+		There are a couple of documentation bits to follow.
+
+2010-02-20
+    bradh
+	[r1733]
+		Trivial API dox addition.
+
+2010-02-17
+    bradh
+	[r1731]
+		Update the IDL and implementation for RopGetPermissionsTable (0x3e)
+		and RopModifyPermissions (0x40) to match MS-OXCPERM.
+		
+		The function signature for GetTable() and ModifyTable() has changed.
+		They are now called GetPermissionsTable() and ModifyPermissions()
+		respectively, and there is an additional "flags" argument, which you
+		almost certainly want to pass as 0x00 if you are porting from some
+		older implementation.
+		
+		Updates all users, and adds mapitest unit tests.
+
+2010-02-11
+    jkerihuel
+	[r1729]
+		Add country codes to codepage-lcid description file
+    bradh
+	[r1727]
+		Remove copied code from samba (ldb) and just use the ldb
+		version.
+		
+		Resolves ticket #167
+	[r1726]
+		Allow building if popt isn't available.
+		
+		The changes are to:
+		- remove unnecessary include in libmapiadmin
+		- only build mapistore test tool if popt is available
+		- only build torture tests if popt is available.
+		
+		The last change could be finer (e.g. only leaving out the
+		part of the torture test that actually requires popt) but
+		that seemed more fragile and generally unnecessary.
+		
+		Resolves ticket #233.
+    jelmer
+	[r1728]
+		Update bzrignore.
+
+2010-02-10
+    bradh
+	[r1724]
+		Ensure we always initialise before trying to cleanup (e.g. in a failure scenario).
+		
+		Issue identified and patch provided by Erik Hovland, minor changes by me.
+		
+		Resolves ticket #236.
+	[r1723]
+		prop is declared within the switch statement.
+		
+		Fix by Erik Hovland - thanks very much.
+		
+		Resolves ticket #239.
+	[r1722]
+		Use strncpy instead of strcpy.
+		
+		Patch by Erik Hovland, plus a minor change by me to ensure the string is null terminated.
+		
+		Resolves ticket #237.
+	[r1721]
+		Add missing break statements
+		
+		Patch by Erik Hovland <erik@hovland.org>
+		
+		Resolves ticket #238.
+	[r1720]
+		Mark appropriate constructors as explicit.
+		
+		Patch by Erik Hovland - thanks very much.
+		
+		Resolves ticket #240.
+	[r1719]
+		Add newline.
+		
+		Patch from Erik Hovland - thanks again.
+		
+		Resolves ticket #242.
+	[r1718]
+		Fix spelling errors.
+		
+		Patch by Erik Hovland - thanks very much.
+		
+		Resolves ticket #241.
+	[r1717]
+		Make sure we actually can compile when using --enable-openchange-qt4
+		
+		This patch ensures that $(MOC) gets set in the Makefile.
+
+2010-02-09
+    jkerihuel
+	[r1715]
+		Add canonical names for codepage related properties (involved in
+		PT_STRING8 encoding/decoding)
+
+2010-02-08
+    jkerihuel
+	[r1711]
+		- Add parser for codepage-lcid
+		
+		- Add entire set of conversion functions for lcid, codepage, language
+		  and locale
+		
+		- mapiprofile now uses codepage/lcid matching LC_CTYPE environment
+		  variable for language detection, otherwise codepage/lcid matching
+		  language list. Language list is now dumped from codepage-lcid
+		  auto-generaed code.
+		
+		- Remove deprecated util and tests directory from libmapi and from
+		  build system. We now only rely on codepage_lcid.c
+		
+		- Update openchange code (utils, mapiprofile, mapitest and
+		  exchange2ical libs) to use this new API.
+		
+		- I have not looked into icalparameter_get_language, but assuming it
+		  is relying on previous API, I may have introduced a bug here. Looks
+		  like the function outputs for example "en-US" while we now checks
+		  for "en_US" to match setlocale output.
+    bradh
+	[r1710]
+		Minor API documentation adds.
+	[r1709]
+		Add unit test coverage for the GetGALTable() function.
+		
+		This is mostly lifted from utils/openchangeclient.c
+	[r1708]
+		Switch to only building Qt4 bindings if specifically asked for.
+		
+		This is a bit experimental for now, so lets go safer...
+
+2010-02-05
+    jkerihuel
+	[r1706]
+		In this particular case (error returned, mapi_response shouldn't
+		be free'd)
+	[r1705]
+		Fix bug 605827 - SRowSet was free'd while still needed
+
+2010-02-04
+    jkerihuel
+	[r1703]
+		Template file which associates Language, LCID, Locale and Codepage.
+		Furthermore commits will implement the mparse parser which will
+		auto-generate the associated C files. This should give us a reliable
+		way to use it in mapiprofile, MAPI profiles database and for
+		PT_STRING8 proper conversion purposes.
+		
+		If anything is missing or is incorrect, updating the file will
+		be trivial.
+
+2010-02-03
+    bradh
+	[r1701]
+		Fix bug where you couldn't select another messages in the default folder without
+		changing folder first.
+		
+		Looks like this is just a bit I forgot to update when changing from an initial
+		cut to the "more working" implementation.
+
+2010-02-02
+    jkerihuel
+	[r1699]
+		- Fix trac ticket #183: PT_UNICODE properties are now turned to UTF-8
+		  directly.
+		
+		- Remove deprecated utf8_convert lexer and windows_to_utf8 routine
+		
+		- Change openchange tools to use _UNICODE tag version instead
+		
+		- octool_get_propval now prefer UNICODE properties over PT_STRING8
+		  ones (default behavior).
+		
+		- Change mapidump_message API to take an optional mapi_object_t
+		  message parameter. If the message object is specified, we can have
+		  access to the subject, and recipients (to, cc, bcc) without having
+		  to query them within a GetProps call.
+    bradh
+	[r1698]
+		Fix an ugly cut-n-paste error.
+	[r1697]
+		Add pkg-config support for libmapi++.
+
+2010-02-01
+    jkerihuel
+	[r1695]
+		Fix ticket #123 (known as 562948 on gnome bugzilla):
+		"Unable to send mails containing UTF8 strings"
+		
+		OpenChange was using strlen(str) * 2 + 2 to calculate the 
+		expected size for utf16 string. This patch fixes this and
+		replaces it with a function that make proper utf8 to utf16 
+		conversion.
+		
+		This commit also replaces PT_STRING8 properties in openchangeclient.c
+		with PT_UNICODE ones to ensure utf8 strings get converted properly.
+
+2010-01-26
+    jkerihuel
+	[r1693]
+		- Add NormalizedSubject and SubjectPrefix strings to object_message_t
+		  structure.
+		- Add a function to retrieve TypedString value
+		- Add a mapidump function for obj_message (only retrieve subject and
+		  recipients)
+		- Add --fetchsummary option to openchangeclient: Dumps properties from
+		  OpenMessage response only (subject and recipients) rather than going
+		  through GetProps and dumping a more complete version.
+    bradh
+	[r1692]
+		Move make distclean to the end again.
+
+2010-01-23
+    bradh
+	[r1690]
+		Remove a copy of the dlinklist.h header, and just use the samba
+		version instead.
+
+2010-01-20
+    bradh
+	[r1688]
+		Install missing file.
+
+2010-01-13
+    bradh
+	[r1686]
+		Allow us to find samba python code on 64-bit machines.
+
+2010-01-10
+    jkerihuel
+	[r1684]
+		Update EcDoConnectEx IDL to match latest specifications
+    bradh
+	[r1683]
+		Minor additions to "make clean" / "make distclean" to remove
+		generated python bits, and also the config.h file.
+
+2010-01-08
+    bradh
+	[r1681]
+		Implement IsMailboxFolder for public folder types.
+		
+		Involves some refactoring of the way we handled the mapi_object_store_t,
+		such that we now talloc_zero the structure. 
+		
+		Adds mapitest coverage for these.
+		
+		Resolves Ticket #134.
+
+2010-01-06
+    bradh
+	[r1679]
+		Add unit tests for IsMailboxFolder
+		
+		Also use 0xFFFFFFFFF instead of -1 for no-such-mailbox, consistent with the unsigned data type.
+
+2010-01-04
+    jkerihuel
+	[r1677]
+		Change location of .cpp.o and .ccp.po to the correct location
+		and inhibit compilation line output for moc and cpp compilation.
+    bradh
+	[r1676]
+		Try harder to clean up libmapi++ bits.
+
+2010-01-03
+    jkerihuel
+	[r1673]
+		Ignore moc files and generated binary
+	[r1672]
+		Update OpenChange version to 0.10 NOMAD
+		
+		Nomad is a mechanical explorer sent from Earth in 2002. 
+		It was melded with an alien device named Tan Ru and the resulting robotic
+		hybrid began destroying anything that was imperfect including, in 2267,
+		itself. 
+    bradh
+	[r1674]
+		Add documentation for qt/ subdirectory.
+	[r1671]
+		Try harder to find moc.
+	[r1670]
+		Initial commit of some Qt-style bindings.
+		
+		This is mostly for testing, although hopefully the library will
+		emerge with a set of mostly-useful widgets for implementing
+		real clients.
+
+2009-12-31
+    bradh
+	[r1668]
+		Quiet the build here.
+		
+		Inadvertent removal in a previous patch.
+	[r1667]
+		Some support for ReviewBoard.
+
+2009-12-29
+    bradh
+	[r1665]
+		Update OpenMessage flags to match specification values.
+	[r1664]
+		Cleanup libmapi++ code when we "make clean".
+	[r1663]
+		Add svn ignore entries.
+	[r1662]
+		Remove inline from shared library class.
+		
+		Fixes build on Intel C++ compiler.
+
+2009-12-27
+    clsk
+	[r1660]
+		libmapi++ is no longer a header-only library
+
+2009-12-26
+    bradh
+	[r1658]
+		Add first part of Restrictions support.
+	[r1657]
+		A little more documentation fixes.
+2009-12-25
+    jkerihuel
+	[r1654]
+		Fix MAPIUninitialize() crash when leaving after an unsuccessful call.
+		In such situation, mapi_response is not allocated but has a destructor
+		associated. This fix removes the destructor whenever the error code is
+		different from MAPI_E_SUCCESS.
+		
+		Also add a minor (probably useless) check on mapi_response pointer validity
+		before attempting any other child's free.
+    bradh
+	[r1656]
+		A couple of minor API documentation fixes.
+
+2009-12-24
+    jkerihuel
+	[r1651]
+		Rename libmapi into openchange in our release script.
+		Makes more sense given the scope of our releases.
+	[r1650]
+		Fix format string warnings.
+	[r1649]
+		New ModifyRecipients IDL and implementation.
+		
+		This patch improves the logic within the RecipientFlags bitmask
+		calculation function and make use of different MAPI properties for
+		ModifyRecipients. 
+		
+		Fix trac ticket #125 and https://bugzilla.gnome.org/show_bug.cgi?id=568763
+    bradh
+	[r1648]
+		Minor API documentation fix.
 2009-12-23
     bradh
+	[r1647]
+		Fix some exchange2ical memory leaks / "still reachable" memory.
 	[r1645]
 		Fix property tag array count, so we get the language in Summary
 		lines in the ical output.

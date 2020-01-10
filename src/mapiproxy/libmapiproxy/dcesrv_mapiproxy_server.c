@@ -3,7 +3,7 @@
 
    OpenChange Project
 
-   Copyright (C) Julien Kerihuel 2009
+   Copyright (C) Julien Kerihuel 2009-2011
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <mapiproxy/dcesrv_mapiproxy.h>
+#include "mapiproxy/dcesrv_mapiproxy.h"
 #include "libmapiproxy.h"
 #include <util/debug.h>
 
@@ -82,14 +82,14 @@ NTSTATUS mapiproxy_server_unbind(struct server_id server_id, uint32_t context_id
 
 extern NTSTATUS mapiproxy_server_register(const void *_server_module)
 {
-	const struct mapiproxy_module	*server_module = _server_module;
+	const struct mapiproxy_module	*server_module = (const struct mapiproxy_module *) _server_module;
 
 	server_modules = realloc_p(server_modules, struct server_module, num_server_modules + 1);
 	if (!server_modules) {
 		smb_panic("out of memory in mapiproxy_server_register");
 	}
 
-	server_modules[num_server_modules].server_module = smb_xmemdup(server_module, sizeof (*server_module));
+	server_modules[num_server_modules].server_module = (struct mapiproxy_module *) smb_xmemdup(server_module, sizeof (*server_module));
 	server_modules[num_server_modules].server_module->name = smb_xstrdup(server_module->name);
 
 	num_server_modules++;
@@ -179,7 +179,7 @@ static NTSTATUS mapiproxy_server_load(struct dcesrv_context *dce_ctx)
 								   NDR_EXCHANGE_DS_RFR_NAME, NULL };
 
 	/* Check server mode */
-	server_mode = lp_parm_bool(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "server", false);
+	server_mode = lpcfg_parm_bool(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "server", false);
 	DEBUG(0, ("MAPIPROXY server mode %s\n", (server_mode == false) ? "disabled" : "enabled"));
 
 	if (server_mode == true) {
@@ -197,15 +197,15 @@ static NTSTATUS mapiproxy_server_load(struct dcesrv_context *dce_ctx)
 	}
 
 	/* Check for override/custom NSPI server */
-	nspi = lp_parm_string(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "nspi_server");
+	nspi = lpcfg_parm_string(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "nspi_server");
 	mapiproxy_server_overwrite(dce_ctx, nspi, NDR_EXCHANGE_NSP_NAME);
 
 	/* Check for override/custom EMSMDB server */
-	emsmdb = lp_parm_string(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "emsmdb_server");
+	emsmdb = lpcfg_parm_string(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "emsmdb_server");
 	mapiproxy_server_overwrite(dce_ctx, emsmdb, NDR_EXCHANGE_EMSMDB_NAME);
 
 	/* Check for override/custom RFR server */
-	rfr = lp_parm_string(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "rfr_server");
+	rfr = lpcfg_parm_string(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "rfr_server");
 	mapiproxy_server_overwrite(dce_ctx, rfr, NDR_EXCHANGE_DS_RFR_NAME);
 
 	for (server = server_list; server; server = server->next) {
@@ -230,12 +230,16 @@ static NTSTATUS mapiproxy_server_load(struct dcesrv_context *dce_ctx)
  */
 _PUBLIC_ NTSTATUS mapiproxy_server_init(struct dcesrv_context *dce_ctx)
 {
-	init_module_fn		*servers;
+	openchange_plugin_init_fn *servers;
 	NTSTATUS		ret;
 
-	servers = load_samba_modules(NULL, dce_ctx->lp_ctx, "dcerpc_mapiproxy_server");
+	servers = load_openchange_plugins(NULL, "dcerpc_mapiproxy_server");
 
-	run_init_functions(servers);
+	if (servers != NULL) {
+		int i;
+		for (i = 0; servers[i]; i++) { servers[i](); }
+	}
+
 	talloc_free(servers);
 
 	ret = mapiproxy_server_load(dce_ctx);
@@ -300,7 +304,7 @@ _PUBLIC_ TDB_CONTEXT *mapiproxy_server_emsabp_tdb_init(struct loadparm_context *
 	if (!mem_ctx) return NULL;
 
 	/* Step 0. Retrieve a TDB context pointer on the emsabp_tdb database */
-	tdb_path = talloc_asprintf(mem_ctx, "%s/%s", lp_private_dir(lp_ctx), EMSABP_TDB_NAME);
+	tdb_path = talloc_asprintf(mem_ctx, "%s/%s", lpcfg_private_dir(lp_ctx), EMSABP_TDB_NAME);
 	emsabp_tdb_ctx = tdb_open(tdb_path, 0, 0, O_RDWR|O_CREAT, 0600);
 	talloc_free(tdb_path);
 	if (!emsabp_tdb_ctx) {
@@ -333,6 +337,13 @@ _PUBLIC_ void *mapiproxy_server_openchange_ldb_init(struct loadparm_context *lp_
 	TALLOC_CTX		*mem_ctx;
 	struct tevent_context	*ev;
 	int			ret;
+	struct ldb_result	*res;
+	struct ldb_dn		*tmp_dn = NULL;
+	static const char	*attrs[] = {
+		"rootDomainNamingContext",
+		"defaultNamingContext",
+		NULL
+	};
 
 	/* Sanity checks */
 	if (openchange_ldb_ctx) return openchange_ldb_ctx;
@@ -344,19 +355,42 @@ _PUBLIC_ void *mapiproxy_server_openchange_ldb_init(struct loadparm_context *lp_
 	if (!mem_ctx) return NULL;
 
 	/* Step 0. Retrieve a LDB context pointer on openchange.ldb database */
-	ldb_path = talloc_asprintf(mem_ctx, "%s/%s", lp_private_dir(lp_ctx), OPENCHANGE_LDB_NAME);
+	ldb_path = talloc_asprintf(mem_ctx, "%s/%s", lpcfg_private_dir(lp_ctx), OPENCHANGE_LDB_NAME);
 	openchange_ldb_ctx = ldb_init(mem_ctx, ev);
 	if (!openchange_ldb_ctx) {
 		talloc_free(mem_ctx);
 		return NULL;
 	}
 
-	ret = ldb_connect(openchange_ldb_ctx, ldb_path, 0, NULL);
+	/* Step 1. Connect to the database */
+	ret = ldb_connect((struct ldb_context *)openchange_ldb_ctx, ldb_path, 0, NULL);
 	talloc_free(ldb_path);
 	if (ret != LDB_SUCCESS) {
 		talloc_free(mem_ctx);
 		return NULL;
 	}
+
+	/* Step 2. Search for the rootDSE record */
+	ret = ldb_search(openchange_ldb_ctx, mem_ctx, &res, ldb_dn_new(mem_ctx, openchange_ldb_ctx, "@ROOTDSE"),
+			  LDB_SCOPE_BASE, attrs, NULL);
+	if (ret != LDB_SUCCESS) {
+		talloc_free(mem_ctx);
+		return NULL;
+	}
+
+	if (res->count != 1) {
+		talloc_free(mem_ctx);
+		return NULL;
+	}
+
+	/* Step 3. Set opaque naming */
+	tmp_dn = ldb_msg_find_attr_as_dn((struct ldb_context *)openchange_ldb_ctx, openchange_ldb_ctx,
+					 res->msgs[0], "rootDomainNamingContext");
+	ldb_set_opaque((struct ldb_context *)openchange_ldb_ctx, "rootDomainNamingContext", tmp_dn);
+
+	tmp_dn = ldb_msg_find_attr_as_dn((struct ldb_context *)openchange_ldb_ctx, openchange_ldb_ctx,
+					 res->msgs[0], "defaultNamingContext");
+	ldb_set_opaque((struct ldb_context *)openchange_ldb_ctx, "defaultNamingContext", tmp_dn);
 
 	return openchange_ldb_ctx;
 }

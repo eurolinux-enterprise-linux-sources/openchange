@@ -144,6 +144,7 @@ _PUBLIC_ enum MAPISTATUS emsabp_tdb_close(TDB_CONTEXT *tdb_ctx)
 /**
    \details Fetch an element within a TDB database given its key
 
+   \param tdb_ctx pointer to the EMSABP TDB context
    \param keyname pointer to the TDB key to fetch
    \param result pointer on TDB results
 
@@ -273,13 +274,15 @@ static int emsabp_tdb_traverse_MId_DN(TDB_CONTEXT *tdb_ctx,
 	uint32_t		value;
 	struct emsabp_MId	*emsabp_MId = (struct emsabp_MId *) state;
 
-	if (key.dptr && strcmp((const char *)key.dptr, EMSABP_TDB_DATA_REC)) {
-		MId = talloc_strndup(emsabp_MId, (char *)dbuf.dptr, dbuf.dsize);
-		value = strtol((const char *)MId, NULL, 16);
-		talloc_free(MId);
-		if (value == emsabp_MId->MId) {
-			emsabp_MId->dn = talloc_strndup(emsabp_MId, (char *)key.dptr, key.dsize);
-			return 1;
+	if (key.dptr) {
+		if (!strncmp((const char *)key.dptr, "CN=", 3)) {
+			MId = talloc_strndup(emsabp_MId, (char *)dbuf.dptr, dbuf.dsize);
+			value = strtol((const char *)MId, NULL, 16);
+			talloc_free(MId);
+			if (value == emsabp_MId->MId) {
+				emsabp_MId->dn = talloc_strndup(emsabp_MId, (char *)key.dptr, key.dsize);
+				return 1;
+			}
 		}
 	}
 

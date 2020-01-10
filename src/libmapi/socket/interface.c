@@ -19,8 +19,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/proto_private.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
 #include <param.h>
 
 #define ALLONES  ((uint32_t)0xFFFFFFFF)
@@ -29,6 +29,11 @@
 */
 #define MKBCADDR(_IP, _NM) ((_IP & _NM) | (_NM ^ ALLONES))
 #define MKNETADDR(_IP, _NM) (_IP & _NM)
+
+bool is_zero_ip_v4(struct in_addr ip);
+bool same_net_v4(struct in_addr ip1, struct in_addr ip2, struct in_addr mask);
+uint32_t interpret_addr(const char *str);
+struct in_addr interpret_addr2(const char *str);
 
 /****************************************************************************
 Try and find an interface that matches an ip. If we cannot, return NULL
@@ -76,7 +81,7 @@ static void add_interface(TALLOC_CTX *mem_ctx, struct in_addr ip, struct in_addr
 	iface->ip_s = talloc_strdup(iface, inet_ntoa(iface->ip));
 	iface->nmask_s = talloc_strdup(iface, inet_ntoa(iface->nmask));
 	
-	if (nmask.s_addr != ~0) {
+	if (nmask.s_addr != ~(in_addr_t)0) {
 		iface->bcast_s = talloc_strdup(iface, inet_ntoa(bcast));
 	}
 
@@ -194,7 +199,7 @@ void load_interfaces(TALLOC_CTX *mem_ctx, const char **interfaces, struct interf
 	loopback_ip = interpret_addr2("127.0.0.1");
 
 	/* probe the kernel for interfaces */
-	total_probed = get_interfaces(ifaces, MAX_INTERFACES);
+	total_probed = get_interfaces_oc(ifaces, MAX_INTERFACES);
 
 	/* if we don't have a interfaces line then use all interfaces
 	   except loopback */

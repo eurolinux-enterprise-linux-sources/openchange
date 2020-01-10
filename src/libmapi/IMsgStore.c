@@ -17,8 +17,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/proto_private.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
 
 
 /**
@@ -45,7 +45,8 @@
 
    \sa MAPIInitialize, OpenMsgStore, GetLastError
  */
-_PUBLIC_ enum MAPISTATUS OpenFolder(mapi_object_t *obj_store, mapi_id_t id_folder,
+_PUBLIC_ enum MAPISTATUS OpenFolder(mapi_object_t *obj_store, 
+				    mapi_id_t id_folder,
 				    mapi_object_t *obj_folder)
 {
 	struct mapi_request	*mapi_request;
@@ -60,7 +61,6 @@ _PUBLIC_ enum MAPISTATUS OpenFolder(mapi_object_t *obj_store, mapi_id_t id_folde
 	uint8_t			logon_id;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj_store);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
@@ -68,7 +68,7 @@ _PUBLIC_ enum MAPISTATUS OpenFolder(mapi_object_t *obj_store, mapi_id_t id_folde
 	if ((retval = mapi_object_get_logon_id(obj_store, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "OpenFolder");
+	mem_ctx = talloc_named(session, 0, "OpenFolder");
 
 	/* Fill the OpenFolder operation */
 	request.handle_idx = 0x1;
@@ -93,7 +93,7 @@ _PUBLIC_ enum MAPISTATUS OpenFolder(mapi_object_t *obj_store, mapi_id_t id_folde
 	mapi_request->handles[0] = mapi_object_get_handle(obj_store);
 	mapi_request->handles[1] = 0xffffffff;
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -148,7 +148,6 @@ _PUBLIC_ enum MAPISTATUS PublicFolderIsGhosted(mapi_object_t *obj_store,
 	uint8_t					logon_id;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_folder, MAPI_E_INVALID_PARAMETER, NULL);
 	
@@ -164,7 +163,7 @@ _PUBLIC_ enum MAPISTATUS PublicFolderIsGhosted(mapi_object_t *obj_store,
 	folderId = mapi_object_get_id(obj_folder);
 	OPENCHANGE_RETVAL_IF(!folderId, MAPI_E_INVALID_PARAMETER, NULL);
 
-	mem_ctx = talloc_named(NULL, 0, "PublicFolderIsGhosted");
+	mem_ctx = talloc_named(session[0], 0, "PublicFolderIsGhosted");
 	size = 0;
 
 	/* Fill the PublicFolderIsGhosted operation */
@@ -187,7 +186,7 @@ _PUBLIC_ enum MAPISTATUS PublicFolderIsGhosted(mapi_object_t *obj_store,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_store);
 
-	status = emsmdb_transaction(session[0]->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session[0], mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -237,7 +236,6 @@ _PUBLIC_ enum MAPISTATUS OpenPublicFolderByName(mapi_object_t *obj_folder,
 	uint8_t					logon_id;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_folder, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_child, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!name, MAPI_E_INVALID_PARAMETER, NULL);
@@ -247,7 +245,7 @@ _PUBLIC_ enum MAPISTATUS OpenPublicFolderByName(mapi_object_t *obj_folder,
 	if ((retval = mapi_object_get_logon_id(obj_folder, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "OpenPublicFolderByName");
+	mem_ctx = talloc_named(session, 0, "OpenPublicFolderByName");
 	size = 0;
 
 	/* Fill the OpenPublicFolderByName operation */
@@ -275,7 +273,7 @@ _PUBLIC_ enum MAPISTATUS OpenPublicFolderByName(mapi_object_t *obj_folder,
 	mapi_request->handles[0] = mapi_object_get_handle(obj_folder);
 	mapi_request->handles[1] = 0xffffffff;
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -329,7 +327,6 @@ _PUBLIC_ enum MAPISTATUS SetReceiveFolder(mapi_object_t *obj_store,
 	uint8_t				logon_id;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_folder, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!lpszMessageClass, MAPI_E_INVALID_PARAMETER, NULL);
@@ -338,7 +335,7 @@ _PUBLIC_ enum MAPISTATUS SetReceiveFolder(mapi_object_t *obj_store,
 	if ((retval = mapi_object_get_logon_id(obj_store, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "SetReceiveFolder");
+	mem_ctx = talloc_named(session, 0, "SetReceiveFolder");
 
 	/* Fill the SetReceiveFolder operation */
 	size = 0;
@@ -363,7 +360,7 @@ _PUBLIC_ enum MAPISTATUS SetReceiveFolder(mapi_object_t *obj_store,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_store);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -418,14 +415,13 @@ _PUBLIC_ enum MAPISTATUS GetReceiveFolder(mapi_object_t *obj_store,
 	uint8_t				logon_id;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj_store);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 	if ((retval = mapi_object_get_logon_id(obj_store, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "GetReceiveFolder");
+	mem_ctx = talloc_named(session, 0, "GetReceiveFolder");
 
 	*id_folder = 0;
 
@@ -454,7 +450,7 @@ _PUBLIC_ enum MAPISTATUS GetReceiveFolder(mapi_object_t *obj_store,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_store);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -508,14 +504,13 @@ _PUBLIC_ enum MAPISTATUS GetReceiveFolderTable(mapi_object_t *obj_store,
 	uint8_t					logon_id;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj_store);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 	if ((retval = mapi_object_get_logon_id(obj_store, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "GetReceiveFolderTable");
+	mem_ctx = talloc_named(session, 0, "GetReceiveFolderTable");
 	size = 0;
 
 	/* Fill the MAPI_REQ request */
@@ -533,7 +528,7 @@ _PUBLIC_ enum MAPISTATUS GetReceiveFolderTable(mapi_object_t *obj_store,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_store);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -609,7 +604,6 @@ _PUBLIC_ enum MAPISTATUS GetTransportFolder(mapi_object_t *obj_store,
 	uint8_t				logon_id;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!FolderId, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj_store);
@@ -617,7 +611,7 @@ _PUBLIC_ enum MAPISTATUS GetTransportFolder(mapi_object_t *obj_store,
 	if ((retval = mapi_object_get_logon_id(obj_store, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "GetTransportFolder");
+	mem_ctx = talloc_named(session, 0, "GetTransportFolder");
 	size = 0;
 
 	/* Fill the MAPI_REQ request */
@@ -635,7 +629,7 @@ _PUBLIC_ enum MAPISTATUS GetTransportFolder(mapi_object_t *obj_store,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_store);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -697,7 +691,6 @@ _PUBLIC_ enum MAPISTATUS GetOwningServers(mapi_object_t *obj_store,
 	uint8_t				logon_id;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_folder, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!OwningServersCount, MAPI_E_INVALID_PARAMETER, NULL);
@@ -713,7 +706,7 @@ _PUBLIC_ enum MAPISTATUS GetOwningServers(mapi_object_t *obj_store,
 	FolderId = mapi_object_get_id(obj_folder);
 	OPENCHANGE_RETVAL_IF(!FolderId, MAPI_E_INVALID_PARAMETER, NULL);
 		
-	mem_ctx = talloc_named(NULL, 0, "GetOwningServers");
+	mem_ctx = talloc_named(session, 0, "GetOwningServers");
 	
 	size = 0;
 
@@ -737,7 +730,7 @@ _PUBLIC_ enum MAPISTATUS GetOwningServers(mapi_object_t *obj_store,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_store);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -801,7 +794,6 @@ _PUBLIC_ enum MAPISTATUS GetStoreState(mapi_object_t *obj_store,
 	uint8_t				logon_id;
 
 	/* Sanity Checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!StoreState, MAPI_E_INVALID_PARAMETER, NULL);
 
@@ -811,7 +803,7 @@ _PUBLIC_ enum MAPISTATUS GetStoreState(mapi_object_t *obj_store,
 	if ((retval = mapi_object_get_logon_id(obj_store, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "GetStoreState");
+	mem_ctx = talloc_named(session, 0, "GetStoreState");
 	size = 0;
 
 	/* Fill the MAPI_REQ request */
@@ -829,7 +821,7 @@ _PUBLIC_ enum MAPISTATUS GetStoreState(mapi_object_t *obj_store,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_store);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -871,7 +863,6 @@ _PUBLIC_ enum MAPISTATUS GetStoreState(mapi_object_t *obj_store,
 _PUBLIC_ enum MAPISTATUS GetOutboxFolder(mapi_object_t *obj_store, 
 					 mapi_id_t *outbox_id)
 {
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 
 	*outbox_id = ((mapi_object_store_t *)obj_store->private_data)->fid_outbox;
@@ -883,6 +874,7 @@ _PUBLIC_ enum MAPISTATUS GetOutboxFolder(mapi_object_t *obj_store,
 /**
    \details Notify the store of a new message to be processed
 
+   \param obj_store the store that the message is in (logon object)
    \param obj_folder the folder that the message is in
    \param obj_msg the message to be processed
    \param MessageClass the message class of the message to be processed
@@ -899,7 +891,8 @@ _PUBLIC_ enum MAPISTATUS GetOutboxFolder(mapi_object_t *obj_store,
 
    \sa GetReceiveFolder, GetReceiveFolderTable
  */
-_PUBLIC_ enum MAPISTATUS TransportNewMail(mapi_object_t *obj_folder, mapi_object_t *obj_msg,
+_PUBLIC_ enum MAPISTATUS TransportNewMail(mapi_object_t *obj_store, mapi_object_t *obj_folder,
+					  mapi_object_t *obj_msg,
 					  const char *MessageClass, uint32_t MessageFlags)
 {
 	struct mapi_request		*mapi_request;
@@ -914,7 +907,8 @@ _PUBLIC_ enum MAPISTATUS TransportNewMail(mapi_object_t *obj_folder, mapi_object
 	uint8_t				logon_id;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
+	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_folder, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_msg, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!MessageClass, MAPI_E_INVALID_PARAMETER, NULL);
@@ -924,7 +918,7 @@ _PUBLIC_ enum MAPISTATUS TransportNewMail(mapi_object_t *obj_folder, mapi_object
 	if ((retval = mapi_object_get_logon_id(obj_folder, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "TransportNewMail");
+	mem_ctx = talloc_named(session, 0, "TransportNewMail");
 
 	/* Fill the TransportNewMail operation */
 	size = 0;
@@ -951,9 +945,9 @@ _PUBLIC_ enum MAPISTATUS TransportNewMail(mapi_object_t *obj_folder, mapi_object
 	mapi_request->length = size;
 	mapi_request->mapi_req = mapi_req;
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
-	mapi_request->handles[0] = mapi_object_get_handle(obj_folder);
+	mapi_request->handles[0] = mapi_object_get_handle(obj_store);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;

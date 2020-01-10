@@ -18,8 +18,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/proto_private.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
 
 /**
    \file IMAPITable.c
@@ -64,7 +64,6 @@ _PUBLIC_ enum MAPISTATUS SetColumns(mapi_object_t *obj_table,
 	uint8_t 		logon_id = 0;
 
 	/* sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	
 	session = mapi_object_get_session(obj_table);
@@ -73,7 +72,7 @@ _PUBLIC_ enum MAPISTATUS SetColumns(mapi_object_t *obj_table,
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "SetColumns");
+	mem_ctx = talloc_named(session, 0, "SetColumns");
 	size = 0;
 
 	/* Fill the SetColumns operation */
@@ -98,7 +97,7 @@ _PUBLIC_ enum MAPISTATUS SetColumns(mapi_object_t *obj_table,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -163,7 +162,6 @@ _PUBLIC_ enum MAPISTATUS QueryPosition(mapi_object_t *obj_table,
 	uint8_t 		logon_id = 0;
 
 	/* Sanity Checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 
 	session = mapi_object_get_session(obj_table);
@@ -172,7 +170,7 @@ _PUBLIC_ enum MAPISTATUS QueryPosition(mapi_object_t *obj_table,
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "QueryPosition");
+	mem_ctx = talloc_named(session, 0, "QueryPosition");
 	size = 0;
 
 	/* Fill the MAPI_REQ request */
@@ -190,7 +188,7 @@ _PUBLIC_ enum MAPISTATUS QueryPosition(mapi_object_t *obj_table,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -238,10 +236,12 @@ _PUBLIC_ enum MAPISTATUS QueryPosition(mapi_object_t *obj_table,
 
    \sa SetColumns, QueryPosition, QueryColumns, SeekRow
  */
-_PUBLIC_ enum MAPISTATUS QueryRows(mapi_object_t *obj_table, uint16_t row_count,
+_PUBLIC_ enum MAPISTATUS QueryRows(mapi_object_t *obj_table, 
+				   uint16_t row_count,
 				   enum QueryRowsFlags flags, 
 				   struct SRowSet *rowSet)
 {
+	struct mapi_context	*mapi_ctx;
 	struct mapi_request	*mapi_request;
 	struct mapi_response	*mapi_response;
 	struct EcDoRpc_MAPI_REQ	*mapi_req;
@@ -256,16 +256,18 @@ _PUBLIC_ enum MAPISTATUS QueryRows(mapi_object_t *obj_table, uint16_t row_count,
 	uint8_t 		logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 
 	session = mapi_object_get_session(obj_table);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 
+	mapi_ctx = session->mapi_ctx;
+	OPENCHANGE_RETVAL_IF(!mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
+
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "QueryRows");
+	mem_ctx = talloc_named(session, 0, "QueryRows");
 	size = 0;
 
 	/* Fill the QueryRows operation */
@@ -291,7 +293,7 @@ _PUBLIC_ enum MAPISTATUS QueryRows(mapi_object_t *obj_table, uint16_t row_count,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -307,7 +309,7 @@ _PUBLIC_ enum MAPISTATUS QueryRows(mapi_object_t *obj_table, uint16_t row_count,
 	reply = &mapi_response->mapi_repl->u.mapi_QueryRows;
 	rowSet->cRows = reply->RowCount;
 	rowSet->aRow = talloc_array((TALLOC_CTX *)table, struct SRow, rowSet->cRows);
-	emsmdb_get_SRowSet((TALLOC_CTX *)rowSet->aRow, global_mapi_ctx->lp_ctx, rowSet, &table->proptags, &reply->RowData);
+	emsmdb_get_SRowSet((TALLOC_CTX *)rowSet->aRow, rowSet, &table->proptags, &reply->RowData);
 
 	talloc_free(mapi_response);
 	talloc_free(mem_ctx);
@@ -350,7 +352,6 @@ _PUBLIC_ enum MAPISTATUS QueryColumns(mapi_object_t *obj_table,
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	
 	session = mapi_object_get_session(obj_table);
@@ -359,7 +360,7 @@ _PUBLIC_ enum MAPISTATUS QueryColumns(mapi_object_t *obj_table,
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "QueryColumns");
+	mem_ctx = talloc_named(session, 0, "QueryColumns");
 
 	cols->cValues = 0;
 	size = 0;
@@ -379,7 +380,7 @@ _PUBLIC_ enum MAPISTATUS QueryColumns(mapi_object_t *obj_table,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -444,7 +445,6 @@ _PUBLIC_ enum MAPISTATUS SeekRow(mapi_object_t *obj_table,
 	uint8_t 		logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 
 	session = mapi_object_get_session(obj_table);
@@ -453,7 +453,7 @@ _PUBLIC_ enum MAPISTATUS SeekRow(mapi_object_t *obj_table,
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "SeekRow");
+	mem_ctx = talloc_named(session, 0, "SeekRow");
 	*row = 0;
 
 	/* Fill the SeekRow operation */
@@ -481,7 +481,7 @@ _PUBLIC_ enum MAPISTATUS SeekRow(mapi_object_t *obj_table,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -540,7 +540,6 @@ _PUBLIC_ enum MAPISTATUS SeekRowBookmark(mapi_object_t *obj_table,
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 
 	session = mapi_object_get_session(obj_table);
@@ -552,7 +551,7 @@ _PUBLIC_ enum MAPISTATUS SeekRowBookmark(mapi_object_t *obj_table,
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "SeekRowBookmark");
+	mem_ctx = talloc_named(session, 0, "SeekRowBookmark");
 
 	/* Fill the SeekRowBookmark operation */
 	size = 0;
@@ -581,7 +580,7 @@ _PUBLIC_ enum MAPISTATUS SeekRowBookmark(mapi_object_t *obj_table,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -646,7 +645,6 @@ _PUBLIC_ enum MAPISTATUS SeekRowApprox(mapi_object_t *obj_table,
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!ulDenominator, MAPI_E_INVALID_PARAMETER, NULL);
 
@@ -656,7 +654,7 @@ _PUBLIC_ enum MAPISTATUS SeekRowApprox(mapi_object_t *obj_table,
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "SeekRowApprox");
+	mem_ctx = talloc_named(session, 0, "SeekRowApprox");
 	
 	/* Fill the SeekRowApprox operation */
 	size = 0;
@@ -681,7 +679,7 @@ _PUBLIC_ enum MAPISTATUS SeekRowApprox(mapi_object_t *obj_table,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -731,7 +729,6 @@ _PUBLIC_ enum MAPISTATUS CreateBookmark(mapi_object_t *obj_table,
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 
 	session = mapi_object_get_session(obj_table);
@@ -740,7 +737,7 @@ _PUBLIC_ enum MAPISTATUS CreateBookmark(mapi_object_t *obj_table,
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "CreateBookmark");	
+	mem_ctx = talloc_named(session, 0, "CreateBookmark");	
 	size = 0;
 
 	/* Fill the MAPI_REQ request */
@@ -758,7 +755,7 @@ _PUBLIC_ enum MAPISTATUS CreateBookmark(mapi_object_t *obj_table,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -828,7 +825,6 @@ _PUBLIC_ enum MAPISTATUS FreeBookmark(mapi_object_t *obj_table,
 	uint8_t 			logon_id = 0;
 
 	/* Sanity check */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 
 	session = mapi_object_get_session(obj_table);
@@ -844,7 +840,7 @@ _PUBLIC_ enum MAPISTATUS FreeBookmark(mapi_object_t *obj_table,
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "FreeBookmark");
+	mem_ctx = talloc_named(session, 0, "FreeBookmark");
 
 	while (bookmark) {
 		if (bookmark->index == bkPosition) {
@@ -875,7 +871,7 @@ _PUBLIC_ enum MAPISTATUS FreeBookmark(mapi_object_t *obj_table,
 			mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 			mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-			status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+			status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 			OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 			OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 			retval = mapi_response->mapi_repl->error_code;
@@ -928,7 +924,6 @@ _PUBLIC_ enum MAPISTATUS SortTable(mapi_object_t *obj_table,
 	uint8_t 		logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!lpSortCriteria, MAPI_E_INVALID_PARAMETER, NULL);
 
@@ -938,7 +933,7 @@ _PUBLIC_ enum MAPISTATUS SortTable(mapi_object_t *obj_table,
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "SortTable");
+	mem_ctx = talloc_named(session, 0, "SortTable");
 
 	/* Fill the SortTable operation */
 	size = 0;
@@ -969,7 +964,7 @@ _PUBLIC_ enum MAPISTATUS SortTable(mapi_object_t *obj_table,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -1013,6 +1008,9 @@ uint32_t get_mapi_SRestriction_size(struct mapi_SRestriction *res)
 			size += get_mapi_SRestriction_size((struct mapi_SRestriction *)&(res->res.resOr.res[i]));
 		}
 		break;
+	/* case RES_NOT: */
+	/* 	size += get_mapi_SRestriction_size(res->res.resNot.res); */
+	/* 	break; */
 	case RES_CONTENT:
 		size += sizeof (res->res.resContent.fuzzy);
 		size += sizeof (res->res.resContent.ulPropTag);
@@ -1076,7 +1074,6 @@ _PUBLIC_ enum MAPISTATUS Reset(mapi_object_t *obj_table)
 	uint8_t 		logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 
 	session = mapi_object_get_session(obj_table);
@@ -1085,7 +1082,7 @@ _PUBLIC_ enum MAPISTATUS Reset(mapi_object_t *obj_table)
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "Reset");
+	mem_ctx = talloc_named(session, 0, "Reset");
 	size = 0;
 
 	/* Fill the MAPI_REQ request */
@@ -1103,7 +1100,7 @@ _PUBLIC_ enum MAPISTATUS Reset(mapi_object_t *obj_table)
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -1169,7 +1166,6 @@ _PUBLIC_ enum MAPISTATUS Restrict(mapi_object_t *obj_table,
 	uint8_t 		logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!res, MAPI_E_INVALID_PARAMETER, NULL);
 
@@ -1179,7 +1175,7 @@ _PUBLIC_ enum MAPISTATUS Restrict(mapi_object_t *obj_table,
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "Restrict");
+	mem_ctx = talloc_named(session, 0, "Restrict");
 
 	/* Fill the Restrict operation */
 	size = 0;
@@ -1207,7 +1203,7 @@ _PUBLIC_ enum MAPISTATUS Restrict(mapi_object_t *obj_table,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -1266,6 +1262,7 @@ _PUBLIC_ enum MAPISTATUS FindRow(mapi_object_t *obj_table,
 				 enum FindRow_ulFlags ulFlags,
 				 struct SRowSet *SRowSet)
 {
+	struct mapi_context	*mapi_ctx;
 	struct mapi_request    	*mapi_request;
 	struct mapi_response   	*mapi_response;
 	struct EcDoRpc_MAPI_REQ	*mapi_req;
@@ -1281,12 +1278,14 @@ _PUBLIC_ enum MAPISTATUS FindRow(mapi_object_t *obj_table,
 	uint8_t 		logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!res, MAPI_E_INVALID_PARAMETER, NULL);
 
 	session = mapi_object_get_session(obj_table);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
+
+	mapi_ctx = session->mapi_ctx;
+	OPENCHANGE_RETVAL_IF(!mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
@@ -1296,7 +1295,7 @@ _PUBLIC_ enum MAPISTATUS FindRow(mapi_object_t *obj_table,
 		OPENCHANGE_RETVAL_IF(retval, MAPI_E_INVALID_BOOKMARK, NULL);
 	}
 
-	mem_ctx = talloc_named(NULL, 0, "FindRow");
+	mem_ctx = talloc_named(session, 0, "FindRow");
 
 	/* Fill the FindRow operation */
 	size = 0;
@@ -1335,7 +1334,7 @@ _PUBLIC_ enum MAPISTATUS FindRow(mapi_object_t *obj_table,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -1350,7 +1349,7 @@ _PUBLIC_ enum MAPISTATUS FindRow(mapi_object_t *obj_table,
 	reply = &mapi_response->mapi_repl->u.mapi_FindRow;
 	SRowSet->cRows = 1;
 	SRowSet->aRow = talloc_array((TALLOC_CTX *)table, struct SRow, SRowSet->cRows);
-	emsmdb_get_SRowSet((TALLOC_CTX *)table, global_mapi_ctx->lp_ctx, SRowSet, &table->proptags, &reply->row);
+	emsmdb_get_SRowSet((TALLOC_CTX *)table, SRowSet, &table->proptags, &reply->row);
 
 	talloc_free(mapi_response);
 	talloc_free(mem_ctx);
@@ -1401,7 +1400,6 @@ _PUBLIC_ enum MAPISTATUS GetStatus(mapi_object_t *obj_table, uint8_t *TableStatu
 	uint8_t 		logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	
 	session = mapi_object_get_session(obj_table);
@@ -1410,7 +1408,7 @@ _PUBLIC_ enum MAPISTATUS GetStatus(mapi_object_t *obj_table, uint8_t *TableStatu
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "GetStatus");
+	mem_ctx = talloc_named(session, 0, "GetStatus");
 	size = 0;
 
 	/* Fill the MAPI_REQ request */
@@ -1428,7 +1426,7 @@ _PUBLIC_ enum MAPISTATUS GetStatus(mapi_object_t *obj_table, uint8_t *TableStatu
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 	
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -1478,7 +1476,6 @@ _PUBLIC_ enum MAPISTATUS Abort(mapi_object_t *obj_table, uint8_t *TableStatus)
 	uint8_t 		logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!TableStatus, MAPI_E_INVALID_PARAMETER, NULL);
 	
@@ -1488,7 +1485,7 @@ _PUBLIC_ enum MAPISTATUS Abort(mapi_object_t *obj_table, uint8_t *TableStatus)
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "Abort");
+	mem_ctx = talloc_named(session, 0, "Abort");
 	size = 0;
 
 	/* Fill the MAPI_REQ request */
@@ -1498,7 +1495,7 @@ _PUBLIC_ enum MAPISTATUS Abort(mapi_object_t *obj_table, uint8_t *TableStatus)
 	mapi_req->handle_idx = 0;
 	size += 5;
 
-	/* Fill the mapi_request stucture */
+	/* Fill the mapi_request structure */
 	mapi_request = talloc_zero(mem_ctx, struct mapi_request);
 	mapi_request->mapi_len = size + sizeof (uint32_t);
 	mapi_request->length = size;
@@ -1506,7 +1503,7 @@ _PUBLIC_ enum MAPISTATUS Abort(mapi_object_t *obj_table, uint8_t *TableStatus)
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -1563,10 +1560,13 @@ _PUBLIC_ enum MAPISTATUS Abort(mapi_object_t *obj_table, uint8_t *TableStatus)
 
    \sa CollapseRow
  */
-_PUBLIC_ enum MAPISTATUS ExpandRow(mapi_object_t *obj_table, uint64_t categoryId,
-				   uint16_t maxRows, struct SRowSet *rowData,
+_PUBLIC_ enum MAPISTATUS ExpandRow(mapi_object_t *obj_table, 
+				   uint64_t categoryId,
+				   uint16_t maxRows, 
+				   struct SRowSet *rowData,
 				   uint32_t *expandedRowCount)
 {
+	struct mapi_context		*mapi_ctx;
 	struct mapi_request		*mapi_request;
 	struct mapi_response		*mapi_response;
 	struct EcDoRpc_MAPI_REQ		*mapi_req;
@@ -1581,7 +1581,6 @@ _PUBLIC_ enum MAPISTATUS ExpandRow(mapi_object_t *obj_table, uint64_t categoryId
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!rowData, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!expandedRowCount, MAPI_E_INVALID_PARAMETER, NULL);
@@ -1589,10 +1588,13 @@ _PUBLIC_ enum MAPISTATUS ExpandRow(mapi_object_t *obj_table, uint64_t categoryId
 	session = mapi_object_get_session(obj_table);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 
+	mapi_ctx = session->mapi_ctx;
+	OPENCHANGE_RETVAL_IF(!mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
+
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "ExpandRow");
+	mem_ctx = talloc_named(session, 0, "ExpandRow");
 	size = 0;
 
 	/* Fill the ExpandRow operation */
@@ -1617,7 +1619,7 @@ _PUBLIC_ enum MAPISTATUS ExpandRow(mapi_object_t *obj_table, uint64_t categoryId
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -1633,7 +1635,7 @@ _PUBLIC_ enum MAPISTATUS ExpandRow(mapi_object_t *obj_table, uint64_t categoryId
 	reply = &mapi_response->mapi_repl->u.mapi_ExpandRow;
 	rowData->cRows = reply->RowCount;
 	rowData->aRow = talloc_array((TALLOC_CTX *)table, struct SRow, reply->RowCount);
-	emsmdb_get_SRowSet((TALLOC_CTX *)table, global_mapi_ctx->lp_ctx, rowData, &table->proptags, &reply->RowData);
+	emsmdb_get_SRowSet((TALLOC_CTX *)table, rowData, &table->proptags, &reply->RowData);
 	*expandedRowCount = reply->ExpandedRowCount;
 
 	talloc_free(mapi_response);
@@ -1687,7 +1689,6 @@ _PUBLIC_ enum MAPISTATUS CollapseRow(mapi_object_t *obj_table, uint64_t category
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 
 	session = mapi_object_get_session(obj_table);
@@ -1696,7 +1697,7 @@ _PUBLIC_ enum MAPISTATUS CollapseRow(mapi_object_t *obj_table, uint64_t category
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "CollapseRow");
+	mem_ctx = talloc_named(session, 0, "CollapseRow");
 	size = 0;
 
 	/* Fill the CollapseRow operation */
@@ -1719,7 +1720,7 @@ _PUBLIC_ enum MAPISTATUS CollapseRow(mapi_object_t *obj_table, uint64_t category
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 	
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -1783,7 +1784,6 @@ _PUBLIC_ enum MAPISTATUS GetCollapseState(mapi_object_t *obj_table, uint64_t row
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 
 	session = mapi_object_get_session(obj_table);
@@ -1791,7 +1791,7 @@ _PUBLIC_ enum MAPISTATUS GetCollapseState(mapi_object_t *obj_table, uint64_t row
 
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
-	mem_ctx = talloc_named(NULL, 0, "GetCollapseState");
+	mem_ctx = talloc_named(session, 0, "GetCollapseState");
 	size = 0;
 
 	/* Fill the GetCollapseState operation */
@@ -1817,7 +1817,7 @@ _PUBLIC_ enum MAPISTATUS GetCollapseState(mapi_object_t *obj_table, uint64_t row
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 	
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -1867,7 +1867,6 @@ _PUBLIC_ enum MAPISTATUS SetCollapseState(mapi_object_t *obj_table,
 	struct mapi_response		*mapi_response;
 	struct EcDoRpc_MAPI_REQ		*mapi_req;
 	struct SetCollapseState_req	request;
-	struct SetCollapseState_repl	*reply;
 	struct mapi_session		*session;
 	NTSTATUS			status;
 	enum MAPISTATUS			retval;
@@ -1877,7 +1876,6 @@ _PUBLIC_ enum MAPISTATUS SetCollapseState(mapi_object_t *obj_table,
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!CollapseState, MAPI_E_INVALID_PARAMETER, NULL);
 	
@@ -1887,7 +1885,7 @@ _PUBLIC_ enum MAPISTATUS SetCollapseState(mapi_object_t *obj_table,
 	if ((retval = mapi_object_get_logon_id(obj_table, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "SetCollapseState");
+	mem_ctx = talloc_named(session, 0, "SetCollapseState");
 	size = 0;
 
 	/* Fill the SetCollapseState operation */
@@ -1913,15 +1911,13 @@ _PUBLIC_ enum MAPISTATUS SetCollapseState(mapi_object_t *obj_table,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_table);
 	
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
 	OPENCHANGE_RETVAL_IF(retval, retval, mem_ctx);
 
 	OPENCHANGE_CHECK_NOTIFICATION(session, mapi_response);
-
-	reply = &mapi_response->mapi_repl->u.mapi_SetCollapseState;
 
 	mapi_table = (mapi_object_table_t *)obj_table->private_data;
 	OPENCHANGE_RETVAL_IF(!mapi_table, MAPI_E_INVALID_PARAMETER, mem_ctx);

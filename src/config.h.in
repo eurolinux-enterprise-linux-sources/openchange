@@ -3,6 +3,12 @@
 /* Whether or not we have comparison_fn_t */
 #undef HAVE_COMPARISON_FN_T
 
+/* Define to 1 if you have the `dlopen' function. */
+#undef HAVE_DLOPEN
+
+/* Define if you want to use gthread for thread safety */
+#undef HAVE_GTHREAD
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
@@ -18,6 +24,12 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
+/* Define to 1 if you have the `mq_open' function. */
+#undef HAVE_MQ_OPEN
+
+/* Define if you want to use pthread for thread safety */
+#undef HAVE_PTHREADS
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
@@ -32,6 +44,9 @@
 
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
+
+/* Define if you want to use subunit */
+#undef HAVE_SUBUNIT
 
 /* Define to 1 if you have the <sys/cdefs.h> header file. */
 #undef HAVE_SYS_CDEFS_H

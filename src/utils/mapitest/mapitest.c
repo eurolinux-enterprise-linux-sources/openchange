@@ -19,12 +19,13 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
+#include "utils/mapitest/mapitest.h"
+#include "utils/openchange-tools.h"
+
 #include <samba/popt.h>
 #include <param.h>
 
-#include <utils/openchange-tools.h>
-#include "utils/mapitest/mapitest.h"
+#include "config.h"
 
 /**
 	\file
@@ -50,6 +51,7 @@ static void mapitest_init(TALLOC_CTX *mem_ctx, struct mapitest *mt)
 	mt->mapi_suite = false;
 	mt->cmdline_calls = NULL;
 	mt->cmdline_suite = NULL;
+	mt->subunit_output = false;
 }
 
 /**
@@ -151,7 +153,7 @@ static bool mapitest_get_server_info(struct mapitest *mt,
 
 	/* if no profile was specified, get the default */
 	if (!opt_profname) {
-		retval = GetDefaultProfile(&opt_profname);
+		retval = GetDefaultProfile(mt->mapi_ctx, &opt_profname);
 		if (retval != MAPI_E_SUCCESS) {
 			mapi_errstr("GetDefaultProfile", retval);
 			talloc_free(mem_ctx);
@@ -161,13 +163,13 @@ static bool mapitest_get_server_info(struct mapitest *mt,
 		
 
 	/* debug options */
-	SetMAPIDumpData(opt_dumpdata);
+	SetMAPIDumpData(mt->mapi_ctx, opt_dumpdata);
 
 	if (opt_debug) {
-		SetMAPIDebugLevel(atoi(opt_debug));
+		SetMAPIDebugLevel(mt->mapi_ctx, atoi(opt_debug));
 	}
 
-	retval = MapiLogonEx(&session, opt_profname, password);
+	retval = MapiLogonEx(mt->mapi_ctx, &session, opt_profname, password);
 	MAPIFreeBuffer(opt_profname);
 	talloc_free(mem_ctx);
 	if (retval != MAPI_E_SUCCESS) {
@@ -175,6 +177,7 @@ static bool mapitest_get_server_info(struct mapitest *mt,
 		return false;
 	}
 	mt->session = session;
+	mt->profile = session->profile;
 
 	info = emsmdb_get_info(session);
 	memcpy(&mt->info, info, sizeof (struct emsmdb_info));
@@ -207,25 +210,33 @@ int main(int argc, const char *argv[])
 	const char		*opt_password = NULL;
 	const char		*opt_outfile = NULL;
 	char			*prof_tmp = NULL;
+	bool			opt_leak_report = false;
+	bool			opt_leak_report_full = false;
 
 	enum { OPT_PROFILE_DB=1000, OPT_PROFILE, OPT_PASSWORD,
 	       OPT_CONFIDENTIAL, OPT_OUTFILE, OPT_MAPI_CALLS,
 	       OPT_NO_SERVER, OPT_LIST_ALL, OPT_DUMP_DATA,
-	       OPT_DEBUG, OPT_COLOR };
+	       OPT_DEBUG, OPT_COLOR, OPT_SUBUNIT, OPT_LEAK_REPORT,
+	       OPT_LEAK_REPORT_FULL };
 
 	struct poptOption long_options[] = {
 		POPT_AUTOHELP
-		{ "database",     'f', POPT_ARG_STRING, NULL, OPT_PROFILE_DB,    "set the profile database", NULL },
-		{ "profile",      'p', POPT_ARG_STRING, NULL, OPT_PROFILE,       "set the profile name", NULL },
-		{ "password",     'p', POPT_ARG_STRING, NULL, OPT_PASSWORD,      "set the profile or account password", NULL },
-		{ "confidential",  0,  POPT_ARG_NONE,   NULL, OPT_CONFIDENTIAL,  "remove any sensitive data from the report", NULL },
-		{ "color",         0,  POPT_ARG_NONE,   NULL, OPT_COLOR,         "color MAPI retval", NULL },
-		{ "outfile",      'o', POPT_ARG_STRING, NULL, OPT_OUTFILE,       "set the report output file", NULL },
-		{ "mapi-calls",    0,  POPT_ARG_STRING, NULL, OPT_MAPI_CALLS,    "test custom ExchangeRPC tests", NULL },
-		{ "list-all",      0,  POPT_ARG_NONE,   NULL, OPT_LIST_ALL,      "list suite and tests - names and description", NULL },
-		{ "no-server",     0,  POPT_ARG_NONE,   NULL, OPT_NO_SERVER,     "only run tests that do not require server connection", NULL },
-		{ "dump-data",     0,  POPT_ARG_NONE,   NULL, OPT_DUMP_DATA,     "dump the hex data", NULL },
-		{ "debuglevel",   'd', POPT_ARG_STRING, NULL, OPT_DEBUG,         "set debug level", NULL },
+		{ "database",        'f', POPT_ARG_STRING, NULL, OPT_PROFILE_DB,       "set the profile database", NULL },
+		{ "profile",         'p', POPT_ARG_STRING, NULL, OPT_PROFILE,          "set the profile name", NULL },
+		{ "password",        'p', POPT_ARG_STRING, NULL, OPT_PASSWORD,         "set the profile or account password", NULL },
+		{ "confidential",      0, POPT_ARG_NONE,   NULL, OPT_CONFIDENTIAL,     "remove any sensitive data from the report", NULL },
+		{ "color",             0, POPT_ARG_NONE,   NULL, OPT_COLOR,            "color MAPI retval", NULL },
+#if HAVE_SUBUNIT
+		{ "subunit",           0, POPT_ARG_NONE,   NULL, OPT_SUBUNIT,          "output in subunit protocol format", NULL },
+#endif
+		{ "outfile",         'o', POPT_ARG_STRING, NULL, OPT_OUTFILE,          "set the report output file", NULL },
+		{ "mapi-calls",        0, POPT_ARG_STRING, NULL, OPT_MAPI_CALLS,       "test custom ExchangeRPC tests", NULL },
+		{ "list-all",          0, POPT_ARG_NONE,   NULL, OPT_LIST_ALL,         "list suite and tests - names and description", NULL },
+		{ "no-server",         0, POPT_ARG_NONE,   NULL, OPT_NO_SERVER,        "only run tests that do not require server connection", NULL },
+		{ "dump-data",         0, POPT_ARG_NONE,   NULL, OPT_DUMP_DATA,        "dump the hex data", NULL },
+		{ "debuglevel",      'd', POPT_ARG_STRING, NULL, OPT_DEBUG,            "set debug level", NULL },
+		{ "leak-report",       0, POPT_ARG_NONE,   NULL, OPT_LEAK_REPORT,      "enable talloc leak reporting on exit", NULL },
+		{ "leak-report-full",  0, POPT_ARG_NONE,   NULL, OPT_LEAK_REPORT_FULL, "enable full talloc leak reporting on exit", NULL },
 		POPT_OPENCHANGE_VERSION
 		{ NULL, 0, 0, NULL, 0, NULL, NULL }
 	};
@@ -273,11 +284,22 @@ int main(int argc, const char *argv[])
 		case OPT_COLOR:
 			mt.color = true;
 			break;
+		case OPT_SUBUNIT:
+			mt.subunit_output = true;
+			break;
 		case OPT_LIST_ALL:
 			mapitest_list(&mt, NULL);
 			talloc_free(mem_ctx);
 			poptFreeContext(pc);
 			return 0;
+			break;
+		case OPT_LEAK_REPORT:
+			opt_leak_report = true;
+			talloc_enable_leak_report();
+			break;
+		case OPT_LEAK_REPORT_FULL:
+			opt_leak_report_full = true;
+			talloc_enable_leak_report_full();
 			break;
 		}
 	}
@@ -295,7 +317,7 @@ int main(int argc, const char *argv[])
 		opt_profdb = talloc_asprintf(mem_ctx, DEFAULT_PROFDB, getenv("HOME"));
 	}
 
-	retval = MAPIInitialize(opt_profdb);
+	retval = MAPIInitialize(&(mt.mapi_ctx), opt_profdb);
 	if (retval != MAPI_E_SUCCESS) {
 		mapi_errstr("MAPIInitialize", retval);
 		return -2;
@@ -307,6 +329,14 @@ int main(int argc, const char *argv[])
 					     opt_dumpdata, opt_debug);
 
 	mapitest_print_headers(&mt);
+
+	/* Do not run any tests if we couldn't find a profile or if
+	 * server is offline and connection to server was implicitly
+	 * specified */
+	if (!opt_profname && mt.online == false && mt.no_server == false) {
+		fprintf(stderr, "No MAPI profile found for online tests\n");
+		return -2;
+	}
 
 	/* Run custom tests */
 	if (mt.cmdline_calls) {
@@ -325,8 +355,16 @@ int main(int argc, const char *argv[])
 	mapitest_cleanup_stream(&mt);
 
 	/* Uninitialize and free memory */
-	MAPIUninitialize();
+	MAPIUninitialize(mt.mapi_ctx);
 	talloc_free(mt.mem_ctx);
+
+	if (opt_leak_report) {
+		talloc_report(NULL, stdout);
+	}
+
+	if (opt_leak_report_full) {
+		talloc_report_full(NULL, stdout);
+	}
 
 	return num_tests_failed;
 }

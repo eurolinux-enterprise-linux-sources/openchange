@@ -19,9 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
-
-#include <utils/mapitest/mapitest.h>
+#include "utils/mapitest/mapitest.h"
 
 #include <fcntl.h>
 
@@ -62,16 +60,15 @@ _PUBLIC_ bool mapitest_common_folder_open(struct mapitest *mt,
 					  mapi_object_t *obj_child,
 					  uint32_t olNum)
 {
-	enum MAPISTATUS	retval;
 	mapi_id_t	id_child;
 
-	retval = GetDefaultFolder(obj_parent, &id_child, olNum);
+	GetDefaultFolder(obj_parent, &id_child, olNum);
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		mapitest_print(mt, "* %-35s: 0x%.8x\n", "GetDefaultFolder", GetLastError());
 		return false;
 	}
 
-	retval = OpenFolder(obj_parent, id_child, obj_child);
+	OpenFolder(obj_parent, id_child, obj_child);
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		mapitest_print(mt, "* %-35s: 0x%.8x\n", "OpenFolder", GetLastError());
 		return false;
@@ -158,8 +155,7 @@ _PUBLIC_ bool mapitest_common_find_folder(struct mapitest *mt,
 	struct SPropTagArray	*SPropTagArray;
 	struct SRowSet		rowset;
 	mapi_object_t		obj_htable;
-	const char		*tmp;
-	char			*newname;
+	const char		*newname;
 	const uint64_t		*fid;
 	uint32_t		count;
 	uint32_t		index;
@@ -184,16 +180,13 @@ _PUBLIC_ bool mapitest_common_find_folder(struct mapitest *mt,
 	while (((retval = QueryRows(&obj_htable, count, TBL_ADVANCE, &rowset)) != MAPI_E_NOT_FOUND) && rowset.cRows) {
 		for (index = 0; index < rowset.cRows; index++) {
 			fid = (const uint64_t *)find_SPropValue_data(&rowset.aRow[index], PR_FID);
-			tmp = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_DISPLAY_NAME);
+			newname = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_DISPLAY_NAME);
 
-			newname = windows_to_utf8(mt->mem_ctx, tmp);
 			if (newname && fid && !strcmp(newname, name)) {
 				retval = OpenFolder(obj_parent, *fid, obj_child);
 				mapi_object_release(&obj_htable);
-				MAPIFreeBuffer(newname);
 				return true;
 			}
-			MAPIFreeBuffer(newname);
 		}
 	}
 
@@ -212,10 +205,10 @@ _PUBLIC_ bool mapitest_common_message_create(struct mapitest *mt,
 {
 	enum MAPISTATUS		retval;
 
-	/* Create the mesage */
+	/* Create the message */
 	retval = CreateMessage(obj_folder, obj_message);
-	if (GetLastError() != MAPI_E_SUCCESS) {
-		mapitest_print(mt, "* %-35s: 0x%.8x\n", "CreateMessage", GetLastError());
+	if (retval != MAPI_E_SUCCESS) {
+		mapitest_print_retval(mt, "(Common) CreateMessage");
 		return false;
 	}
 
@@ -229,17 +222,17 @@ _PUBLIC_ bool mapitest_common_message_fill(struct mapitest *mt,
 					   mapi_object_t *obj_message,
 					   const char *subject)
 {
-	enum MAPISTATUS		retval;
-	struct SPropTagArray	*SPropTagArray;
-	struct SRowSet		*SRowSet = NULL;
-	struct SPropTagArray   	*flaglist = NULL;
-	struct SPropValue	SPropValue;
-	struct SPropValue	lpProps[4];
-	const char	       	*username[2];
-	const char		*body;
-	uint32_t		msgflag;
-	uint32_t		format;
-	uint32_t		ret;
+	enum MAPISTATUS			retval;
+	struct SPropTagArray		*SPropTagArray;
+	struct SRowSet			*SRowSet = NULL;
+	struct PropertyTagArray_r	*flaglist = NULL;
+	struct SPropValue		SPropValue;
+	struct SPropValue		lpProps[4];
+	const char			*username[2];
+	const char			*body;
+	uint32_t			msgflag;
+	uint32_t			format;
+	uint32_t			ret;
 
 	/* Sanity checks */
 	if (subject == NULL) return false;
@@ -257,19 +250,18 @@ _PUBLIC_ bool mapitest_common_message_fill(struct mapitest *mt,
 					  PR_7BIT_DISPLAY_NAME_UNICODE,
 					  PR_SMTP_ADDRESS_UNICODE);
 
-	username[0] = (const char *)mt->info.szDisplayName;
+	username[0] = (char *)mt->profile->mailbox;
 	username[1] = NULL;
 
 	SRowSet = talloc_zero(mt->mem_ctx, struct SRowSet);
-	flaglist = talloc_zero(mt->mem_ctx, struct SPropTagArray);
+	flaglist = talloc_zero(mt->mem_ctx, struct PropertyTagArray_r);
 
 	retval = ResolveNames(mapi_object_get_session(obj_message), username, SPropTagArray, 
 			      &SRowSet, &flaglist, MAPI_UNICODE);
 	MAPIFreeBuffer(SPropTagArray);
 	if (retval != MAPI_E_SUCCESS) {
-		mapitest_print(mt, "* %-35s: 0x%.8x\n", "ResolveNames", GetLastError());
+		mapitest_print_retval(mt, "(Common) ResolveNames");
 		talloc_free(SRowSet);
-		talloc_free(SPropTagArray);
 		talloc_free(flaglist);
 		return false;
 	}
@@ -285,7 +277,7 @@ _PUBLIC_ bool mapitest_common_message_fill(struct mapitest *mt,
 	MAPIFreeBuffer(SRowSet);
 	MAPIFreeBuffer(flaglist);
 	if (retval != MAPI_E_SUCCESS) {
-		mapitest_print(mt, "* %-35s: 0x%.8x\n", "ModifyRecipients", retval);
+		mapitest_print_retval(mt, "(Common) ModifyRecipients");
 		return false;
 	}
 
@@ -298,9 +290,9 @@ _PUBLIC_ bool mapitest_common_message_fill(struct mapitest *mt,
 	format = EDITOR_FORMAT_PLAINTEXT;
 	set_SPropValue_proptag(&lpProps[3], PR_MSG_EDITOR_FORMAT, (const void *)&format);
 
-	retval = SetProps(obj_message, lpProps, 4);
+	retval = SetProps(obj_message, 0, lpProps, 4);
 	if (retval != MAPI_E_SUCCESS) {
-		mapitest_print(mt, "* %-35s: 0x%.8x\n", "SetProps", retval);
+		mapitest_print_retval(mt, "(Common) SetProps");
 		return false;
 	}
 
@@ -401,13 +393,13 @@ _PUBLIC_ bool mapitest_common_create_filled_test_folder(struct mapitest *mt)
 			return false;
 		}
 
-		from = talloc_asprintf(mt->mem_ctx, "[MT] Dummy%i", i);
+		from = talloc_asprintf(mt->mem_ctx, "MT Dummy%i", i);
 		set_SPropValue_proptag(&lpProp[0], PR_SENDER_NAME, (const void *)from);
 		body = talloc_asprintf(mt->mem_ctx, "Body of message %i", i);
 		set_SPropValue_proptag(&lpProp[1], PR_BODY, (const void *)body);
 		format = EDITOR_FORMAT_PLAINTEXT;
 		set_SPropValue_proptag(&lpProp[2], PR_MSG_EDITOR_FORMAT, (const void *)&format);
-		retval = SetProps(&(context->obj_test_msg[i]), lpProp, 3);
+		retval = SetProps(&(context->obj_test_msg[i]), 0, lpProp, 3);
 		MAPIFreeBuffer((void *)from);
 		MAPIFreeBuffer((void *)body);
 		if (retval != MAPI_E_SUCCESS) {
@@ -424,7 +416,7 @@ _PUBLIC_ bool mapitest_common_create_filled_test_folder(struct mapitest *mt)
 	/* Create 5 test messages in the test folder with the same sender */
 	for (i = 5; i < 10; ++i) {
 		mapi_object_init(&(context->obj_test_msg[i]));
-		subject = talloc_asprintf(mt->mem_ctx, "[MT] Subject%i", i);
+		subject = talloc_asprintf(mt->mem_ctx, "MT Subject%i", i);
 		ret = mapitest_common_message_create(mt, &(context->obj_test_folder),
 							&(context->obj_test_msg[i]), subject);
 		if (! ret){
@@ -432,13 +424,13 @@ _PUBLIC_ bool mapitest_common_create_filled_test_folder(struct mapitest *mt)
 			return false;
 		}
 
-		from = talloc_asprintf(mt->mem_ctx, "[MT] Dummy From");
+		from = talloc_asprintf(mt->mem_ctx, "MT Dummy From");
 		set_SPropValue_proptag(&lpProp[0], PR_SENDER_NAME, (const void *)from);
 		body = talloc_asprintf(mt->mem_ctx, "Body of message %i", i);
 		set_SPropValue_proptag(&lpProp[1], PR_BODY, (const void *)body);
 		format = EDITOR_FORMAT_PLAINTEXT;
 		set_SPropValue_proptag(&lpProp[2], PR_MSG_EDITOR_FORMAT, (const void *)&format);
-		retval = SetProps(&(context->obj_test_msg[i]), lpProp, 3);
+		retval = SetProps(&(context->obj_test_msg[i]), 0, lpProp, 3);
 		MAPIFreeBuffer((void *)from);
 		MAPIFreeBuffer((void *)body);
 		if (retval != MAPI_E_SUCCESS) {

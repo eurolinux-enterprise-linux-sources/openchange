@@ -73,7 +73,6 @@ objectCategory: CN=ms-Exch-Admin-Group,${SCHEMADN}
 msExchAdminGroupMode: 0
 msExchDefaultAdminGroup: TRUE
 
-
 #
 # Servers
 #
@@ -121,7 +120,6 @@ msExchTrkLogCleaningInterval: 7
 msExchMailboxManagerActivationStyle: 0
 msExchMailboxManagerAdminMode: 2
 
-
 #
 # Information Store
 #
@@ -152,7 +150,6 @@ name: First Storage Group
 systemFlags: 1610612736
 objectCategory: CN=ms-Exch-Storage-Group,${SCHEMADN}
 
-
 #
 # Public Folder Store (${NETBIOSNAME})
 #
@@ -166,14 +163,16 @@ displayName: Public Folder Store (${NETBIOSNAME})
 activationStyle: 1
 messageSizeLimit: 10240
 showInAdvancedViewOnly: TRUE
-#homeMTA: CN=Microsoft MTA,CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
+homeMTA: CN=Microsoft MTA,CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
 adminDisplayName: Public Folder Store (${NETBIOSNAME})
 proxyAddresses: SMTP:${NETBIOSNAME}-IS@${DNSDOMAIN}
 proxyAddresses: X400:c=US;a= ;p=First Organizati;o=Exchange;s=EXCH2K3-IS;
 deliveryMechanism: 1
 garbageCollPeriod: 604800
 quotaNotificationStyle: 1
-#homeMDBBL: CN=SMTP (${NETBIOSNAME}-{E95EE010-3E8A-425B-806F-15ED60887F6B}),CN=Connections,${FIRSTORGDN}
+# TODO: determine if this needs to go back in, and overcome the linked attribute issue.
+# See http://tracker.openchange.org/issues/252
+# homeMDBBL: CN=SMTP (${NETBIOSNAME}-{E95EE010-3E8A-425B-806F-15ED60887F6B}),CN=Connections,${FIRSTORGDN}
 mailNickname: ${NETBIOSNAME}-IS
 name: Public Folder Store (${NETBIOSNAME})
 systemFlags: 1610612736
@@ -187,36 +186,6 @@ msExchMaxCachedViews: 11
 msExchDatabaseCreated: TRUE
 msExchPoliciesIncluded: {627410A4-E1A9-4DD0-9568-FA22DEACB6B8},{26491CFC-9E50-
  4857-861B-0CB8DF22B5D7}
-
-
-#
-# Mailbox Store (${NETBIOSNAME})
-#
-dn: CN=Mailbox Store (${NETBIOSNAME}),CN=First Storage Group,CN=InformationStore,CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
-objectClass: top
-objectClass: msExchMDB
-objectClass: msExchPrivateMDB
-cn: Mailbox Store (${NETBIOSNAME})
-distinguishedName: CN=Mailbox Store (${NETBIOSNAME}),CN=First Storage Group,CN=InformationStore,CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
-displayName: Mailbox Store (${NETBIOSNAME})
-activationStyle: 1
-deletedItemFlags: 5
-showInAdvancedViewOnly: TRUE
-adminDisplayName: Mailbox Store (${NETBIOSNAME})
-deliveryMechanism: 1
-garbageCollPeriod: 604800
-quotaNotificationStyle: 1
-name: Mailbox Store (${NETBIOSNAME})
-systemFlags: 1610612736
-legacyExchangeDN: /o=${FIRSTORG}/ou=First Administrative Group/cn=Configuration/cn=Servers/cn=${NETBIOSNAME}/cn=Microsoft Private MDB
-objectCategory: CN=ms-Exch-Private-MDB,${SCHEMADN}
-#msExchUseOAB: CN=Default Offline Address List,CN=Offline Address Lists,CN=Address Lists Container,${FIRSTORGDN}
-msExchOwningServer: CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
-msExchHomePublicMDB: CN=Public Folder Store (${NETBIOSNAME}),CN=First Storage Group,CN=InformationStore,CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
-msExchMailboxRetentionPeriod: 2592000
-msExchMaxCachedViews: 11
-msExchDatabaseCreated: TRUE
-
 
 #
 # Address Lists Containers
@@ -233,38 +202,6 @@ displayName: Address Lists Container
 showInAdvancedViewOnly: TRUE
 name: Address Lists Container
 objectCategory: CN=ms-Exch-Container,${SCHEMADN}
-
-
-#
-# All Global Address Lists
-#
-dn: CN=All Global Address Lists,CN=Address Lists Container,${FIRSTORGDN}
-objectClass: top
-objectClass: addressBookContainer
-cn: All Global Address Lists
-distinguishedName: CN=All Global Address Lists,CN=Address Lists Container,${FIRSTORGDN}
-displayName: All Global Address Lists
-showInAdvancedViewOnly: TRUE
-name: All Global Address Lists
-systemFlags: 1610612736
-objectCategory: CN=Address-Book-Container,${SCHEMADN}
-
-
-#
-# Default global Address List
-#
-dn: CN=Default Global Address List,CN=All Global Address Lists,CN=Address Lists Container,${FIRSTORGDN}
-objectClass: top
-objectClass: addressBookContainer
-cn: Default Global Address List
-distinguishedName: CN=Default Global Address List,CN=All Global Address Lists,CN=Address Lists Container,${FIRSTORGDN}
-displayName: Default Global Address List
-showInAdvancedViewOnly: TRUE
-name: Default Global Address List
-systemFlags: 1610612736
-objectCategory: CN=Address-Book-Container,${SCHEMADN}
-purportedSearch: (& (mailnickname=*) (| (&(objectCategory=person)(objectClass=user)(!(homeMDB=*))(!(msExchHomeServerName=*)))(&(objectCategory=person)(objectClass=user)(|(homeMDB=*)(msExchHomeServerName=*)))(&(objectCategory=person)(objectClass=contact))(objectCategory=group)(objectCategory=publicFolder)(objectCategory=msExchDynamicDistributionList) ))
-
 
 #
 # Offline Address Lists
@@ -292,6 +229,7 @@ distinguishedName: CN=Default Offline Address List,CN=Offline Address Lists,CN=A
 showInAdvancedViewOnly: TRUE
 offLineABStyle: 1
 offLineABContainers: CN=Default Global Address List,CN=All Global Address Lists,CN=Address Lists Container,${FIRSTORGDN}
+offLineABSchedule:: AAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAA
 offLineABServer: CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
 siteFolderGUID: e72eae5f-ee8e-4908-becb-fb58af7c62aa
 siteFolderServer: CN=Public Folder Store (${NETBIOSNAME}),CN=First Storage Group,CN=InformationStore,CN=${NETBIOSNAME},CN=Servers,${FIRSTORGDN}
@@ -300,7 +238,66 @@ name: Default Offline Address List
 systemFlags: 1610612736
 legacyExchangeDN: /o=${FIRSTORG}/cn=addrlists/cn=oabs/cn=Default Offline Address List
 objectCategory: CN=ms-Exch-OAB,${SCHEMADN}
+objectGUID: f4d2ff48-0a08-4f96-8cfc-967401492989
 msExchOABDefault: TRUE
+msExchOABFolder: AA==
+
+#
+# Mailbox Store (${NETBIOSNAME})
+#
+dn: CN=Mailbox Store (${NETBIOSNAME}),CN=First Storage Group,CN=InformationStore,CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
+objectClass: top
+objectClass: msExchMDB
+objectClass: msExchPrivateMDB
+cn: Mailbox Store (${NETBIOSNAME})
+distinguishedName: CN=Mailbox Store (${NETBIOSNAME}),CN=First Storage Group,CN=InformationStore,CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
+displayName: Mailbox Store (${NETBIOSNAME})
+activationStyle: 1
+deletedItemFlags: 5
+showInAdvancedViewOnly: TRUE
+adminDisplayName: Mailbox Store (${NETBIOSNAME})
+deliveryMechanism: 1
+garbageCollPeriod: 604800
+quotaNotificationStyle: 1
+name: Mailbox Store (${NETBIOSNAME})
+systemFlags: 1610612736
+legacyExchangeDN: /o=${FIRSTORG}/ou=First Administrative Group/cn=Configuration/cn=Servers/cn=${NETBIOSNAME}/cn=Microsoft Private MDB
+objectCategory: CN=ms-Exch-Private-MDB,${SCHEMADN}
+msExchUseOAB: CN=Default Offline Address List,CN=Offline Address Lists,CN=Address Lists Container,${FIRSTORGDN}
+msExchOwningServer: CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
+msExchHomePublicMDB: CN=Public Folder Store (${NETBIOSNAME}),CN=First Storage Group,CN=InformationStore,CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
+msExchMailboxRetentionPeriod: 2592000
+msExchMaxCachedViews: 11
+msExchDatabaseCreated: TRUE
+
+#
+# All Global Address Lists
+#
+dn: CN=All Global Address Lists,CN=Address Lists Container,${FIRSTORGDN}
+objectClass: top
+objectClass: addressBookContainer
+cn: All Global Address Lists
+distinguishedName: CN=All Global Address Lists,CN=Address Lists Container,${FIRSTORGDN}
+displayName: All Global Address Lists
+showInAdvancedViewOnly: TRUE
+name: All Global Address Lists
+systemFlags: 1610612736
+objectCategory: CN=Address-Book-Container,${SCHEMADN}
+
+#
+# Default global Address List
+#
+dn: CN=Default Global Address List,CN=All Global Address Lists,CN=Address Lists Container,${FIRSTORGDN}
+objectClass: top
+objectClass: addressBookContainer
+cn: Default Global Address List
+distinguishedName: CN=Default Global Address List,CN=All Global Address Lists,CN=Address Lists Container,${FIRSTORGDN}
+displayName: Default Global Address List
+showInAdvancedViewOnly: TRUE
+name: Default Global Address List
+systemFlags: 1610612736
+objectCategory: CN=Address-Book-Container,${SCHEMADN}
+purportedSearch: (& (mailnickname=*) (| (&(objectCategory=person)(objectClass=user)(!(homeMDB=*))(!(msExchHomeServerName=*)))(&(objectCategory=person)(objectClass=user)(|(homeMDB=*)(msExchHomeServerName=*)))(&(objectCategory=person)(objectClass=contact))(objectCategory=group)(objectCategory=publicFolder)(objectCategory=msExchDynamicDistributionList) ))
 
 
 #
@@ -316,7 +313,6 @@ displayName: Recipient Update Services
 showInAdvancedViewOnly: TRUE
 name: Recipient Update Services
 objectCategory: CN=ms-Exch-Container,${SCHEMADN}
-
 
 #
 # Recipient Update Service (${DOMAIN})
@@ -344,29 +340,26 @@ msExchDomainGlobalGroupGuid: {1E2B98D3-4FAC-4FAE-B16F-A26AB09AAE34}
 msExchDomainLocalGroupSid: S-1-5-21-1226241484-1028146065-4277480997-1110
 msExchDomainGlobalGroupSid: S-1-5-21-1226241484-1028146065-4277480997-1109
 
-
 #
 # Recipient Update Service (Enterprise Configuration)
 #
-dn: CN=Recipient Update Service (Enterprise Configuration),CN=Recipient Update Services,CN=Address Lists Container,${FIRSTORGDN}
-objectClass: top
-objectClass: msExchAddressListService
-cn: Recipient Update Service (Enterprise Configuration)
-distinguishedName: CN=Recipient Update Service (Enterprise Configuration),CN=Recipient Update Services,CN=Address Lists Container,${FIRSTORGDN}
-activationStyle: 2
-showInAdvancedViewOnly: TRUE
-name: Recipient Update Service (Enterprise Configuration)
-systemFlags: 1073741824
-objectCategory: CN=ms-Exch-Address-List-Service,CN=Schema,CN=Configuration,DC=
- openchange2003,DC=local
-msExchServer1NetworkAddress: ${HOSTNAME}
-msExchServer1PageSize: 20
-msExchDoFullReplication: FALSE
-msExchReplicateNow: FALSE
-msExchPollInterval: 60
-msExchAddressListServiceLink: CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
-msExchDomainLink: CN=Configuration,${DOMAINDN}
-
+#dn: CN=Recipient Update Service (Enterprise Configuration),CN=Recipient Update Services,CN=Address Lists Container,${FIRSTORGDN}
+#objectClass: top
+#objectClass: msExchAddressListService
+#cn: Recipient Update Service (Enterprise Configuration)
+#distinguishedName: CN=Recipient Update Service (Enterprise Configuration),CN=Recipient Update Services,CN=Address Lists Container,${FIRSTORGDN}
+#activationStyle: 2
+#showInAdvancedViewOnly: TRUE
+#name: Recipient Update Service (Enterprise Configuration)
+#systemFlags: 1073741824
+#objectCategory: CN=ms-Exch-Address-List-Service,CN=Schema,CN=Configuration,DC=openchange2003,DC=local
+#msExchServer1NetworkAddress: ${HOSTNAME}
+#msExchServer1PageSize: 20
+#msExchDoFullReplication: FALSE
+#msExchReplicateNow: FALSE
+#msExchPollInterval: 60
+#msExchAddressListServiceLink: CN=${NETBIOSNAME},CN=Servers,CN=First Administrative Group,CN=Administrative Groups,${FIRSTORGDN}
+#msExchDomainLink: CN=Configuration,${DOMAINDN}
 
 #
 # All Address Lists
@@ -520,6 +513,7 @@ msExchTemplateRDNs: 404
 msExchTemplateRDNs: 804
 msExchTemplateRDNs: 412
 msExchTemplateRDNs: 40c
+msExchTemplateRDNs: c0c
 msExchTemplateRDNs: 407
 msExchTemplateRDNs: 411
 msExchTemplateRDNs: 409
@@ -561,7 +555,6 @@ name: Display-Templates
 legacyExchangeDN: /o=${FIRSTORG}/cn=Configuration/cn=Addressing/cn=Display-Templates
 objectCategory: CN=ms-Exch-Container,${SCHEMADN}
 
-
 #
 # Arabic Address-Templates
 #
@@ -577,9 +570,10 @@ adminDisplayName: Arabic
 name: 401
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=401
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -599,9 +593,10 @@ adminDisplayName: Bulgarian
 name: 402
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=402
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -621,9 +616,10 @@ adminDisplayName: Catalan
 name: 403
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=403
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -643,9 +639,10 @@ adminDisplayName: Chinese Traditional
 name: 404
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=404
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -665,9 +662,10 @@ adminDisplayName: Czech
 name: 405
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=405
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -687,9 +685,10 @@ adminDisplayName: Danish
 name: 406
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=406
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -709,9 +708,10 @@ adminDisplayName: German
 name: 407
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=407
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -731,9 +731,10 @@ adminDisplayName: Greek
 name: 408
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=408
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -753,9 +754,10 @@ adminDisplayName: English
 name: 409
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=409
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -775,9 +777,10 @@ adminDisplayName: Finnish
 name: 40b
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=40b
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -797,9 +800,33 @@ adminDisplayName: French
 name: 40c
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=40c
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
+msExchTemplateRDNs: MS
+msExchTemplateRDNs: x400
+
+
+#
+# French (Canada) Address-Templates
+#
+dn: CN=c0c,CN=Address-Templates,CN=Addressing,${FIRSTORGDN}
+objectClass: top
+objectClass: container
+cn: c0c
+distinguishedName: CN=c0c,CN=Address-Templates,CN=Addressing,${FIRSTORGDN}
+instanceType: 4
+displayName: French
+showInAdvancedViewOnly: TRUE
+adminDisplayName: French (Canada)
+name: c0c
+legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=c0c
+objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
 msExchTemplateRDNs: SMTP
+msExchTemplateRDNs: CCMAIL
+msExchTemplateRDNs: MSA
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -819,9 +846,10 @@ adminDisplayName: Hebrew
 name: 40d
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=40d
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -841,9 +869,10 @@ adminDisplayName: Hungarian
 name: 40e
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=40e
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -863,9 +892,10 @@ adminDisplayName: Italian
 name: 410
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=410
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -885,9 +915,10 @@ adminDisplayName: Japanese
 name: 411
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=411
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -907,9 +938,10 @@ adminDisplayName: Korean
 name: 412
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=412
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -929,9 +961,10 @@ adminDisplayName: Dutch
 name: 413
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=413
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -951,9 +984,10 @@ adminDisplayName: Norwegian
 name: 414
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=414
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -973,9 +1007,10 @@ adminDisplayName: Polish
 name: 415
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=415
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -995,9 +1030,10 @@ adminDisplayName: Brazilian
 name: 416
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=416
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1017,9 +1053,10 @@ adminDisplayName: Romanian
 name: 418
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=418
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1039,9 +1076,10 @@ adminDisplayName: Russian
 name: 419
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=419
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1061,9 +1099,10 @@ adminDisplayName: Croatian
 name: 41a
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=41a
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1083,9 +1122,10 @@ adminDisplayName: Slovak
 name: 41b
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=41b
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1105,9 +1145,10 @@ adminDisplayName: Swedish
 name: 41d
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=41d
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1127,9 +1168,10 @@ adminDisplayName: Thai
 name: 41e
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=41e
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1149,9 +1191,10 @@ adminDisplayName: Turkish
 name: 41f
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=41f
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1171,9 +1214,10 @@ adminDisplayName: Ukrainian
 name: 422
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=422
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1193,9 +1237,10 @@ adminDisplayName: Slovenian
 name: 424
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=424
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1215,9 +1260,10 @@ adminDisplayName: Estonian
 name: 425
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=425
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1237,9 +1283,10 @@ adminDisplayName: Latvian
 name: 426
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=426
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1259,9 +1306,10 @@ adminDisplayName: Lithuanian
 name: 427
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=427
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1281,9 +1329,10 @@ adminDisplayName: Basque
 name: 42d
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=42d
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1303,9 +1352,10 @@ adminDisplayName: Chinese Simplified
 name: 804
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=804
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1325,9 +1375,10 @@ adminDisplayName: Portuguese
 name: 816
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=816
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1347,9 +1398,10 @@ adminDisplayName: Serbian
 name: 81A
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=81A
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1369,9 +1421,10 @@ adminDisplayName: Spanish
 name: C0A
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Address-Templates/CN=C0A
 objectCategory: CN=Container,${SCHEMADN}
+msExchTemplateRDNs: EX
+msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: CCMAIL
 msExchTemplateRDNs: MSA
-msExchTemplateRDNs: SMTP
 msExchTemplateRDNs: MS
 msExchTemplateRDNs: x400
 
@@ -1560,6 +1613,23 @@ showInAdvancedViewOnly: TRUE
 adminDisplayName: French
 name: 40c
 legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Display-Templates/CN=40c
+objectCategory: CN=Container,${SCHEMADN}
+
+
+#
+# French (Canada) Display-Templates (cocorico)
+#
+dn: CN=c0c,CN=Display-Templates,CN=Addressing,${FIRSTORGDN}
+objectClass: top
+objectClass: container
+cn: c0c
+distinguishedName: CN=c0c,CN=Display-Templates,CN=Addressing,${FIRSTORGDN}
+instanceType: 4
+displayName: French (Canada)
+showInAdvancedViewOnly: TRUE
+adminDisplayName: French (Canada)
+name: c0c
+legacyExchangeDN: /o=${FIRSTORG}/CN=Configuration/CN=Addressing/CN=Display-Templates/CN=c0c
 objectCategory: CN=Container,${SCHEMADN}
 
 

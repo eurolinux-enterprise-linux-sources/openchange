@@ -2,6 +2,7 @@
    OpenChange MAPI implementation.
 
    Copyright (C) Fabien Le Mentec 2007.
+   Copyright (C) Julien Kerihuel 2007-2011.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,9 +18,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/proto_private.h>
-#include <libmapi/defs_private.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
 
 /**
    \file mapi_object.c
@@ -72,8 +72,6 @@ static void mapi_object_reset(mapi_object_t *obj)
 _PUBLIC_ enum MAPISTATUS mapi_object_init(mapi_object_t *obj)
 {
 	mapi_object_reset(obj);
-
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 
 	return MAPI_E_SUCCESS;
 }
@@ -192,7 +190,7 @@ _PUBLIC_ void mapi_object_set_session(mapi_object_t *obj,
  
    \param obj pointer on the MAPI object to get the ID for
 
-   \return the object ID, or -1 if the object does not exist
+   \return the object ID, or 0xFFFFFFFFFFFFFFFF if the object does not exist
 */
 _PUBLIC_ mapi_id_t mapi_object_get_id(mapi_object_t *obj)
 {
@@ -265,11 +263,11 @@ _PUBLIC_ void mapi_object_set_logon_store(mapi_object_t *obj)
 
    \param obj pointer on the MAPI object to retrieve the handle from
 
-   \return a valid MAPI object handle on success, otherwise -1.
+   \return a valid MAPI object handle on success, otherwise 0xFFFFFFFF.
  */
 mapi_handle_t mapi_object_get_handle(mapi_object_t *obj)
 {
-	return (!obj) ? -1 : obj->handle;
+	return (!obj) ? 0xFFFFFFFF : obj->handle;
 }
 
 
@@ -347,7 +345,6 @@ enum MAPISTATUS mapi_object_bookmark_find(mapi_object_t *obj_table, uint32_t bkP
 	bookmark = table->bookmark;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!table, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!bookmark, MAPI_E_NOT_INITIALIZED, NULL);
@@ -381,7 +378,6 @@ _PUBLIC_ enum MAPISTATUS mapi_object_bookmark_get_count(mapi_object_t *obj_table
 	table = (mapi_object_table_t *)obj_table->private_data;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!table, MAPI_E_NOT_INITIALIZED, NULL);
 
@@ -407,7 +403,6 @@ _PUBLIC_ enum MAPISTATUS mapi_object_bookmark_debug(mapi_object_t *obj_table)
 	bookmark = table->bookmark;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_table, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!table, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!bookmark, MAPI_E_NOT_INITIALIZED, NULL);

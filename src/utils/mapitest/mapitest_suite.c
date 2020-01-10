@@ -19,7 +19,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
 #include "utils/mapitest/mapitest.h"
 
 /**
@@ -200,10 +199,46 @@ static bool mapitest_suite_test_is_applicable(struct mapitest *mt, struct mapite
 {
 	uint16_t actualServerVer = mt->info.rgwServerVersion[0];
 
-	if ((test->flags & NotInExchange2010) && (actualServerVer >= Exchange2010Version)) {
+	if ((test->flags & NotInExchange2010) && (actualServerVer >= Exchange2010SP0Version)) {
+		return false;
+	}
+	if ((test->flags & NotInExchange2010SP0) && (actualServerVer == Exchange2010SP0Version)) {
 		return false;
 	}
 	return true;
+}
+
+static bool run_test(struct mapitest *mt, struct mapitest_suite *suite, struct mapitest_test *el)
+{
+	bool			(*fn)(struct mapitest *);
+	bool			ret = false;
+
+	if (!mapitest_suite_test_is_applicable(mt, el)) {
+		mapitest_stat_add_skipped_test(suite, el->name, el->flags);
+	} else {
+		errno = 0;
+		mapitest_print_test_title_start(mt, el->name);
+		
+		fn = el->fn;
+		ret = fn(mt);
+
+		if (el->flags & ExpectedFail) {
+			if (ret) {
+				mapitest_stat_add_result(suite, el->name, UnexpectedPass);
+			} else {
+				mapitest_stat_add_result(suite, el->name, ExpectedFailure);
+			}
+		} else {
+			if (ret) {
+				mapitest_stat_add_result(suite, el->name, Pass);
+			} else {
+				mapitest_stat_add_result(suite, el->name, Fail);
+			}
+		}
+		mapitest_print_test_title_end(mt);
+		mapitest_print_test_result(mt, el->name, ret);
+	}
+	return ret;
 }
 
 /**
@@ -221,24 +256,12 @@ _PUBLIC_ bool mapitest_suite_run_test(struct mapitest *mt,
 {
 	struct mapitest_test	*el;
 	bool			ret;
-	bool			(*fn)(struct mapitest *);
 
 	if (!suite || !name) return false;
 
 	for (el = suite->tests; el; el = el->next) {
-		if (!mapitest_suite_test_is_applicable(mt, el)) {
-			mapitest_stat_add_skipped_test(suite, el->name, el->flags);
-			return true;
-		}
 		if (!strcmp(el->name, name)) {
-			errno = 0;
-			mapitest_print_test_title_start(mt, el->name);
-			fn = el->fn;
-			ret = fn(mt);
-
-			mapitest_stat_add_result(suite, el->name, ret);
-			mapitest_print_test_title_end(mt);
-			mapitest_print_test_result(mt, el->name, ret);
+			ret = run_test(mt, suite, el);
 			return ret;
 		}
 	}
@@ -280,7 +303,7 @@ static bool mapitest_run_test_all(struct mapitest *mt, const char *name)
 	if (!strcmp(tmp,"ALL")) {
 		suite = mapitest_suite_find(mt, sname);
 
-		if (suite) {
+		if ((suite && (suite->online == mt->online)) || (suite && (suite->online == false))) {
 			for (el = suite->tests; el; el = el->next) {
 				if (mapitest_suite_test_is_applicable(mt, el)) {
 					mapitest_suite_run_test(mt, suite, el->name);
@@ -319,7 +342,7 @@ _PUBLIC_ bool mapitest_run_test(struct mapitest *mt, const char *name)
 	for (suite = mt->mapi_suite; suite; suite = suite->next) {
 		for (el = suite->tests; el; el = el->next) {
 			if (!strcmp(name, el->name)) {
-				if ((mt->online == suite->online) || (suite->online == false)) {
+				if (((mt->online == suite->online) && mt->session) || (suite->online == false)) {
 					errno = 0;
 					ret = mapitest_suite_run_test(mt, suite, name);
 					return ret;
@@ -341,6 +364,14 @@ _PUBLIC_ bool mapitest_run_test(struct mapitest *mt, const char *name)
 	return ret;
 }
 
+static void run_tests_in_suite(struct mapitest *mt, struct mapitest_suite *suite)
+{
+	struct mapitest_test	*el;
+
+	for (el = suite->tests; el; el = el->next) {
+		run_test(mt, suite, el);
+	}
+}
 
 /**
    \details all tests from all suites
@@ -349,35 +380,17 @@ _PUBLIC_ bool mapitest_run_test(struct mapitest *mt, const char *name)
 
    \return true on success, otherwise -1
  */
-_PUBLIC_ bool mapitest_run_all(struct mapitest *mt)
+_PUBLIC_ void mapitest_run_all(struct mapitest *mt)
 {
 	struct mapitest_suite	*suite;
-	struct mapitest_test	*el;
-	bool			(*fn)(struct mapitest *);
-	bool			ret = false;
 
 	for (suite = mt->mapi_suite; suite; suite = suite->next) {
-		if ((mt->online == suite->online) || (suite->online == false)) {
+		if (((mt->online == suite->online) && mt->session) || (suite->online == false)) {
 			mapitest_print_module_title_start(mt, suite->name);
 
-			for (el = suite->tests; el; el = el->next) {
-				if (!mapitest_suite_test_is_applicable(mt, el)) {
-					mapitest_stat_add_skipped_test(suite, el->name, el->flags);
-				} else {
-					errno = 0;
-					mapitest_print_test_title_start(mt, el->name);
-					
-					fn = el->fn;
-					ret = fn(mt);
-					
-					mapitest_stat_add_result(suite, el->name, ret);
-					mapitest_print_test_title_end(mt);
-					mapitest_print_test_result(mt, el->name, ret);
-				}
-			}
+			run_tests_in_suite(mt, suite);
 
 			mapitest_print_module_title_end(mt);
 		}
 	}
-	return ret;
 }

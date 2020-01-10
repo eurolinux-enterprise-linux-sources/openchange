@@ -17,7 +17,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapiadmin/libmapiadmin.h>
+#include "libmapiadmin/libmapiadmin.h"
 
 /**
 	\file
@@ -34,7 +34,6 @@ _PUBLIC_ struct mapiadmin_ctx *mapiadmin_init(struct mapi_session *session)
 {
 	struct mapiadmin_ctx	*mapiadmin_ctx;
 
-	if (!global_mapi_ctx) return NULL;
 	if (!session) return NULL;
 	if (!session->profile) return NULL;
 
@@ -50,7 +49,7 @@ _PUBLIC_ struct mapiadmin_ctx *mapiadmin_init(struct mapi_session *session)
 /**
 	Clean up a mapiadmin_ctx structure
 
-	The structure is assumed to have been allocated uding mapiadmin_init() or
+	The structure is assumed to have been allocated using mapiadmin_init() or
 	equivalent code.
 */
 _PUBLIC_ enum MAPISTATUS mapiadmin_release(struct mapiadmin_ctx *mapiadmin_ctx)

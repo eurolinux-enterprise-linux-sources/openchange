@@ -1,8 +1,8 @@
 %{!?python_sitearch: %global python_sitearch %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib(1)")}
 
-%global samba4_version 4.0.0-21alpha10
-%global talloc_version 1.2.0
-%global nickname COCHRANE
+%global samba4_version 4.0.0
+%global talloc_version 2.0.5
+%global nickname BORG
 
 %global build_python_package 0
 %global build_server_package 0
@@ -12,22 +12,26 @@
 # Licensing Note: The code is GPLv3+ and the IDL files are public domain.
 
 Name: openchange
-Version: 0.9
-Release: 7%{?dist}
+Version: 1.0
+Release: 4%{?dist}
 Group: Applications/System
 Summary: Provides access to Microsoft Exchange servers using native protocols
 License: GPLv3+ and Public Domain
 URL: http://www.openchange.org/
-Source0: http://downloads.sourceforge.net/openchange/openchange-%{version}-%{nickname}.tar.gz
+Source0: http://tracker.openchange.org/attachments/download/180/openchange-%{version}-%{nickname}.tar.gz
 Source1: doxygen_to_devhelp.xsl
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 ### Build Dependencies ###
 
+BuildRequires: autoconf
+BuildRequires: automake
 BuildRequires: bison
 BuildRequires: doxygen
 BuildRequires: file-devel
 BuildRequires: flex
+BuildRequires: gcc
+BuildRequires: libical-devel
 BuildRequires: libldb-devel
 BuildRequires: libtalloc-devel >= %{talloc_version}
 BuildRequires: libtdb-devel
@@ -40,6 +44,14 @@ BuildRequires: samba4-pidl >= %{samba4_version}
 BuildRequires: sqlite-devel
 BuildRequires: zlib-devel
 
+# Certain versions of libtevent have incorrect
+# internal ABI versions
+Conflicts: libtevent < 0.9.13
+
+# Obsolete multilib version of this package,
+# since samba4-libs is no longer multilib.
+Obsoletes: openchange < 1.0-4
+
 ### Patches ###
 
 # OpenChange's libmapi conflicts with Zarafa's libmapi.
@@ -49,13 +61,23 @@ Patch0: libmapi-0.8.2-libmapi-conflict.patch
 # RH bug #552984
 Patch1: openchange-0.9-generate-xml-doc.patch
 
-# RH bug #605364
-Patch2: openchange-0.9-prop-types-and-unicode.patch
+# Use system's popt.h
+Patch2: openchange-1.0-popt.patch
+
+Patch3: openchange-1.0-OC_RULE_ADD-fix.patch
+
+# http://tracker.openchange.org/issues/397
+Patch4: openchange-1.0-uninit-crash.patch
+
+# http://tracker.openchange.org/issues/398
+Patch5: openchange-1.0-symbol-clash.patch
+
+# RH-bug #870405
+Patch6: openchange-1.0-writestream.patch
 
 %description
 OpenChange provides libraries to access Microsoft Exchange servers
 using native protocols.
-Requires: devhelp
 
 %package devel
 Summary: Developer tools for OpenChange libraries
@@ -70,6 +92,7 @@ using native protocols.
 %package devel-docs
 Summary: Developer documentation for OpenChange libraries
 Group: Development/Libraries
+Requires: devhelp
 Requires: openchange = %{version}-%{release}
 
 %description devel-docs
@@ -109,10 +132,19 @@ This package provides the server elements for OpenChange.
 %setup -q -n %{name}-%{version}-%{nickname}
 %patch0 -p1 -b .libmapi-conflict
 %patch1 -p1 -b .generate-xml-doc
-%patch2 -p1 -b .prop-types-and-unicode
+%patch2 -p1 -b .popt
+%patch3 -p1 -b .OC_RULE_ADD-fix
+%patch4 -p1 -b .uninit-crash
+%patch5 -p1 -b .symbol-clash
+%patch6 -p1 -b .writestream
 
 %build
-%configure
+./autogen.sh
+%configure \
+%if %{build_python_package}
+	--enable-pymapi \
+%endif
+	--with-modulesdir=%{_libdir}/samba/modules
 
 # Parallel builds prohibited by makefile
 make
@@ -143,22 +175,13 @@ rm -rf $RPM_BUILD_ROOT%{_libdir}/libmapiproxy.so.*
 
 mkdir $RPM_BUILD_ROOT%{_mandir}
 cp -r doc/man/man1 $RPM_BUILD_ROOT%{_mandir}
-cp -r apidocs/man/man3 $RPM_BUILD_ROOT%{_mandir}
 
-# Avoid a file conflict with man-pages package.
-# Page is still reachable as "mapi_obj_bookmark".
-rm $RPM_BUILD_ROOT%{_mandir}/man3/index.3
+# Skip man3 for now, it doesn't work anyway
+# cp -r apidocs/man/man3 $RPM_BUILD_ROOT%{_mandir}
+rm -r apidocs/man/man3
 
-%if ! %{build_python_package}
-rm -r $RPM_BUILD_ROOT%{python_sitearch}/openchange
-%endif
-
-%if ! %{build_server_package}
-# XXX There is no configure switch to disable the server
-#     libraries in OpenChange 0.9, so just delete them.
-rm $RPM_BUILD_ROOT%{_libdir}/libmapiserver.so.*
-rm $RPM_BUILD_ROOT%{_libdir}/libmapistore.so.*
-rm $RPM_BUILD_ROOT%{_libdir}/mapistore_backends/mapistore_sqlite3.so
+%if !%{build_python_package} && !%{build_server_package}
+rm $RPM_BUILD_ROOT%{_bindir}/check_fasttransfer
 %endif
 
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-libmapi
@@ -203,6 +226,10 @@ rm -rf $RPM_BUILD_ROOT
 %doc ChangeLog COPYING IDL_LICENSE.txt VERSION
 %{_libdir}/libmapi-openchange.so.*
 %{_libdir}/libmapiadmin.so.*
+%if %{build_python_package} || %{build_server_package}
+%{_libdir}/libmapiproxy.so.*
+%{_libdir}/libmapistore.so.*
+%endif
 %{_libdir}/libocpf.so.*
 
 %files devel
@@ -210,20 +237,21 @@ rm -rf $RPM_BUILD_ROOT
 %{_includedir}/*
 %{_libdir}/*.so
 %{_libdir}/pkgconfig/*
-%{_mandir}/man3/*
+
+%files devel-docs
+%defattr(-,root,root,-)
+#%{_mandir}/man3/*
+%doc %{_datadir}/devhelp/books/*
 %doc apidocs/html/libmapi
 %doc apidocs/html/libocpf
 %doc apidocs/html/overview
 %doc apidocs/html/index.html
 
-%files devel-docs
-%defattr(-,root,root,-)
-%doc %{_datadir}/devhelp/books/*
-
 %files client
 %defattr(-,root,root,-)
 %{_bindir}/*
 %{_mandir}/man1/*
+%{_datadir}/mapitest/*
 
 %if %{build_python_package}
 %files python
@@ -235,11 +263,27 @@ rm -rf $RPM_BUILD_ROOT
 %files server
 %defattr(-,root,root,-)
 %{_libdir}/libmapiserver.so.*
-%{_libdir}/libmapistore.so.*
-%{_libdir}/mapistore_backends/mapistore_sqlite3.so
+%{_libdir}/samba/dcerpc_server/dcesrv_mapiproxy.so
+%{_libdir}/samba/modules/*
+%if !0%{?rhel}
+%{_libdir}/nagios/check_exchange
+%endif
+%{_datadir}/setup/*
 %endif
 
 %changelog
+* Thu Jan 17 2013 Milan Crha <mcrha@redhat.com> - 1.0-4
+- Use current version (1.0-4) for a multilib obsolete (RH bug #881698).
+
+* Tue Jan 08 2013 Milan Crha <mcrha@redhat.com> - 1.0-3
+- Add patch to be able to send large messages (RH bug #870405)
+
+* Mon Jan 07 2013 Matthew Barnes <mbarnes@redhat.com> - 1.0-2
+- Drop multilib by obsoleting openchange < 0.9 (RH bug #881698).
+
+* Wed Oct 03 2012 Matthew Barnes <mbarnes@redhat.com> - 1.0-1
+- Rebase to 1.0 using the rpm spec from Fedora 18.
+
 * Fri Jun 25 2010 Milan Crha <mcrha@redhat.com> - 0.9-7
 - Backport unicode and properties support (RH bug #605364).
 

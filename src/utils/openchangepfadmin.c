@@ -19,8 +19,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
-#include <libmapiadmin/libmapiadmin.h>
+#include "libmapi/libmapi.h"
+#include "libmapiadmin/libmapiadmin.h"
 #include <samba/popt.h>
 #include <param.h>
 
@@ -76,14 +76,6 @@ static void list_IPF_class(void)
 	}
 }
 
-static char *utf8tolinux(TALLOC_CTX *mem_ctx, const char *wstring)
-{
-	char		*newstr;
-
-	newstr = windows_to_utf8(mem_ctx, wstring);
-	return newstr;
-}
-
 static bool get_child_folders_pf(TALLOC_CTX *mem_ctx, mapi_object_t *parent, mapi_id_t folder_id, int count)
 {
 	enum MAPISTATUS		retval;
@@ -93,7 +85,6 @@ static bool get_child_folders_pf(TALLOC_CTX *mem_ctx, mapi_object_t *parent, map
 	struct SPropTagArray	*SPropTagArray;
 	struct SRowSet		rowset;
 	const char	       	*name;
-	char			*newname;
 	const uint32_t		*child;
 	uint32_t		index;
 	const uint64_t		*fid;
@@ -108,7 +99,7 @@ static bool get_child_folders_pf(TALLOC_CTX *mem_ctx, mapi_object_t *parent, map
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0x3,
-					  PR_DISPLAY_NAME,
+					  PR_DISPLAY_NAME_UNICODE,
 					  PR_FID,
 					  PR_FOLDER_CHILD_COUNT);
 	retval = SetColumns(&obj_htable, SPropTagArray);
@@ -118,15 +109,13 @@ static bool get_child_folders_pf(TALLOC_CTX *mem_ctx, mapi_object_t *parent, map
 	while (((retval = QueryRows(&obj_htable, 0x32, TBL_ADVANCE, &rowset)) != MAPI_E_NOT_FOUND) && rowset.cRows) {
 		for (index = 0; index < rowset.cRows; index++) {
 			fid = (const uint64_t *)find_SPropValue_data(&rowset.aRow[index], PR_FID);
-			name = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_DISPLAY_NAME);
+			name = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_DISPLAY_NAME_UNICODE);
 			child = (const uint32_t *)find_SPropValue_data(&rowset.aRow[index], PR_FOLDER_CHILD_COUNT);
 
 			for (i = 0; i < count; i++) {
 				printf("|   ");
 			}
-			newname = utf8tolinux(mem_ctx, name);
-			printf("|---+ %-15s\n", newname);
-			MAPIFreeBuffer(newname);
+			printf("|---+ %-15s\n", name);
 			if (*child) {
 				ret = get_child_folders_pf(mem_ctx, &obj_folder, *fid, count + 1);
 				if (ret == false) return ret;
@@ -146,7 +135,6 @@ static enum MAPISTATUS openchangepfadmin_getdir(TALLOC_CTX *mem_ctx,
 	struct SPropTagArray	*SPropTagArray;
 	struct SRowSet		rowset;
 	mapi_object_t		obj_htable;
-	char			*newname;
 	const char		*name;
 	const uint64_t		*fid;
 	uint32_t		index;
@@ -156,7 +144,7 @@ static enum MAPISTATUS openchangepfadmin_getdir(TALLOC_CTX *mem_ctx,
 	MAPI_RETVAL_IF(retval, GetLastError(), NULL);
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0x2,
-					  PR_DISPLAY_NAME,
+					  PR_DISPLAY_NAME_UNICODE,
 					  PR_FID);
 	retval = SetColumns(&obj_htable, SPropTagArray);
 	MAPIFreeBuffer(SPropTagArray);
@@ -165,15 +153,13 @@ static enum MAPISTATUS openchangepfadmin_getdir(TALLOC_CTX *mem_ctx,
 	while (((retval = QueryRows(&obj_htable, 0x32, TBL_ADVANCE, &rowset)) != MAPI_E_NOT_FOUND) && rowset.cRows) {
 		for (index = 0; index < rowset.cRows; index++) {
 			fid = (const uint64_t *)find_SPropValue_data(&rowset.aRow[index], PR_FID);
-			name = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_DISPLAY_NAME);
+			name = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_DISPLAY_NAME_UNICODE);
 
-			newname = utf8tolinux(mem_ctx, name);
-			if (newname && fid && !strcmp(newname, folder)) {
+			if (name && fid && !strcmp(name, folder)) {
 				retval = OpenFolder(obj_container, *fid, obj_child);
 				MAPI_RETVAL_IF(retval, GetLastError(), NULL);
 				return MAPI_E_SUCCESS;
 			}
-			MAPIFreeBuffer(newname);
 		}
 	}
 
@@ -199,7 +185,7 @@ static enum MAPISTATUS openchangepfadmin_mkdir(mapi_object_t *obj_container,
 		set_SPropValue_proptag(&props[0], PR_CONTAINER_CLASS, (const void *) type);
 		prop_count++;
 
-		retval = SetProps(&obj_folder, props, prop_count);
+		retval = SetProps(&obj_folder, 0, props, prop_count);
 		mapi_object_release(&obj_folder);
 		MAPI_RETVAL_IF(retval, GetLastError(), NULL);
 	}
@@ -235,6 +221,7 @@ int main(int argc, const char *argv[])
 {
 	TALLOC_CTX		*mem_ctx;
 	enum MAPISTATUS		retval;
+	struct mapi_context	*mapi_ctx;
 	struct mapi_session	*session = NULL;
 	mapi_object_t		obj_store;
 	mapi_object_t		obj_ipm_subtree;
@@ -402,17 +389,17 @@ int main(int argc, const char *argv[])
 	/**
 	 * Initialize MAPI subsystem
 	 */
-	retval = MAPIInitialize(opt_profdb);
+	retval = MAPIInitialize(&mapi_ctx, opt_profdb);
 	if (retval != MAPI_E_SUCCESS) {
 		mapi_errstr("MAPIInitialize", GetLastError());
 		exit (1);
 	}
 
 	/* debug options */
-	SetMAPIDumpData(opt_dumpdata);
+	SetMAPIDumpData(mapi_ctx, opt_dumpdata);
 
 	if (opt_debug) {
-		SetMAPIDebugLevel(atoi(opt_debug));
+		SetMAPIDebugLevel(mapi_ctx, atoi(opt_debug));
 	}
 
 	/**
@@ -420,14 +407,14 @@ int main(int argc, const char *argv[])
 	 * from the database
 	 */
 	if (!opt_profname) {
-		retval = GetDefaultProfile(&opt_profname);
+		retval = GetDefaultProfile(mapi_ctx, &opt_profname);
 		if (retval != MAPI_E_SUCCESS) {
 			mapi_errstr("GetDefaultProfile", GetLastError());
 			exit (1);
 		}
 	}
 
-	retval = MapiLogonEx(&session, opt_profname, opt_password);
+	retval = MapiLogonEx(mapi_ctx, &session, opt_profname, opt_password);
 	talloc_free(opt_profname);
 	if (retval != MAPI_E_SUCCESS) {
 		mapi_errstr("MapiLogonEx", GetLastError());
@@ -589,7 +576,7 @@ int main(int argc, const char *argv[])
 end:
 	mapi_object_release(&obj_store);
 
-	MAPIUninitialize();
+	MAPIUninitialize(mapi_ctx);
 	talloc_free(mem_ctx);
 	return 0;
 }

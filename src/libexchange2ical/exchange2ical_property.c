@@ -19,8 +19,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libexchange2ical/libexchange2ical.h>
-
+#include "libexchange2ical/libexchange2ical.h"
+#include <ldb.h>
 
 struct RRULE_byday {
 	uint16_t	DayOfWeek;
@@ -49,44 +49,6 @@ static const char *get_filename(const char *filename)
 
 	return filename;
 }
-
-/*
-  encode as base64
-  Samba4 code
-  caller frees
-*/
-static char *ldb_base64_encode(void *mem_ctx, const char *buf, int len)
-{
-	const char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-	int bit_offset, byte_offset, idx, i;
-	const uint8_t *d = (const uint8_t *)buf;
-	int bytes = (len*8 + 5)/6, pad_bytes = (bytes % 4) ? 4 - (bytes % 4) : 0;
-	char *out;
-
-	out = talloc_array(mem_ctx, char, bytes+pad_bytes+1);
-	if (!out) return NULL;
-
-	for (i=0;i<bytes;i++) {
-		byte_offset = (i*6)/8;
-		bit_offset = (i*6)%8;
-		if (bit_offset < 3) {
-			idx = (d[byte_offset] >> (2-bit_offset)) & 0x3F;
-		} else {
-			idx = (d[byte_offset] << (bit_offset-2)) & 0x3F;
-			if (byte_offset+1 < len) {
-				idx |= (d[byte_offset+1] >> (8-(bit_offset-2)));
-			}
-		}
-		out[i] = b64[idx];
-	}
-
-	for (;i<bytes+pad_bytes;i++)
-		out[i] = '=';
-	out[i] = 0;
-
-	return out;
-}
-
 
 
 void ical_property_ATTACH(struct exchange2ical *exchange2ical)
@@ -128,8 +90,8 @@ void ical_property_ATTACH(struct exchange2ical *exchange2ical)
 									  PR_ATTACH_DATA_BIN
 									  );
 									  
-				lpProps = talloc_zero(exchange2ical->mem_ctx, struct SPropValue);
-				retval = GetProps(&obj_attach, SPropTagArray, &lpProps, &count);
+				lpProps = NULL;
+				retval = GetProps(&obj_attach, MAPI_UNICODE, SPropTagArray, &lpProps, &count);
 				MAPIFreeBuffer(SPropTagArray);
 				if (retval == MAPI_E_SUCCESS) {
 
@@ -153,7 +115,7 @@ void ical_property_ATTACH(struct exchange2ical *exchange2ical)
 					attachMethod	 = octool_get_propval(&aRow2, PR_ATTACH_METHOD);
 					attachmentHidden = octool_get_propval(&aRow2, PR_ATTACHMENT_HIDDEN);
 
-					if(!(*attachmentFlags & 0x00000007) 
+					if(attachmentFlags && !(*attachmentFlags & 0x00000007) 
 						&& (*attachMethod == 0x00000001) 
 						&& (!attachmentHidden || !(*attachmentHidden))) {
 
@@ -163,8 +125,13 @@ void ical_property_ATTACH(struct exchange2ical *exchange2ical)
 						data=ldb_base64_encode(exchange2ical->mem_ctx, (const char *)body.data, body.length);
 						
 						/*Create a new icalattach from above data*/
+#if HAVE_ICAL_0_46
+						/* the function signature for icalattach_new_from_data() changed in 0.46, released 2010-08-30 */
+						/* we can switch to just using the new signature after everyone has had a reasonable chance to update (say end of 2011) */
+						icalattach = icalattach_new_from_data(data, 0, 0);
+#else
 						icalattach = icalattach_new_from_data((unsigned char *)data,0,0);
-						
+#endif
 						/*Add attach property to vevent component*/
 						prop = icalproperty_new_attach(icalattach);
 						icalcomponent_add_property(exchange2ical->vevent, prop);
@@ -224,7 +191,7 @@ void ical_property_ATTENDEE(struct exchange2ical *exchange2ical)
 	for (i = 0; i < SRowSet->cRows; i++) {
 		smtp = (const char *) octool_get_propval(&(SRowSet->aRow[i]), PR_SMTP_ADDRESS);
 		display_name = (const char *) octool_get_propval(&(SRowSet->aRow[i]), PR_RECIPIENT_DISPLAY_NAME);
-		RecipientFlags = (uint32_t *) octool_get_propval(&(SRowSet->aRow[i]), PR_RECIPIENTS_FLAGS);
+		RecipientFlags = (uint32_t *) octool_get_propval(&(SRowSet->aRow[i]), PR_RECIPIENT_FLAGS);
 		RecipientType = (uint32_t *) octool_get_propval(&(SRowSet->aRow[i]), PR_RECIPIENT_TYPE);
 		TrackStatus  = (uint32_t *) octool_get_propval(&(SRowSet->aRow[i]), PR_RECIPIENT_TRACKSTATUS);
 
@@ -584,7 +551,7 @@ void ical_property_ORGANIZER(struct exchange2ical *exchange2ical)
 	for (i = 0; i < SRowSet->cRows; i++) {
 		smtp = (const char *) octool_get_propval(&(SRowSet->aRow[i]), PR_SMTP_ADDRESS);
 		display_name = (const char *) octool_get_propval(&(SRowSet->aRow[i]), PR_RECIPIENT_DISPLAY_NAME);
-		RecipientFlags = (uint32_t *) octool_get_propval(&(SRowSet->aRow[i]), PR_RECIPIENTS_FLAGS);
+		RecipientFlags = (uint32_t *) octool_get_propval(&(SRowSet->aRow[i]), PR_RECIPIENT_FLAGS);
 		RecipientType = (uint32_t *) octool_get_propval(&(SRowSet->aRow[i]), PR_RECIPIENT_TYPE);
 
 		if (RecipientFlags && !(*RecipientFlags & 0x20) &&
@@ -982,12 +949,12 @@ void ical_property_RRULE_daylight_standard(icalcomponent* component , struct SYS
 	if(st.wYear ==0x0000){
 		recurrence.by_month[0]=st.wMonth;
 		/* Microsoft day of week = libIcal day of week +1; */
-		/* Day encode = day + occurence*8 */
+		/* Day encode = day + occurrence*8 */
 		if (st.wDay==5){
-			/* Last occurence of day in the month*/
+			/* Last occurrence of day in the month*/
 			recurrence.by_day[0] = -1 * (st.wDayOfWeek + 9);
 		}else{
-			/* st.wDay occurence of day in the month */
+			/* st.wDay occurrence of day in the month */
 			recurrence.by_day[0] = (st.wDayOfWeek + 1 + st.wDay*8);
 		}
 		
@@ -1083,7 +1050,7 @@ void ical_property_SUMMARY(struct exchange2ical *exchange2ical)
 	}
 
 	if (exchange2ical->MessageLocaleId) {
-		const char *langtag = lcid_langcode2langtag( *(exchange2ical->MessageLocaleId) ); 
+		const char *langtag = mapi_get_locale_from_lcid( *(exchange2ical->MessageLocaleId) ); 
 		language = icalparameter_new_language( langtag );
 		icalproperty_add_parameter(prop, language);
 	}
@@ -1142,19 +1109,17 @@ void ical_property_UID(struct exchange2ical *exchange2ical)
 	struct GlobalObjectId	*GlbObjId;
 	icalproperty		*prop;
 
-	outstr = talloc_strdup(exchange2ical->mem_ctx, "uid");
+	outstr = talloc_strdup(exchange2ical->mem_ctx, "");
 	
 	if(exchange2ical->GlobalObjectId){
 		GlbObjId = get_GlobalObjectId(exchange2ical->mem_ctx, exchange2ical->GlobalObjectId);
 	}
 	
       
-	if (exchange2ical->GlobalObjectId && GlbObjId) {
-		if (GlbObjId->Size >= 12 && (0 == memcmp(GlbObjId->Data, GLOBAL_OBJECT_ID_DATA_START, 12))) {
+	if (exchange2ical->GlobalObjectId && (exchange2ical->GlobalObjectId->cb >= 36) && GlbObjId) {
+		if (GlbObjId->Size >= 16 && (0 == memcmp(GlbObjId->Data, GLOBAL_OBJECT_ID_DATA_START, 12))) {
 			fflush(0);
-			// TODO: could this code overrun GlobalObjectId->lpb?
-			// TODO: I think we should start at 12, not at zero...
-			for (i = 12; i < 52; i++) {
+			for (i = 12; i < exchange2ical->GlobalObjectId->cb; i++) {
 				char objID[6];
 				snprintf(objID, 6, "%.2X", exchange2ical->GlobalObjectId->lpb[i]);
 				outstr = talloc_strdup_append(outstr, objID);

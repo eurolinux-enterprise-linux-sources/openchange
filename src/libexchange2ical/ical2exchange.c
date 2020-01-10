@@ -19,7 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libexchange2ical/libexchange2ical.h>
+#include "libexchange2ical/libexchange2ical.h"
 
 static void ical2exchange_get_properties(struct ical2exchange *ical2exchange, icalcomponent *vevent){
 	icalproperty *icalProp = NULL;
@@ -107,7 +107,7 @@ static void ical2exchange_get_properties(struct ical2exchange *ical2exchange, ic
 				if(!ical2exchange->rdateEvent){
 					ical2exchange->rdateEvent=icalcomponent_new_vevent();
 				}
-				icalproperty *prop = icalproperty_new_clone(icalProp);
+				prop = icalproperty_new_clone(icalProp);
 				ical2exchange->rdateCount ++;
 				icalcomponent_add_property(ical2exchange->rdateEvent, prop);
 				break;
@@ -350,7 +350,7 @@ void _IcalEvent2Exchange(mapi_object_t *obj_folder, icalcomponent *vevent)
 	/*sanity check*/
 	if(icalcomponent_isa(vevent) != ICAL_VEVENT_COMPONENT) return;
 	
-	mem_ctx = talloc_named(NULL, 0, "ical2exchange");
+	mem_ctx = talloc_named(mapi_object_get_session(obj_folder), 0, "ical2exchange");
 	ical2exchange.lpProps = talloc_array(mem_ctx, struct SPropValue, 2);
 
 	ical2exchange_init(&ical2exchange, mem_ctx);
@@ -362,7 +362,7 @@ void _IcalEvent2Exchange(mapi_object_t *obj_folder, icalcomponent *vevent)
 	if (retval != MAPI_E_SUCCESS){
 		mapi_errstr("CreateMessage", GetLastError());
 	} else {
-		retval = SetProps(&obj_message, ical2exchange.lpProps, ical2exchange.cValues);
+		retval = SetProps(&obj_message, 0, ical2exchange.lpProps, ical2exchange.cValues);
 		if (retval != MAPI_E_SUCCESS){
 			mapi_errstr("SetProps", GetLastError());
 		} else {

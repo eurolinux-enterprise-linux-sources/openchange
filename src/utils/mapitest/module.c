@@ -19,7 +19,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
 #include "utils/mapitest/mapitest.h"
 #include "utils/mapitest/proto.h"
 
@@ -36,11 +35,13 @@ _PUBLIC_ uint32_t mapitest_register_modules(struct mapitest *mt)
 	ret += module_oxorule_init(mt);
 	ret += module_oxcnotif_init(mt);
 	ret += module_oxcfxics_init(mt);
+	ret += module_oxcperm_init(mt);
 	ret += module_nspi_init(mt);
 	ret += module_noserver_init(mt);
 	ret += module_errorchecks_init(mt);
 	ret += module_lcid_init(mt);
 	ret += module_mapidump_init(mt);
+	ret += module_lzxpress_init(mt);
 
 	return ret;
 }
@@ -67,6 +68,7 @@ _PUBLIC_ uint32_t module_oxcstor_init(struct mapitest *mt)
 	mapitest_suite_add_test(suite, "GETOWNINGSERVERS", "Get the list of servers that host replicas of a given public folder", mapitest_oxcstor_GetOwningServers);
 	mapitest_suite_add_test(suite, "LONGTERMID", "Map to / from a Long Term ID", mapitest_oxcstor_LongTermId);
 	mapitest_suite_add_test_flagged(suite, "GETSTORESTATE", "Retrieve the store state", mapitest_oxcstor_GetStoreState, NotInExchange2010);
+	mapitest_suite_add_test(suite, "ISMAILBOXFOLDER", "Get the standard folder for a given folder ID", mapitest_oxcstor_IsMailboxFolder);
 
 	mapitest_suite_register(mt, suite);
 	
@@ -88,7 +90,9 @@ _PUBLIC_ uint32_t module_oxcfold_init(struct mapitest *mt)
 	suite = mapitest_suite_init(mt, "OXCFOLD", "Folder Object Protocol", true);
 
 	mapitest_suite_add_test(suite, "OPEN",   "Open a folder", mapitest_oxcfold_OpenFolder);
+	mapitest_suite_add_test(suite, "CREATE-DELETE", "Do a basic create / delete cycle on a folder", mapitest_oxcfold_CreateDeleteFolder);
 	mapitest_suite_add_test(suite, "CREATE", "Create a folder", mapitest_oxcfold_CreateFolder);
+	mapitest_suite_add_test(suite, "CREATE-VARIANTS", "More folder creation variations", mapitest_oxcfold_CreateFolderVariants);
 	mapitest_suite_add_test(suite, "GET-HIERARCHY-TABLE", "Retrieve the hierarchy table", mapitest_oxcfold_GetHierarchyTable);
 	mapitest_suite_add_test(suite, "GET-CONTENTS-TABLE", "Retrieve the contents table", mapitest_oxcfold_GetContentsTable);
 	mapitest_suite_add_test(suite, "SET-SEARCHCRITERIA", "Set a search criteria on a container", mapitest_oxcfold_SetSearchCriteria);
@@ -98,6 +102,7 @@ _PUBLIC_ uint32_t module_oxcfold_init(struct mapitest *mt)
 	mapitest_suite_add_test(suite, "COPYFOLDER", "Copy folder from source to destination", mapitest_oxcfold_CopyFolder);
 	mapitest_suite_add_test(suite, "HARDDELETEMESSAGES", "Hard delete messages", mapitest_oxcfold_HardDeleteMessages);
 	mapitest_suite_add_test(suite, "HARDDELETEMESSAGESANDSUBFOLDERS", "Hard delete messages and subfolders", mapitest_oxcfold_HardDeleteMessagesAndSubfolders);
+	mapitest_suite_add_test(suite, "DELETEMESSAGES", "Soft delete messages", mapitest_oxcfold_DeleteMessages);
 
 	mapitest_suite_register(mt, suite);
 	
@@ -156,7 +161,7 @@ _PUBLIC_ uint32_t module_oxcmsg_init(struct mapitest *mt)
 	mapitest_suite_add_test(suite, "GET-MESSAGE-STATUS", "Get message status", mapitest_oxcmsg_GetMessageStatus);
 	mapitest_suite_add_test(suite, "SET-MESSAGE-STATUS", "Set message status", mapitest_oxcmsg_SetMessageStatus);
 	mapitest_suite_add_test(suite, "OPEN-EMBEDDED-MESSAGE", "Open a message embedded in another message", mapitest_oxcmsg_OpenEmbeddedMessage);
-	mapitest_suite_add_test(suite, "GET-VALID-ATTACHMENTS", "Get valid attachment IDs for a message", mapitest_oxcmsg_GetValidAttachments);
+	mapitest_suite_add_test_flagged(suite, "GET-VALID-ATTACHMENTS", "Get valid attachment IDs for a message", mapitest_oxcmsg_GetValidAttachments, NotInExchange2010);
 	mapitest_suite_add_test(suite, "RELOAD-CACHED-INFORMATION", "Reload cached information for a message", mapitest_oxcmsg_ReloadCachedInformation);
 
 	mapitest_suite_register(mt, suite);
@@ -181,10 +186,10 @@ _PUBLIC_ uint32_t module_oxctable_init(struct mapitest *mt)
 	mapitest_suite_add_test(suite, "SETCOLUMNS", "Set Table Columns", mapitest_oxctable_SetColumns);
 	mapitest_suite_add_test(suite, "QUERYCOLUMNS", "Query Table Columns", mapitest_oxctable_QueryColumns);
 	mapitest_suite_add_test(suite, "QUERYROWS", "Query Table Rows", mapitest_oxctable_QueryRows);
-	mapitest_suite_add_test(suite, "GETSTATUS", "Get Table Status", mapitest_oxctable_GetStatus);
+	mapitest_suite_add_test_flagged(suite, "GETSTATUS", "Get Table Status", mapitest_oxctable_GetStatus, NotInExchange2010);
 	mapitest_suite_add_test(suite, "SEEKROW", "Seek a row", mapitest_oxctable_SeekRow);
 	mapitest_suite_add_test(suite, "RESTRICT", "Apply filters to a table", mapitest_oxctable_Restrict);
-	mapitest_suite_add_test(suite, "SEEKROW-APPROX", "Seek an approximate row", mapitest_oxctable_SeekRowApprox);
+	mapitest_suite_add_test_flagged(suite, "SEEKROW-APPROX", "Seek an approximate row", mapitest_oxctable_SeekRowApprox, NotInExchange2010);
 	mapitest_suite_add_test(suite, "CREATE-BOOKMARK", "Create a table bookmark", mapitest_oxctable_CreateBookmark);
 	mapitest_suite_add_test(suite, "SEEKROW-BOOKMARK", "Seek a row given a bookmark", mapitest_oxctable_SeekRowBookmark);
 	mapitest_suite_add_test(suite, "CATEGORY", "Expand/collapse category rows", mapitest_oxctable_Category);
@@ -218,9 +223,10 @@ _PUBLIC_ uint32_t module_oxcprpt_init(struct mapitest *mt)
 	mapitest_suite_add_test(suite, "COPY-PROPS", "Copy a specified set of properties", mapitest_oxcprpt_CopyProps);
 	mapitest_suite_add_test(suite, "STREAM", "Test stream operations", mapitest_oxcprpt_Stream);
 	mapitest_suite_add_test(suite, "COPYTO", "Copy or move properties", mapitest_oxcprpt_CopyTo);
-	mapitest_suite_add_test(suite, "WRITE-COMMIT-STREAM", "Test atomic Write / Commit operation", mapitest_oxcprpt_WriteAndCommitStream);
-	mapitest_suite_add_test(suite, "COPYTO-STREAM", "Copy stream from source to desination stream", mapitest_oxcprpt_CopyToStream);
+	mapitest_suite_add_test_flagged(suite, "WRITE-COMMIT-STREAM", "Test atomic Write / Commit operation", mapitest_oxcprpt_WriteAndCommitStream, NotInExchange2010);
+	mapitest_suite_add_test_flagged(suite, "COPYTO-STREAM", "Copy stream from source to destination stream", mapitest_oxcprpt_CopyToStream, NotInExchange2010SP0);
 	mapitest_suite_add_test(suite, "NAME-ID", "Convert between Names and IDs", mapitest_oxcprpt_NameId);
+	mapitest_suite_add_test(suite, "PSMAPI-NAME-ID", "Convert between Names and IDs for PS_MAPI namespace", mapitest_oxcprpt_NameId_PSMAPI);
 
 	mapitest_suite_register(mt, suite);
 
@@ -262,7 +268,8 @@ _PUBLIC_ uint32_t module_oxcnotif_init(struct mapitest *mt)
 
 	suite = mapitest_suite_init(mt, "OXCNOTIF", "Core Notification Protocol", true);
 
-	mapitest_suite_add_test(suite, "REGISTER-NOTIFICATION", "Subscribe to notifications", mapitest_oxcnotif_RegisterNotification);
+	// mapitest_suite_add_test(suite, "REGISTER-NOTIFICATION", "Subscribe to notifications", mapitest_oxcnotif_RegisterNotification);
+	mapitest_suite_add_test_flagged(suite, "SYNC-OPEN-ADVISOR", "Test the SyncOpenAdvisor ROP", mapitest_oxcnotif_SyncOpenAdvisor, NotInExchange2010);
 
 	mapitest_suite_register(mt, suite);
 
@@ -284,12 +291,41 @@ _PUBLIC_ uint32_t module_oxcfxics_init(struct mapitest *mt)
 	suite = mapitest_suite_init(mt, "OXCFXICS", "Bulk Data Transfer Protocol", true);
 	
 	mapitest_suite_add_test(suite, "GET-LOCAL-REPLICA-IDS", "Reserve a range of IDs for local replica", mapitest_oxcfxics_GetLocalReplicaIds);
+	mapitest_suite_add_test(suite, "COPYFOLDER", "Test CopyFolder operation", mapitest_oxcfxics_CopyFolder);
+	mapitest_suite_add_test(suite, "COPYMESSAGES", "Test CopyMessages operation", mapitest_oxcfxics_CopyMessages);
+	mapitest_suite_add_test(suite, "COPYTO", "Test CopyTo operation", mapitest_oxcfxics_CopyTo);
+	mapitest_suite_add_test(suite, "COPYPROPS", "Test CopyProperties operation", mapitest_oxcfxics_CopyProperties);
+	mapitest_suite_add_test(suite, "DEST-CONFIGURE", "Test Destination Configure operation", mapitest_oxcfxics_DestConfigure);
+	mapitest_suite_add_test(suite, "SYNC-CONFIGURE", "Configure ICS context for download", mapitest_oxcfxics_SyncConfigure);
+	mapitest_suite_add_test(suite, "SET-LOCAL-REPLICA-MIDSET-DELETED", "Reserve a range of local replica IDs", mapitest_oxcfxics_SetLocalReplicaMidsetDeleted);
+	mapitest_suite_add_test(suite, "SYNC-OPEN-COLLECTOR", "Test opening ICS upload collector", mapitest_oxcfxics_SyncOpenCollector);
 
 	mapitest_suite_register(mt, suite);
 
 	return MAPITEST_SUCCESS;
 }
 
+
+/**
+   \details Register the Permissions Protocol test suite
+
+   \param mt pointer to the top-level mapitest structure
+
+   \return MAPITEST_SUCCESS on success, otherwise MAPITEST_ERROR
+ */
+_PUBLIC_ uint32_t module_oxcperm_init(struct mapitest *mt)
+{
+	struct mapitest_suite	*suite = NULL;
+
+	suite = mapitest_suite_init(mt, "OXCPERM", "Permissions Protocol", true);
+	
+	mapitest_suite_add_test(suite, "GET-PERMISSIONS-TABLE", "Get handle to the Permissions table", mapitest_oxcperm_GetPermissionsTable);
+	mapitest_suite_add_test(suite, "MODIFY-PERMISSIONS", "Modify access permissions on a folder", mapitest_oxcperm_ModifyPermissions);
+
+	mapitest_suite_register(mt, suite);
+
+	return MAPITEST_SUCCESS;
+}
 
 /**
    \details Register the NSPI test suite
@@ -321,6 +357,7 @@ _PUBLIC_ uint32_t module_nspi_init(struct mapitest *mt)
 	mapitest_suite_add_test(suite, "GETNAMESFROMIDS", "Returns a list of property names for a set of proptags", mapitest_nspi_GetNamesFromIDs);
 	mapitest_suite_add_test(suite, "GETIDSFROMNAMES", "Returns the property IDs associated with property names", mapitest_nspi_GetIDsFromNames);
 	mapitest_suite_add_test(suite, "RESOLVENAMES", "Resolve usernames", mapitest_nspi_ResolveNames);
+	mapitest_suite_add_test(suite, "GETGALTABLE", "Fetches the Global Address List", mapitest_nspi_GetGALTable);
 
 	mapitest_suite_register(mt, suite);
 
@@ -341,7 +378,9 @@ _PUBLIC_ uint32_t module_noserver_init(struct mapitest *mt)
 
 	suite = mapitest_suite_init(mt, "NOSERVER", "No server operations", false);
 
-	mapitest_suite_add_test(suite, "LZFU", "Test Compressed RTF operations", mapitest_noserver_lzfu);
+	mapitest_suite_add_test(suite, "LZFU-DECOMPRESS", "Test Compressed RTF decompression operations", mapitest_noserver_lzfu);
+	mapitest_suite_add_test(suite, "LZFU-COMPRESS", "Test Compressed RTF compression operations", mapitest_noserver_rtfcp);
+	mapitest_suite_add_test(suite, "LZFU-COMPRESS-LARGE", "Test RTF (de)compression operations on larger file", mapitest_noserver_rtfcp_large);
 	mapitest_suite_add_test(suite, "SROWSET", "Test SRowSet parsing", mapitest_noserver_srowset);
 	mapitest_suite_add_test(suite, "GETSETPROPS", "Test Property handling", mapitest_noserver_properties);
 	mapitest_suite_add_test(suite, "MAPIPROPS", "Test MAPI Property handling", mapitest_noserver_mapi_properties);
@@ -426,6 +465,27 @@ _PUBLIC_ uint32_t module_mapidump_init(struct mapitest *mt)
 	mapitest_suite_add_test(suite, "MESSAGEMOVEDNOTIF", "Test dump of a message move notification", mapitest_mapidump_messagemoved);
 	mapitest_suite_add_test(suite, "MESSAGECOPYNOTIF", "Test dump of a message copy notification", mapitest_mapidump_messagecopied);
 	mapitest_suite_add_test(suite, "MESSAGEMODIFIEDNOTIF", "Test dump of a message modification notification", mapitest_mapidump_messagemodified);
+	mapitest_suite_register(mt, suite);
+
+	return MAPITEST_SUCCESS;
+}
+
+
+/**
+   \details Initialise the language code / ID test suite
+
+   \param mt pointer to the top-level mapitest structure
+
+   \return MAPITEST_SUCCESS on success, otherwise MAPITEST_ERROR
+ */
+_PUBLIC_ uint32_t module_lzxpress_init(struct mapitest *mt)
+{
+	struct mapitest_suite	*suite = NULL;
+
+	suite = mapitest_suite_init(mt, "LZXPRESS", "lzxpress algorithm test suite", false);
+
+	mapitest_suite_add_test_flagged(suite, "VALIDATE-001", "Validate LZXPRESS implementation using sample file 001", mapitest_lzxpress_validate_test_001, ExpectedFail);
+
 	mapitest_suite_register(mt, suite);
 
 	return MAPITEST_SUCCESS;

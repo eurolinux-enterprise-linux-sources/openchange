@@ -19,7 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <mapiproxy/dcesrv_mapiproxy.h>
+#include "mapiproxy/dcesrv_mapiproxy.h"
 #include "libmapiproxy.h"
 
 /**
@@ -33,7 +33,7 @@
    \details Create and return an allocated pointer to a mpm session
 
    \param mem_ctx pointer to the memory context
-   \param server_id reference to the session context server identifier
+   \param serverid reference to the session context server identifier
    structure
    \param context_id reference to the context identifier
 
@@ -41,7 +41,7 @@
    otherwise NULL
  */
 struct mpm_session *mpm_session_new(TALLOC_CTX *mem_ctx, 
-				     struct server_id server_id,
+				     struct server_id serverid,
 				     uint32_t context_id)
 {
 	struct mpm_session	*session = NULL;
@@ -51,14 +51,30 @@ struct mpm_session *mpm_session_new(TALLOC_CTX *mem_ctx,
 	session = talloc_zero(mem_ctx, struct mpm_session);
 	if (!session) return NULL;
 
-	session->server_id.id = server_id.id;
-	session->server_id.id2 = server_id.id2;
-	session->server_id.node = server_id.node;
+	session->server_id = serverid;
 	session->context_id = context_id;
+	session->ref_count = 0;
 	session->destructor = NULL;
 	session->private_data = NULL;
 
 	return session;
+}
+
+
+/**
+   \details Increment the ref_count associated to a session
+
+   \param session pointer to the session where to increment ref_count
+
+   \return true on success, otherwise false
+ */
+bool mpm_session_increment_ref_count(struct mpm_session *session)
+{
+	if (!session) return false;
+
+	session->ref_count += 1;
+
+	return true;
 }
 
 
@@ -136,6 +152,11 @@ bool mpm_session_release(struct mpm_session *session)
 
 	if (!session) return false;
 
+	if (session->ref_count) {
+		session->ref_count -= 1;
+		return false;
+	}
+
 	if (session->destructor) {
 		ret = session->destructor(session->private_data);
 		if (ret == false) return ret;
@@ -160,9 +181,7 @@ bool mpm_session_cmp_sub(struct mpm_session *session,
 {
 	if (!session) return false;
 
-	if ((session->server_id.id   == sid.id) &&
-	    (session->server_id.id2  == sid.id2) &&
-	    (session->server_id.node == sid.node) &&
+	if (memcmp(&session->server_id, &sid, sizeof(struct server_id) == 0) &&
 	    (session->context_id == context_id)) {
 		return true;
 	}

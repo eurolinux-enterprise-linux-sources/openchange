@@ -22,7 +22,7 @@
 /**
    \file libmapiserver_oxorule.c
 
-   \brief OXORULE Rops
+   \brief OXORULE ROP Response size calculations
  */
 
 #include "libmapiserver.h"
@@ -30,12 +30,22 @@
 /**
    \details Calculate GetRulesTable Rop size
 
-   \param response pointer to the GetRulesTable EcDoRpc_MAPI_REPL
-   structure
-
    \return Size of GetRulesTable response
  */
 _PUBLIC_ uint16_t libmapiserver_RopGetRulesTable_size(void)
+{
+	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
+
+	return size;
+}
+
+
+/**
+   \details Calculate ModifyRules Rop size
+
+   \return Size of ModifyRules response
+ */
+_PUBLIC_ uint16_t libmapiserver_RopModifyRules_size(void)
 {
 	uint16_t	size = SIZE_DFLT_MAPI_RESPONSE;
 

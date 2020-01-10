@@ -37,7 +37,7 @@ namespace libmapipp {
 class mapi_exception : public std::exception
 {
 	public:
-		mapi_exception(enum MAPISTATUS status, const std::string& origin = "") : std::exception(), m_status(status), m_origin(origin), m_what_string(origin)
+		explicit mapi_exception(enum MAPISTATUS status, const std::string& origin = "") : std::exception(), m_status(status), m_origin(origin), m_what_string(origin)
 		{
 			status_map::iterator iter = sm_status_map.find(m_status);
 
@@ -138,8 +138,6 @@ class mapi_exception : public std::exception
 			}
 		}	
 };
-
-mapi_exception::status_map mapi_exception::sm_status_map = status_map();
 
 } // namespace libmapipp
 

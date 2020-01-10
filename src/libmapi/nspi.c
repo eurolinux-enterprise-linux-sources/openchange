@@ -1,7 +1,7 @@
 /*
    OpenChange NSPI implementation.
 
-   Copyright (C) Julien Kerihuel 2005 - 2008.
+   Copyright (C) Julien Kerihuel 2005 - 2011.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,9 +17,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/proto_private.h>
-#include <gen_ndr/ndr_exchange_c.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
+#include "gen_ndr/ndr_exchange_c.h"
 #include <param.h>
 
 
@@ -103,7 +103,7 @@ _PUBLIC_ struct nspi_context *nspi_bind(TALLOC_CTX *parent_ctx,
 		return NULL;
 	}
 
-	mem_ctx = talloc_named(NULL, 0, "nspi_bind");
+	mem_ctx = talloc_named(parent_ctx, 0, __FUNCTION__);
 
 	r.in.dwFlags = 0;
 
@@ -120,7 +120,7 @@ _PUBLIC_ struct nspi_context *nspi_bind(TALLOC_CTX *parent_ctx,
 
 	r.out.handle = &ret->handle;
 
-	status = dcerpc_NspiBind(p, mem_ctx, &r);
+	status = dcerpc_NspiBind_r(p->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	if ((!NT_STATUS_IS_OK(status)) || (retval != MAPI_E_SUCCESS)) {
 		talloc_free(ret);
@@ -147,7 +147,7 @@ int nspi_disconnect_dtor(void *data)
 	enum MAPISTATUS		retval;
 	struct mapi_provider	*provider = (struct mapi_provider *) data;
 
-	retval = nspi_unbind(provider->ctx);
+	retval = nspi_unbind((struct nspi_context *)provider->ctx);
 	return retval;
 }
 
@@ -171,7 +171,7 @@ _PUBLIC_ enum MAPISTATUS nspi_unbind(struct nspi_context *nspi_ctx)
 	r.in.handle = r.out.handle = &nspi_ctx->handle;
 	r.in.Reserved = 0;
 
-	status = dcerpc_NspiUnbind(nspi_ctx->rpc_connection, nspi_ctx->mem_ctx, &r);
+	status = dcerpc_NspiUnbind_r(nspi_ctx->rpc_connection->binding_handle, nspi_ctx->mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF((retval != 1) && !MAPI_STATUS_IS_OK(NT_STATUS_V(status)), retval, NULL);
 
@@ -213,7 +213,7 @@ _PUBLIC_ enum MAPISTATUS nspi_UpdateStat(struct nspi_context *nspi_ctx,
 	r.out.pStat = nspi_ctx->pStat;
 	r.out.plDelta = r.in.plDelta;
 
-	status = dcerpc_NspiUpdateStat(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiUpdateStat_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -240,7 +240,7 @@ _PUBLIC_ enum MAPISTATUS nspi_UpdateStat(struct nspi_context *nspi_ctx,
 _PUBLIC_ enum MAPISTATUS nspi_QueryRows(struct nspi_context *nspi_ctx, 
 					TALLOC_CTX *mem_ctx,
 					struct SPropTagArray *pPropTags,
-					struct SPropTagArray *MIds, 
+					struct PropertyTagArray_r *MIds, 
 					uint32_t count,
 					struct SRowSet **ppRows)
 {
@@ -275,7 +275,7 @@ _PUBLIC_ enum MAPISTATUS nspi_QueryRows(struct nspi_context *nspi_ctx,
 
 	r.out.ppRows = ppRows;
 
-	status = dcerpc_NspiQueryRows(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiQueryRows_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -326,7 +326,7 @@ _PUBLIC_ enum MAPISTATUS nspi_SeekEntries(struct nspi_context *nspi_ctx,
 					  enum TableSortOrders SortType,
 					  struct SPropValue *pTarget,
 					  struct SPropTagArray *pPropTags,
-					  struct SPropTagArray *pMIds,
+					  struct PropertyTagArray_r *pMIds,
 					  struct SRowSet **pRows)
 {
 	struct NspiSeekEntries		r;
@@ -374,10 +374,15 @@ _PUBLIC_ enum MAPISTATUS nspi_SeekEntries(struct nspi_context *nspi_ctx,
 	pStat = talloc(mem_ctx, struct STAT);
 	r.out.pStat = pStat;
 
-	status = dcerpc_NspiSeekEntries(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiSeekEntries_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, pStat);
 	OPENCHANGE_RETVAL_IF(retval, retval, pStat);
+
+	nspi_ctx->pStat->CurrentRec = r.out.pStat->CurrentRec;
+	nspi_ctx->pStat->Delta = r.out.pStat->Delta;
+	nspi_ctx->pStat->NumPos = r.out.pStat->NumPos;
+	nspi_ctx->pStat->TotalRecs = r.out.pStat->TotalRecs;
 
 	return MAPI_E_SUCCESS;
 }
@@ -390,19 +395,24 @@ _PUBLIC_ enum MAPISTATUS nspi_SeekEntries(struct nspi_context *nspi_ctx,
    \param mem_ctx pointer to the memory context
    \param pPropTags pointer to an array of property tags of columns
    \param Filter pointer to the Restriction to apply to the table
+   \param ulRequested The upper limit for returned rows
    \param ppRows pointer to pointer to a SRowSet structure holding the
    rows returned by the server
    \param ppOutMIds pointer to pointer to a list of MId that comprise
    a restricted address book container
 
-   \return MAPI_E_SUCCESS on success, otherwise MAPI error.
+   \return MAPI_E_SUCCESS on success, otherwise MAPI error. If the resulting
+   table rows count will be greater than ulRequested, then an error
+   MAPI_E_TABLE_TOO_BIG is returned. Note, this error can be also returned
+   when server limits for table size are exceeded.
  */
 _PUBLIC_ enum MAPISTATUS nspi_GetMatches(struct nspi_context *nspi_ctx, 
 					 TALLOC_CTX *mem_ctx,
 					 struct SPropTagArray *pPropTags,
 					 struct Restriction_r *Filter,
+					 uint32_t ulRequested,
 					 struct SRowSet **ppRows,
-					 struct SPropTagArray **ppOutMIds)
+					 struct PropertyTagArray_r **ppOutMIds)
 {
 	struct NspiGetMatches		r;
 	NTSTATUS			status;
@@ -429,7 +439,7 @@ _PUBLIC_ enum MAPISTATUS nspi_GetMatches(struct nspi_context *nspi_ctx,
 	r.in.Reserved2 = 0;
 	r.in.Filter = Filter;
 	r.in.lpPropName = NULL;
-	r.in.ulRequested = 5000;
+	r.in.ulRequested = ulRequested;
 	r.in.pPropTags = pPropTags;
 
 	pStat = talloc(mem_ctx, struct STAT);
@@ -437,7 +447,7 @@ _PUBLIC_ enum MAPISTATUS nspi_GetMatches(struct nspi_context *nspi_ctx,
 	r.out.ppOutMIds = ppOutMIds;
 	r.out.ppRows = ppRows;
 
-	status = dcerpc_NspiGetMatches(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiGetMatches_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_NOT_FOUND, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -454,9 +464,9 @@ _PUBLIC_ enum MAPISTATUS nspi_GetMatches(struct nspi_context *nspi_ctx,
    \param mem_ctx pointer to the memory context
    \param SortType the table sort order to use
    \param pInMIds pointer on a list of MIds that comprise a
-   restricted addess book container
+   restricted address book container
    \param ppMIds pointer on pointer to the returned list of MIds that
-   comprise a restricted addess book container.
+   comprise a restricted address book container.
 
    SortType can take the following values:
    -# SortTypeDisplayName
@@ -467,13 +477,13 @@ _PUBLIC_ enum MAPISTATUS nspi_GetMatches(struct nspi_context *nspi_ctx,
 _PUBLIC_ enum MAPISTATUS nspi_ResortRestriction(struct nspi_context *nspi_ctx,
 						TALLOC_CTX *mem_ctx,
 						enum TableSortOrders SortType,
-						struct SPropTagArray *pInMIds,
-						struct SPropTagArray **ppMIds)
+						struct PropertyTagArray_r *pInMIds,
+						struct PropertyTagArray_r **ppMIds)
 {
 	struct NspiResortRestriction	r;
 	enum MAPISTATUS			retval;
 	NTSTATUS			status;
-	struct SPropTagArray		*ppInMIds = NULL;
+	struct PropertyTagArray_r		*ppInMIds = NULL;
 	struct STAT			*pStat = NULL;
 
 	/* Sanity checks */
@@ -497,7 +507,7 @@ _PUBLIC_ enum MAPISTATUS nspi_ResortRestriction(struct nspi_context *nspi_ctx,
 	r.out.pStat = pStat;
 	r.out.ppMIds = ppMIds;
 
-	status = dcerpc_NspiResortRestriction(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiResortRestriction_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -520,7 +530,7 @@ _PUBLIC_ enum MAPISTATUS nspi_ResortRestriction(struct nspi_context *nspi_ctx,
 _PUBLIC_ enum MAPISTATUS nspi_DNToMId(struct nspi_context *nspi_ctx, 
 				      TALLOC_CTX *mem_ctx,
 				      struct StringsArray_r *pNames,
-				      struct SPropTagArray **ppMIds)
+				      struct PropertyTagArray_r **ppMIds)
 {
 	struct NspiDNToMId	r;
 	NTSTATUS		status;
@@ -539,7 +549,7 @@ _PUBLIC_ enum MAPISTATUS nspi_DNToMId(struct nspi_context *nspi_ctx,
 
 	r.out.ppMIds = ppMIds;
 
-	status = dcerpc_NspiDNToMId(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiDNToMId_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL)
@@ -584,7 +594,7 @@ _PUBLIC_ enum MAPISTATUS nspi_GetPropList(struct nspi_context *nspi_ctx,
 	
 	r.out.ppPropTags = ppPropTags;
 
-	status = dcerpc_NspiGetPropList(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiGetPropList_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -610,7 +620,7 @@ _PUBLIC_ enum MAPISTATUS nspi_GetPropList(struct nspi_context *nspi_ctx,
 _PUBLIC_ enum MAPISTATUS nspi_GetProps(struct nspi_context *nspi_ctx, 
 				       TALLOC_CTX *mem_ctx,
 				       struct SPropTagArray *pPropTags, 
-				       struct SPropTagArray *MId,
+				       struct PropertyTagArray_r *MId,
 				       struct SRowSet **SRowSet)
 
 {
@@ -639,7 +649,7 @@ _PUBLIC_ enum MAPISTATUS nspi_GetProps(struct nspi_context *nspi_ctx,
 	ppRows = talloc(mem_ctx, struct SRow);
 	r.out.ppRows = &ppRows;
 
-	status = dcerpc_NspiGetProps(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiGetProps_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL)
@@ -688,7 +698,7 @@ _PUBLIC_ enum MAPISTATUS nspi_CompareMIds(struct nspi_context *nspi_ctx,
 
 	r.out.plResult = plResult;
 
-	status = dcerpc_NspiCompareMIds(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiCompareMIds_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -736,7 +746,7 @@ _PUBLIC_ enum MAPISTATUS nspi_ModProps(struct nspi_context *nspi_ctx,
 	r.in.pPropTags = pPropTags;
 	r.in.pRow = pRow;
 
-	status = dcerpc_NspiModProps(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiModProps_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -792,7 +802,7 @@ _PUBLIC_ enum MAPISTATUS nspi_GetSpecialTable(struct nspi_context *nspi_ctx,
 	r.out.lpVersion = &nspi_ctx->version;
 	r.out.ppRows = ppRows;
 
-	status = dcerpc_NspiGetSpecialTable(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiGetSpecialTable_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -847,7 +857,7 @@ _PUBLIC_ enum MAPISTATUS nspi_GetTemplateInfo(struct nspi_context *nspi_ctx,
 	
 	r.out.ppData = ppData;
 
-	status = dcerpc_NspiGetTemplateInfo(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiGetTemplateInfo_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -897,7 +907,7 @@ _PUBLIC_ enum MAPISTATUS nspi_ModLinkAtt(struct nspi_context *nspi_ctx,
 	r.in.MId = MId;
 	r.in.lpEntryIds = lpEntryIds;
 
-	status = dcerpc_NspiModLinkAtt(nspi_ctx->rpc_connection, nspi_ctx->mem_ctx, &r);
+	status = dcerpc_NspiModLinkAtt_r(nspi_ctx->rpc_connection->binding_handle, nspi_ctx->mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -933,11 +943,11 @@ _PUBLIC_ enum MAPISTATUS nspi_QueryColumns(struct nspi_context *nspi_ctx,
 
 	r.in.handle = &nspi_ctx->handle;
 	r.in.Reserved = 0x0;
-	r.in.dwFlags = (WantUnicode == true) ? NspiUnicodeProptypes : 0x0;
+	r.in.dwFlags = (WantUnicode != false) ? NspiUnicodeProptypes : 0x0;
 	
 	r.out.ppColumns = ppColumns;
 
-	status = dcerpc_NspiQueryColumns(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiQueryColumns_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -986,7 +996,7 @@ _PUBLIC_ enum MAPISTATUS nspi_GetNamesFromIDs(struct nspi_context *nspi_ctx,
 	r.out.ppReturnedPropTags = ppReturnedPropTags;
 	r.out.ppNames = ppNames;
 
-	status = dcerpc_NspiGetNamesFromIDs(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiGetNamesFromIDs_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -1042,7 +1052,7 @@ _PUBLIC_ enum MAPISTATUS nspi_GetIDsFromNames(struct nspi_context *nspi_ctx,
 
 	r.out.ppPropTags = ppPropTags;
 	
-	status = dcerpc_NspiGetIDsFromNames(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiGetIDsFromNames_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -1074,7 +1084,7 @@ _PUBLIC_ enum MAPISTATUS nspi_ResolveNames(struct nspi_context *nspi_ctx,
 					   const char **usernames, 
 					   struct SPropTagArray *pPropTags, 
 					   struct SRowSet ***pppRows,
-					   struct SPropTagArray ***pppMIds)
+					   struct PropertyTagArray_r ***pppMIds)
 {
 	struct NspiResolveNames r;
 	struct StringsArray_r	*paStr;
@@ -1106,7 +1116,7 @@ _PUBLIC_ enum MAPISTATUS nspi_ResolveNames(struct nspi_context *nspi_ctx,
 	r.out.ppMIds = *pppMIds;
 	r.out.ppRows = *pppRows;
 
-	status = dcerpc_NspiResolveNames(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiResolveNames_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
@@ -1117,7 +1127,7 @@ _PUBLIC_ enum MAPISTATUS nspi_ResolveNames(struct nspi_context *nspi_ctx,
 
 /**
    \details Takes a set of string values in the Unicode character set
-   and performs ANR on those strings
+   and performs ambiguous name resolution (ANR) on those strings
 
    \param nspi_ctx pointer on the NSPI connection context
    \param mem_ctx pointer to the memory context
@@ -1137,10 +1147,10 @@ _PUBLIC_ enum MAPISTATUS nspi_ResolveNamesW(struct nspi_context *nspi_ctx,
 					    const char **usernames, 
 					    struct SPropTagArray *pPropTags, 
 					    struct SRowSet ***pppRows,
-					    struct SPropTagArray ***pppMIds)
+					    struct PropertyTagArray_r ***pppMIds)
 {
 	struct NspiResolveNamesW	r;
-	struct WStringsArray_r		*paWStr;
+	struct StringsArrayW_r		*paWStr;
 	NTSTATUS			status;
 	enum MAPISTATUS			retval;
 	uint32_t			count;
@@ -1160,7 +1170,7 @@ _PUBLIC_ enum MAPISTATUS nspi_ResolveNamesW(struct nspi_context *nspi_ctx,
 	r.in.Reserved = 0;
 	r.in.pPropTags = pPropTags;
 
-	paWStr = talloc(mem_ctx, struct WStringsArray_r);
+	paWStr = talloc(mem_ctx, struct StringsArrayW_r);
 	paWStr->Count = count;
 	paWStr->Strings = usernames;
 	r.in.paWStr = paWStr;
@@ -1168,7 +1178,7 @@ _PUBLIC_ enum MAPISTATUS nspi_ResolveNamesW(struct nspi_context *nspi_ctx,
 	r.out.ppMIds = *pppMIds;
 	r.out.ppRows = *pppRows;
 
-	status = dcerpc_NspiResolveNamesW(nspi_ctx->rpc_connection, mem_ctx, &r);
+	status = dcerpc_NspiResolveNamesW_r(nspi_ctx->rpc_connection->binding_handle, mem_ctx, &r);
 	retval = r.out.result;
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), retval, NULL);
 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);

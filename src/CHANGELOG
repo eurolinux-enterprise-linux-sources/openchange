@@ -1,1900 +1,2317 @@
 ------------------------------------------------------------------------
-r1297 | jkerihuel | 2009-04-06 17:20:20 +0200 (Mon, 06 Apr 2009) | 4 lines
+r3105 | wsourdeau | 2011-07-27 16:57:58 +0200 (Wed, 27 Jul 2011) | 1 line
 
-- Add Implementation for Logon redirect response buffer in OpenChange IDL
-- Update libmapiserver size calculation routine for Logon call to handle this case
+added "openchangedb_get_new_changeNumber" for generating version numbers
+------------------------------------------------------------------------
+r3106 | wsourdeau | 2011-07-27 16:58:29 +0200 (Wed, 27 Jul 2011) | 1 line
 
+Return MAPI_E_NO_SUPPORT when message creation is requested
+------------------------------------------------------------------------
+r3107 | wsourdeau | 2011-07-27 17:05:39 +0200 (Wed, 27 Jul 2011) | 1 line
 
+Reseparated cnset_seen, cnset_seen_fai and cnset_read + added the ability for the backends to provide their own change numbers + added the ability to ask for a differential update based on the last highest changed number, derived from cnset_seen
 ------------------------------------------------------------------------
-r1298 | occl | 2009-04-07 00:00:34 +0200 (Tue, 07 Apr 2009) | 1 line
+r3108 | wsourdeau | 2011-07-28 15:08:42 +0200 (Thu, 28 Jul 2011) | 1 line
 
-Daily ChangeLog Update
+Added struct I8Array_r, in order to support arrays of uint64_t
 ------------------------------------------------------------------------
-r1299 | jkerihuel | 2009-04-07 00:37:20 +0200 (Tue, 07 Apr 2009) | 3 lines
+r3109 | wsourdeau | 2011-07-28 15:12:51 +0200 (Thu, 28 Jul 2011) | 1 line
 
-Use parent folder full replica ID: 2 bytes instead of 1 byte
+Added the folder.get_deleted_fmids backend operation
+------------------------------------------------------------------------
+r3110 | wsourdeau | 2011-07-28 15:33:48 +0200 (Thu, 28 Jul 2011) | 1 line
 
+Fixed member name in struct I8Array_r
+------------------------------------------------------------------------
+r3111 | wsourdeau | 2011-07-28 21:09:06 +0200 (Thu, 28 Jul 2011) | 1 line
 
+libmapi/idset.c: handle replid-based idsets in additional to replguid-based ones
 ------------------------------------------------------------------------
-r1300 | occl | 2009-04-08 00:00:34 +0200 (Wed, 08 Apr 2009) | 1 line
+r3112 | wsourdeau | 2011-07-28 21:54:14 +0200 (Thu, 28 Jul 2011) | 1 line
 
-Daily ChangeLog Update
+Implemented IDSET_remove_rawidset
 ------------------------------------------------------------------------
-r1301 | bradh | 2009-04-08 03:49:41 +0200 (Wed, 08 Apr 2009) | 9 lines
+r3113 | wsourdeau | 2011-07-29 15:21:35 +0200 (Fri, 29 Jul 2011) | 1 line
 
-Implement LockRegionStream and UnlockRegionStream ROPs.
+Fixed finding of corresponding range
+------------------------------------------------------------------------
+r3114 | wsourdeau | 2011-07-29 15:22:06 +0200 (Fri, 29 Jul 2011) | 1 line
 
-These appear to be a relatively recent addition to the 
-documentation, possibly only used in Exchange 2007 / Outlook
-2007.
+Added differential state properties
+------------------------------------------------------------------------
+r3115 | wsourdeau | 2011-07-29 15:23:20 +0200 (Fri, 29 Jul 2011) | 1 line
 
-This is complete except for testing of whether the locking
-actually works.
+We do not need to get a range of cn. Only the highest one is necessary.
+------------------------------------------------------------------------
+r3116 | wsourdeau | 2011-07-29 15:24:28 +0200 (Fri, 29 Jul 2011) | 1 line
 
+Implemented reporting of deletions for message objects
 ------------------------------------------------------------------------
-r1302 | bradh | 2009-04-08 04:26:52 +0200 (Wed, 08 Apr 2009) | 2 lines
+r3117 | wsourdeau | 2011-07-29 16:03:43 +0200 (Fri, 29 Jul 2011) | 1 line
 
-Mapitest cleanups - remove GetLastError(), and other minor edits.
+Type errors on 32-bits arch
+------------------------------------------------------------------------
+r3118 | wsourdeau | 2011-07-29 16:10:29 +0200 (Fri, 29 Jul 2011) | 1 line
 
+Fixed a few warnings on 32-bit arch
 ------------------------------------------------------------------------
-r1303 | occl | 2009-04-09 00:00:36 +0200 (Thu, 09 Apr 2009) | 1 line
+r3119 | wsourdeau | 2011-07-29 16:13:10 +0200 (Fri, 29 Jul 2011) | 1 line
 
-Daily ChangeLog Update
+Fixed a few warnings on 32-bit arch
 ------------------------------------------------------------------------
-r1304 | bradh | 2009-04-10 07:50:05 +0200 (Fri, 10 Apr 2009) | 6 lines
+r3120 | wsourdeau | 2011-07-29 16:38:05 +0200 (Fri, 29 Jul 2011) | 1 line
 
-Update IDL for ModifyRules (0x41) and add IDL for 
-UpdateDeferredActionMessages (0x57).
+Fixed a leak
+------------------------------------------------------------------------
+r3121 | wsourdeau | 2011-07-29 21:26:22 +0200 (Fri, 29 Jul 2011) | 1 line
 
-This is a checkpoint commit, pending further investigation
-into how we handle PtypRestriction and PtypRuleAction.
+Fixed decoding of bitmask pattern
+------------------------------------------------------------------------
+r3122 | wsourdeau | 2011-07-29 21:51:27 +0200 (Fri, 29 Jul 2011) | 1 line
 
+Fixed parsing of bitmask-encoded ranges
 ------------------------------------------------------------------------
-r1305 | occl | 2009-04-11 00:00:36 +0200 (Sat, 11 Apr 2009) | 1 line
+r3123 | wsourdeau | 2011-08-01 22:04:29 +0200 (Mon, 01 Aug 2011) | 1 line
 
-Daily ChangeLog Update
+Fixed computing of an utf-16/ubcs-2 stream, since strlen_m_ext now rejects UTF-16
 ------------------------------------------------------------------------
-r1306 | bradh | 2009-04-11 06:01:51 +0200 (Sat, 11 Apr 2009) | 5 lines
+r3124 | wsourdeau | 2011-08-01 22:54:51 +0200 (Mon, 01 Aug 2011) | 1 line
 
-Add a new mapitest suite for OXCNOTIF (Core Notifications).
+Fixed other issues with "bitmask" globset encoding
+------------------------------------------------------------------------
+r3125 | wsourdeau | 2011-08-02 15:46:08 +0200 (Tue, 02 Aug 2011) | 1 line
 
-Add a test to the OXCNOTIF suite based on test case provided by Paolo Abeni.
+Validate the data returned from emsmdbp_object_table_get_row_props and ignore the notification if NULL, in order to avoid a crash
+------------------------------------------------------------------------
+r3126 | wsourdeau | 2011-08-02 20:38:49 +0200 (Tue, 02 Aug 2011) | 1 line
 
+Added a few properties for ol2007
+------------------------------------------------------------------------
+r3127 | wsourdeau | 2011-08-02 22:44:54 +0200 (Tue, 02 Aug 2011) | 1 line
 
+Fixed PSETID_CalendarAssistant
 ------------------------------------------------------------------------
-r1307 | bradh | 2009-04-11 06:04:08 +0200 (Sat, 11 Apr 2009) | 5 lines
+r3128 | wsourdeau | 2011-08-02 22:46:43 +0200 (Tue, 02 Aug 2011) | 1 line
 
-Add session state to the notification.
-Patch by Paolo Abeni - thanks for the investigation and fix.
+Enabled permissions table handling from the backend
+------------------------------------------------------------------------
+r3129 | wsourdeau | 2011-08-02 22:46:59 +0200 (Tue, 02 Aug 2011) | 1 line
 
-Also remove a stray debug message.
+Enabled permissions table handling from the backend
+------------------------------------------------------------------------
+r3130 | wsourdeau | 2011-08-04 15:19:46 +0200 (Thu, 04 Aug 2011) | 1 line
 
+openchangedb_get_parent_fid no longer takes a TALLOC_CTX as argument, as it was useless
 ------------------------------------------------------------------------
-r1308 | occl | 2009-04-12 00:00:38 +0200 (Sun, 12 Apr 2009) | 1 line
+r3131 | wsourdeau | 2011-08-04 15:21:07 +0200 (Thu, 04 Aug 2011) | 1 line
 
-Daily ChangeLog Update
+Free active sessions during unbind, in order to free up some unreleased memory
 ------------------------------------------------------------------------
-r1309 | jkerihuel | 2009-04-12 19:55:51 +0200 (Sun, 12 Apr 2009) | 8 lines
+r3132 | wsourdeau | 2011-08-04 15:29:57 +0200 (Thu, 04 Aug 2011) | 1 line
 
-- Add dcerpc_mapiproxy:delegated_auth option 
-This option delays mapiproxy-remote server authentication when
-the client sends the first request on a given pipe. This is
-mandatory in order to have delegated credentials to work.
+Cleanup of indexing API in order to simply the code, to leave the handling of indexing contexts to the backend instantiation code, and to avoid leaks
+------------------------------------------------------------------------
+r3133 | wsourdeau | 2011-08-04 15:35:33 +0200 (Thu, 04 Aug 2011) | 1 line
 
-- Factor remote connection into mapiproxy_op_connect
+Fixed a few leaks: tdb data structures are not talloc-based
+------------------------------------------------------------------------
+r3134 | wsourdeau | 2011-08-04 15:42:24 +0200 (Thu, 04 Aug 2011) | 1 line
 
+Fixed a few leaks and other memory handling issues
+------------------------------------------------------------------------
+r3135 | wsourdeau | 2011-08-04 15:44:21 +0200 (Thu, 04 Aug 2011) | 1 line
 
+Removed "mapistore_indexing_get_tdb_wrap" as it is now useless
 ------------------------------------------------------------------------
-r1310 | occl | 2009-04-13 00:00:36 +0200 (Mon, 13 Apr 2009) | 1 line
+r3136 | wsourdeau | 2011-08-04 15:45:33 +0200 (Thu, 04 Aug 2011) | 1 line
 
-Daily ChangeLog Update
+Cleanup of indexing API in order to simply the code, to leave the handling of indexing contexts to the backend instantiation code, and to avoid leaks (missed chunk)
 ------------------------------------------------------------------------
-r1311 | bradh | 2009-04-13 04:08:54 +0200 (Mon, 13 Apr 2009) | 4 lines
+r3137 | wsourdeau | 2011-08-04 15:54:13 +0200 (Thu, 04 Aug 2011) | 1 line
 
-Add PT_ACTIONS to list of data types.
+Cleanup of indexing API in order to simply the code, to leave the handling of indexing contexts to the backend instantiation code, and to avoid leaks (missed chunk)
+------------------------------------------------------------------------
+r3138 | wsourdeau | 2011-08-04 15:58:25 +0200 (Thu, 04 Aug 2011) | 1 line
 
-Not fully/correctly handled yet.
+Avoid stupid compilation warnings about undefined values
+------------------------------------------------------------------------
+r3139 | wsourdeau | 2011-08-04 19:41:23 +0200 (Thu, 04 Aug 2011) | 1 line
 
+Slightly simplified code
 ------------------------------------------------------------------------
-r1312 | occl | 2009-04-14 00:00:41 +0200 (Tue, 14 Apr 2009) | 1 line
+r3140 | wsourdeau | 2011-08-04 21:52:08 +0200 (Thu, 04 Aug 2011) | 1 line
 
-Daily ChangeLog Update
+Commented out session freeing from unbind in order to avoid client or server crashes
 ------------------------------------------------------------------------
-r1313 | jelmer | 2009-04-15 11:04:13 +0200 (Wed, 15 Apr 2009) | 1 line
+r3141 | wsourdeau | 2011-08-05 18:31:10 +0200 (Fri, 05 Aug 2011) | 1 line
 
-Ignore generated property file.
+Temporary work-around to avoid releasing mstore contexts too early
 ------------------------------------------------------------------------
-r1314 | bradh | 2009-04-15 14:09:25 +0200 (Wed, 15 Apr 2009) | 4 lines
+r3142 | wsourdeau | 2011-08-05 18:33:55 +0200 (Fri, 05 Aug 2011) | 1 line
 
-Implement RopHardDeleteMessages (0x91). 
+Proper fix for the previous commit
+------------------------------------------------------------------------
+r3143 | wsourdeau | 2011-08-08 17:14:36 +0200 (Mon, 08 Aug 2011) | 1 line
 
-Includes IDL, implementation and mapitest.
+Added definitions for PSETID_Report
+------------------------------------------------------------------------
+r3144 | wsourdeau | 2011-08-08 17:16:19 +0200 (Mon, 08 Aug 2011) | 1 line
 
+Improved handling of string-based named properties
 ------------------------------------------------------------------------
-r1315 | occl | 2009-04-16 00:00:39 +0200 (Thu, 16 Apr 2009) | 1 line
+r3145 | wsourdeau | 2011-08-08 17:58:54 +0200 (Mon, 08 Aug 2011) | 1 line
 
-Daily ChangeLog Update
+Install ndr_exchange.h and ndr_property.h
 ------------------------------------------------------------------------
-r1316 | bradh | 2009-04-16 09:00:24 +0200 (Thu, 16 Apr 2009) | 4 lines
+r3146 | wsourdeau | 2011-08-08 17:59:34 +0200 (Mon, 08 Aug 2011) | 1 line
 
-Implement (IDL, libmapi, mapitest) RopHardDeleteMessagesAndSubfolders (0x92)
+urn: properties are not exported into header files
+------------------------------------------------------------------------
+r3147 | wsourdeau | 2011-08-08 18:00:17 +0200 (Mon, 08 Aug 2011) | 1 line
 
-Also fix some bugs in mapitest common code, and an incorrect sanity check in CreateFolder().
+Append a few more named properties (again)
+------------------------------------------------------------------------
+r3148 | wsourdeau | 2011-08-08 18:01:26 +0200 (Mon, 08 Aug 2011) | 1 line
 
+Slightly enhanced debugging output
 ------------------------------------------------------------------------
-r1317 | occl | 2009-04-17 00:00:42 +0200 (Fri, 17 Apr 2009) | 1 line
+r3149 | jkerihuel | 2011-08-09 12:11:57 +0200 (Tue, 09 Aug 2011) | 1 line
 
-Daily ChangeLog Update
+Creating SOGo Good branch
 ------------------------------------------------------------------------
-r1318 | bradh | 2009-04-17 05:30:26 +0200 (Fri, 17 Apr 2009) | 5 lines
+r3150 | jkerihuel | 2011-08-09 12:36:21 +0200 (Tue, 09 Aug 2011) | 6 lines
 
-Implement RopSetPropertiesNoReplicate (0x79).
+- Good is not compliant with our default authentication mechanism. Disable it for now. 
+We probably need to return an Access denied error instead. TBD later.
 
-IDL was already done. mapitest for DeletePropertiesNoReplicate was
-reused / updated.
+- Add support for fAnonymousLogin in NspiBind
 
+
 ------------------------------------------------------------------------
-r1319 | bradh | 2009-04-17 05:53:02 +0200 (Fri, 17 Apr 2009) | 2 lines
+r3151 | jkerihuel | 2011-08-09 12:40:08 +0200 (Tue, 09 Aug 2011) | 4 lines
 
-Update GetStoreState documentation.
+Good requires NspiGetProps to return PR_EMAIL_ADDRESS property 
+if incoming property tag array is empty.
 
-------------------------------------------------------------------------
-r1320 | bradh | 2009-04-17 08:28:26 +0200 (Fri, 17 Apr 2009) | 7 lines
 
-Fix Search notifications.
+------------------------------------------------------------------------
+r3152 | jkerihuel | 2011-08-09 13:03:24 +0200 (Tue, 09 Aug 2011) | 3 lines
 
-MS concurred that the docs are wrong.
+Add server-side implementation for NspiResolveNames (0x13)
 
-Patch by Paolo Abeni - thanks very much for the
-investigation and the patch.
 
 ------------------------------------------------------------------------
-r1321 | occl | 2009-04-18 00:00:41 +0200 (Sat, 18 Apr 2009) | 1 line
+r3153 | jkerihuel | 2011-08-09 13:07:10 +0200 (Tue, 09 Aug 2011) | 4 lines
+
+Specify arbitrary data for PR_SEND_RICH_INFO and PR_SEND_INTERNET_ENCODING.
+Prevent Good from prematuraly interrupt NSPI connection
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1322 | bradh | 2009-04-18 13:05:09 +0200 (Sat, 18 Apr 2009) | 4 lines
+r3154 | jkerihuel | 2011-08-09 13:31:40 +0200 (Tue, 09 Aug 2011) | 4 lines
 
-Implement RopCloneStream (0x3b) and RopWriteAndCommitStream (0x90).
+Improve MAPI/AD attribute mapping
+Update search filters to match more closely Good requirements and MAPI profile creation cases
 
-Includes IDL, implementation and mapitest tests.
 
 ------------------------------------------------------------------------
-r1323 | occl | 2009-04-19 00:00:36 +0200 (Sun, 19 Apr 2009) | 1 line
+r3155 | jkerihuel | 2011-08-09 13:33:39 +0200 (Tue, 09 Aug 2011) | 3 lines
 
-Daily ChangeLog Update
+Temporary fix talloc_abort case on EphemeralGUID generation
+
+
 ------------------------------------------------------------------------
-r1324 | jkerihuel | 2009-04-19 15:29:21 +0200 (Sun, 19 Apr 2009) | 6 lines
+r3156 | jkerihuel | 2011-08-09 13:41:06 +0200 (Tue, 09 Aug 2011) | 5 lines
 
-- Add Redirect buffer support for OpenMsgStore and OpenPublicFolder.
-This commit fixes the ecWrongServer (0x478) error users encounter
-while running openchange based software in a clustered Exchange 
-environment.
+Good doesn't respect Microsoft specifications with regards to stream commit and message submission.
+Prevent from loosing the stream attached to the message (e.g. PR_HTML) when SubmitMessage is called prior
+to CommitStream or Release operation on streams.
 
 
 ------------------------------------------------------------------------
-r1325 | occl | 2009-04-20 00:00:35 +0200 (Mon, 20 Apr 2009) | 1 line
+r3157 | jkerihuel | 2011-08-09 13:47:15 +0200 (Tue, 09 Aug 2011) | 2 lines
+
+CreateMessage no matter if it is root folder or mapistore backend
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1326 | bradh | 2009-04-21 08:48:25 +0200 (Tue, 21 Apr 2009) | 6 lines
+r3158 | jkerihuel | 2011-08-09 13:52:14 +0200 (Tue, 09 Aug 2011) | 3 lines
 
-Implement RopTransportNewMail (0x51).
+Reimplement "open if existing" semantic and root folder creation within openchangedb
+
+
+------------------------------------------------------------------------
+r3159 | jkerihuel | 2011-08-09 13:57:10 +0200 (Tue, 09 Aug 2011) | 4 lines
 
-Includes IDL, libmapi implementation, and basic mapitest coverage.
+An arbitrary value 8192 bytes for stream support caused Good to call EcDoDisconnect right after GetProps call.
+Decrease this value to 4096 instead.
 
-Also fix a few doxygen / formatting things.
 
 ------------------------------------------------------------------------
-r1327 | occl | 2009-04-22 00:00:36 +0200 (Wed, 22 Apr 2009) | 1 line
+r3160 | jkerihuel | 2011-08-09 14:19:43 +0200 (Tue, 09 Aug 2011) | 4 lines
 
-Daily ChangeLog Update
+Add server-side skeleton for GetPropsAll and GetPropsList
+Add libmapiserver function to calculate size of a mapi_SPropValue array
+
+
 ------------------------------------------------------------------------
-r1328 | bradh | 2009-04-22 09:26:51 +0200 (Wed, 22 Apr 2009) | 2 lines
+r3161 | jkerihuel | 2011-08-09 14:31:01 +0200 (Tue, 09 Aug 2011) | 3 lines
+
+Add PR_SOURCE_KEY support for system/special folder (openchangedb)
 
-Warning fix.
 
 ------------------------------------------------------------------------
-r1329 | occl | 2009-04-23 00:00:46 +0200 (Thu, 23 Apr 2009) | 1 line
+r3162 | jkerihuel | 2011-08-09 15:08:41 +0200 (Tue, 09 Aug 2011) | 3 lines
 
-Daily ChangeLog Update
+Set a default 0 value for unsupported content properties within openchangedb
+
+
 ------------------------------------------------------------------------
-r1330 | bradh | 2009-04-23 04:40:48 +0200 (Thu, 23 Apr 2009) | 2 lines
+r3163 | jkerihuel | 2011-08-09 18:49:02 +0200 (Tue, 09 Aug 2011) | 5 lines
+
+Add PSETID and properties used by Good.
 
-Typo fix.
+Since creation of named properties doesn't work with mapistore v1, we need to hardcode them.
 
+
 ------------------------------------------------------------------------
-r1331 | jkerihuel | 2009-04-23 12:36:12 +0200 (Thu, 23 Apr 2009) | 3 lines
+r3164 | jkerihuel | 2011-08-09 19:01:31 +0200 (Tue, 09 Aug 2011) | 4 lines
 
-Make sure delayed authenication is not called when server mode is enabled
+- Add implementation for GetPropsAll and GetPropsList
+- Add convenient functions in libmapi to add mapi_SPropValue
 
 
 ------------------------------------------------------------------------
-r1332 | bradh | 2009-04-23 13:26:53 +0200 (Thu, 23 Apr 2009) | 4 lines
+r3169 | jkerihuel | 2011-08-10 12:24:59 +0200 (Wed, 10 Aug 2011) | 3 lines
 
-Fix display of Folder ID values (one is filled with ., the other is prefixed with .16 instead of being filled.
+Merge latest sogo branch changes back into sogo-good branch
 
-Also remove duplicate close() of file descriptor.
 
 ------------------------------------------------------------------------
-r1333 | bradh | 2009-04-23 13:57:27 +0200 (Thu, 23 Apr 2009) | 4 lines
+r3170 | jkerihuel | 2011-08-10 15:45:23 +0200 (Wed, 10 Aug 2011) | 3 lines
 
-Update property list to reflect current OAB props.
+Add PR_SOURCE_KEY support for Inbox/Calendar/Tasks/Draft folders
 
-This deletes a few incompatible properties. Cannot determine the history of the PR_MAILBEAT_ props.
 
 ------------------------------------------------------------------------
-r1335 | occl | 2009-04-24 00:00:34 +0200 (Fri, 24 Apr 2009) | 1 line
+r3172 | jkerihuel | 2011-08-10 16:46:12 +0200 (Wed, 10 Aug 2011) | 3 lines
+
+Merge provisioning fix from sogo branch
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1336 | jkerihuel | 2009-04-26 15:46:31 +0200 (Sun, 26 Apr 2009) | 14 lines
+r3186 | jkerihuel | 2011-08-11 14:04:12 +0200 (Thu, 11 Aug 2011) | 3 lines
 
-Patch from Paolo Abeni <paolo.abeni@gmail.com>:
+Merge latest commits from sogo branch
 
-ProcessNotification() is ignoring the handle value contained into the
-processed notifications. This means that if many Subscribe() calls are
-performed on different folders but with the same flags, all the
-registered callback are [incorrectly] signaled with each received
-notification.
 
-The attached patch match the handler contained into the notification
-message against the notification object handle to avoid such
-replication.
+------------------------------------------------------------------------
+r3189 | jkerihuel | 2011-08-11 17:06:39 +0200 (Thu, 11 Aug 2011) | 3 lines
 
+Return PR_SOURCE_KEY property when querying tables for mapistore root folders
 
 
 ------------------------------------------------------------------------
-r1337 | occl | 2009-04-27 00:00:38 +0200 (Mon, 27 Apr 2009) | 1 line
+r3192 | jkerihuel | 2011-08-11 18:33:56 +0200 (Thu, 11 Aug 2011) | 3 lines
+
+Add named properties requested by Good on GMM install
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1338 | jkerihuel | 2009-04-27 13:39:45 +0200 (Mon, 27 Apr 2009) | 17 lines
+r3193 | jkerihuel | 2011-08-11 18:34:38 +0200 (Thu, 11 Aug 2011) | 3 lines
 
-Patch from Paolo Abeni <paolo.abeni@gmail.com>:
+Fix search problem on provisioning
 
-Mapi notifications can occurs inside any emsmdb_transaction; currently
-only the notification send by the server inside the
-emsmdb_transaction_null() in MonitorNotification() are
-parsed/processed/delivered to the appropriate callback.
 
-To be able to process all the received notifications, the notification
-structure must comprise the private data to be passed to the
-notification callback, since in the average mapi call this data is not
-available. This patch modifies the Subscribe() call and the 
-mapi_notification structure, adding the private_data parameter (also the 
-related Subscribe() calls are update)  and add a libmapi call 
-(DispatchNotifications) to force the notification dispatching in
-a [quite] non blocking way
+------------------------------------------------------------------------
+r3194 | jkerihuel | 2011-08-11 18:35:34 +0200 (Thu, 11 Aug 2011) | 3 lines
 
+Merge in latest sogo branch commits
 
+
 ------------------------------------------------------------------------
-r1339 | jkerihuel | 2009-04-27 13:49:03 +0200 (Mon, 27 Apr 2009) | 6 lines
+r3195 | jkerihuel | 2011-08-11 18:36:12 +0200 (Thu, 11 Aug 2011) | 2 lines
 
-Patch from Paolo Abeni <paolo.abeni@gmail.com>:
+Merge oxcfxics bug fix from sogo branch
 
-call ProcessNotification() after each successful 
-emsmdb_transaction() in all the libmapi calls.
+------------------------------------------------------------------------
+r3200 | jkerihuel | 2011-08-12 15:53:18 +0200 (Fri, 12 Aug 2011) | 2 lines
 
+Merge latest sogo branch changes locally.
 
 ------------------------------------------------------------------------
-r1340 | occl | 2009-04-28 00:00:36 +0200 (Tue, 28 Apr 2009) | 1 line
+r3201 | jkerihuel | 2011-08-12 15:56:56 +0200 (Fri, 12 Aug 2011) | 2 lines
 
-Daily ChangeLog Update
+Add an =EX proxyAddresses to match good queries in NspiResolveNamesW
+
 ------------------------------------------------------------------------
-r1341 | jkerihuel | 2009-05-07 15:20:00 +0200 (Thu, 07 May 2009) | 13 lines
+r3212 | jkerihuel | 2011-08-24 14:55:32 +0200 (Wed, 24 Aug 2011) | 3 lines
+
+Merge sogo branch r3200-3211 back into good branch
+
 
-- Add preliminary IDL support for Exchange 2003/2007 EMSMDB RPC calls:
-  * EcDoConnectEx
-  * EcDoRpcExt2
+------------------------------------------------------------------------
+r3213 | jkerihuel | 2011-08-30 17:05:09 +0200 (Tue, 30 Aug 2011) | 2 lines
 
-- Add LZxpress and XorMagic support to EcDoRpcExt2 request/reply
-  blob. However it doesn't yet support Chained calls.
+Fix bug when querying getprops with a NULL array (typo bug)
 
-- Add AuxInfo/AUX_HEADER structures and IDL
+------------------------------------------------------------------------
+r3229 | jkerihuel | 2011-09-22 15:55:25 +0200 (Thu, 22 Sep 2011) | 3 lines
 
-- Refactor mapi_request and mapi_response: move obfuscate_data calls
-  up to the EcDoRpc layer
+Merge latest sogo branch changes back into sogo-good.
 
 
 ------------------------------------------------------------------------
-r1342 | occl | 2009-05-08 00:00:41 +0200 (Fri, 08 May 2009) | 1 line
+r3235 | jkerihuel | 2011-09-23 12:27:46 +0200 (Fri, 23 Sep 2011) | 2 lines
+
+Merge latest sogo branch
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1343 | jkerihuel | 2009-05-25 17:54:08 +0200 (Mon, 25 May 2009) | 3 lines
+r3243 | jkerihuel | 2011-09-29 18:05:24 +0200 (Thu, 29 Sep 2011) | 10 lines
 
-Fix pull structure for QueryRows reply when no RowData is available
+Add preliminary POC implementation of OCSManager (OpenChange Services Manager).
+Current code only includesi:
+- authentication scheme for server
+- preliminary newmail client only performing authentication 
+- small util for generating SSHA passwords
+- setup.sh tool to setup the required environment
 
+Detailed documentation to come on the wiki.
 
+
 ------------------------------------------------------------------------
-r1344 | occl | 2009-05-26 00:00:56 +0200 (Tue, 26 May 2009) | 1 line
+r3244 | jkerihuel | 2011-09-29 18:12:57 +0200 (Thu, 29 Sep 2011) | 2 lines
 
-Daily ChangeLog Update
+Add mydevenv to the list of ignored directories
+
 ------------------------------------------------------------------------
-r1345 | jkerihuel | 2009-05-28 14:42:48 +0200 (Thu, 28 May 2009) | 14 lines
+r3245 | jkerihuel | 2011-09-30 13:37:49 +0200 (Fri, 30 Sep 2011) | 3 lines
+
+Add data and ocsmanager egg to ignore list
+Add posix_ipc python mdule download and install within virtualenv (mydevenv)
 
-Patch from Erik Hovland <erik@hovland.org>:
+------------------------------------------------------------------------
+r3246 | jkerihuel | 2011-09-30 16:16:59 +0200 (Fri, 30 Sep 2011) | 3 lines
 
-Make sure pointers are valid before dereferencing
-1. lpProps 'might' be null
-2. Add folder to variables checked before moving on.
-4. Check nprop->guid before giving to strcmp, two times
-6. Check definition before handing to strlen (which will dereference
-it) Reworked this one to include talloc_free
-7. Check MessageClass? before handing to strncasecmp
-8. Check backend, return if null.
-10. Don't print out anything if lpProp is null
-11. Check attach_size before dereferencing
+We don't need to import picckle module here.
 
 
 ------------------------------------------------------------------------
-r1346 | jkerihuel | 2009-05-28 14:53:38 +0200 (Thu, 28 May 2009) | 5 lines
+r3247 | jkerihuel | 2011-09-30 17:14:05 +0200 (Fri, 30 Sep 2011) | 3 lines
+
+Add a function to retrieve the tokenLogin parameter from payloads
+
 
-Patch from Erik Hovland <erik@hovland.org>
+------------------------------------------------------------------------
+r3248 | jkerihuel | 2011-09-30 17:15:34 +0200 (Fri, 30 Sep 2011) | 5 lines
 
-Adds a #include config.h to suppress compiler warnings for vasprintf
+Factorize common network code into functions: make_request and exec_request
+Implement the PUT operation
+Add code to extract token from successful login response
 
 
 ------------------------------------------------------------------------
-r1347 | jkerihuel | 2009-05-28 15:07:41 +0200 (Thu, 28 May 2009) | 10 lines
+r3249 | jkerihuel | 2011-09-30 18:19:51 +0200 (Fri, 30 Sep 2011) | 6 lines
 
-Patch from Erik Hovland <erik@hovland.org>
+Fix PUT requests
+Prefix OCSManager class with Client
+Implement a newmail function call skeleton
+factorize immediate error check into a function
 
-1. In mapiproxy, the directory handle dir will be leaked after it is
-done being used.
-2. exchange2mbox main() should use exit at line 785 just like all of
-the other error paths so that we don't leak anything
+
+------------------------------------------------------------------------
+r3250 | jkerihuel | 2011-09-30 18:20:22 +0200 (Fri, 30 Sep 2011) | 3 lines
 
-ref. ticket #157
+Add ClientNotification class
 
 
 ------------------------------------------------------------------------
-r1348 | jkerihuel | 2009-05-28 15:12:23 +0200 (Thu, 28 May 2009) | 11 lines
+r3251 | jkerihuel | 2011-09-30 18:25:48 +0200 (Fri, 30 Sep 2011) | 5 lines
 
-Patch From Erik Hovland <erik@hovland.org>
+Add a new controller for notifications
+Add a skeleton for the newmail function and a sample template
+Add a function to retrieve the tokenLogin from a request payload
 
-In torture_rpc_mapi_sendattach a call is made to the system function
-read at line 199. The return value of read is assigned to read_size,
-which happens to be of unsigned type. So if read returns -1 (which it
-can) it will not be noticed. The patch changes the type to ssize_t
-(signed) and checks for -1 as well as zero to break out of the loop.
 
-Ref ticket #156
+------------------------------------------------------------------------
+r3256 | jkerihuel | 2011-10-03 14:28:29 +0200 (Mon, 03 Oct 2011) | 6 lines
+
+Move the _check_document private function into lib/utils.py file and rename it validateDocXML. 
+This convenient function is likely to be called each time, so make it available widely.
+
+Replace existing _check_document calls (and function) with validateDocXML.
 
 
 ------------------------------------------------------------------------
-r1349 | jkerihuel | 2009-05-28 16:00:13 +0200 (Thu, 28 May 2009) | 7 lines
+r3257 | jkerihuel | 2011-10-03 14:29:13 +0200 (Mon, 03 Oct 2011) | 3 lines
 
-- Add sanity check on mapitest_common creation routines within
-  mapitest modules
+Fix typo error with lxml error.
+
+
+------------------------------------------------------------------------
+r3258 | jkerihuel | 2011-10-03 15:33:18 +0200 (Mon, 03 Oct 2011) | 5 lines
 
-- Apply patch from Erik Hovland <erik@hovland.org>: check return
-  types.
+Add a preliminary NotificationModel which parses newmail payload
+Update newmail client to handle required arguments (new options)
+Fix error message printing in newmail client
 
 
 ------------------------------------------------------------------------
-r1350 | jkerihuel | 2009-05-28 16:31:22 +0200 (Thu, 28 May 2009) | 7 lines
+r3259 | jkerihuel | 2011-10-03 16:13:43 +0200 (Mon, 03 Oct 2011) | 3 lines
 
-Patch from Erik Hovland <erik@hovland.org>:
+Merge latest sogo branch changes back into sogo-good branch
 
-Initializes variables to make sure they aren't used uninitialized.
 
-Ref ticket #153
+------------------------------------------------------------------------
+r3263 | jkerihuel | 2011-10-04 18:08:03 +0200 (Tue, 04 Oct 2011) | 3 lines
 
+Merge in some property changes introduced on sogo branch (allocation / assignment)
 
+
 ------------------------------------------------------------------------
-r1351 | occl | 2009-05-29 00:00:48 +0200 (Fri, 29 May 2009) | 1 line
+r3264 | jkerihuel | 2011-10-04 18:12:35 +0200 (Tue, 04 Oct 2011) | 3 lines
+
+Fix small typo in talloc_named
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1357 | jkerihuel | 2009-06-18 16:20:19 +0200 (Thu, 18 Jun 2009) | 3 lines
+r3265 | jkerihuel | 2011-10-04 18:15:37 +0200 (Tue, 04 Oct 2011) | 5 lines
 
-Add some PidTag* mapping involved with Recipients and RecipientRow
+Rename mapistore_uri attribute into MAPIStoreURI.
 
+This was causing ldb_search request to fail with invalid syntax error.
 
+
 ------------------------------------------------------------------------
-r1358 | occl | 2009-06-19 00:00:44 +0200 (Fri, 19 Jun 2009) | 1 line
+r3266 | jkerihuel | 2011-10-04 18:16:21 +0200 (Tue, 04 Oct 2011) | 3 lines
+
+Merge in sogo branch changes on emsmdb server
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1362 | jelmer | 2009-06-21 03:50:29 +0200 (Sun, 21 Jun 2009) | 1 line
+r3267 | jkerihuel | 2011-10-04 18:20:51 +0200 (Tue, 04 Oct 2011) | 15 lines
+
+Introduce a skeleton mapistore_mgmt interface designed to be called 
+by ocsmanager webservice (python bindings). We only make use of the
+structure encapsulation with different types to split access and
+preserve semantics. Also introduce very preliminary python bindings 
+for this skeleton interface
+
+I have also rewritten initialization and context creation/deletion for
+mapistore python bindings which now cope with latest mapistore requirements.
+
+A convenient function in mapistore has been introduced to set 
+mapistore_conn_info structure easily.
+
+Finally this patch merges in some changes from sogo branch on ModifyRecipients.
+
 
-Link libmapiserver against all libraries.
 ------------------------------------------------------------------------
-r1364 | jelmer | 2009-06-21 11:57:53 +0200 (Sun, 21 Jun 2009) | 1 line
+r3270 | jkerihuel | 2011-10-05 18:11:55 +0200 (Wed, 05 Oct 2011) | 8 lines
 
-Keep separate flags for libraries around in config.mk.
+Update mapistore python bindings.
+
+Objects have been divided into separate files.
+Context object is now able to open a folder
+Folder objects have 3 getters to retrieve the number of subfolders, messages and FAI messages.
+
+
+
 ------------------------------------------------------------------------
-r1365 | jelmer | 2009-06-21 12:00:01 +0200 (Sun, 21 Jun 2009) | 1 line
+r3273 | jkerihuel | 2011-10-05 19:38:09 +0200 (Wed, 05 Oct 2011) | 2 lines
 
-Fix typo in Python variable name.
+Add missing mapistore error errstring
+
 ------------------------------------------------------------------------
-r1366 | occl | 2009-06-22 00:00:36 +0200 (Mon, 22 Jun 2009) | 1 line
+r3274 | jkerihuel | 2011-10-05 19:55:30 +0200 (Wed, 05 Oct 2011) | 6 lines
+
+Implement a PyErr check for pymapistore calls.
+Add folder creation flags and define
 
-Daily ChangeLog Update
+Preliminary check on CreateFolder
+
+
 ------------------------------------------------------------------------
-r1416 | jelmer | 2009-07-18 15:25:53 +0200 (Sat, 18 Jul 2009) | 1 line
+r3276 | jkerihuel | 2011-10-06 14:27:55 +0200 (Thu, 06 Oct 2011) | 3 lines
+
+Implement a skeleton of MAPIStore table object for future implementation.
 
-Fix typo in variable name.
+
 ------------------------------------------------------------------------
-r1417 | jelmer | 2009-07-18 16:46:02 +0200 (Sat, 18 Jul 2009) | 1 line
+r3283 | jkerihuel | 2011-10-07 12:49:25 +0200 (Fri, 07 Oct 2011) | 2 lines
 
-Link libmapi against tevent since it uses tevent_context_init, link ndr_exchange.po into libmapiserver since it uses some ndr_push_* symbols.
+Merge changes required to upgrade to samba4 alpha17
+
 ------------------------------------------------------------------------
-r1418 | jelmer | 2009-07-18 17:18:14 +0200 (Sat, 18 Jul 2009) | 1 line
+r3284 | jkerihuel | 2011-10-07 12:50:45 +0200 (Fri, 07 Oct 2011) | 3 lines
+
+Add mapistore_nameid.h auto-generated file to ignore list
 
-Create symlink for libmapistore.
+
 ------------------------------------------------------------------------
-r1419 | jelmer | 2009-07-18 17:40:57 +0200 (Sat, 18 Jul 2009) | 1 line
+r3285 | jkerihuel | 2011-10-07 14:04:21 +0200 (Fri, 07 Oct 2011) | 3 lines
+
+Move mapistore management bindings into mapistore bindings and instantiate mgmt object from mapistore.management()
+
 
-Use LDFLAGS when linking exchange2ical.
 ------------------------------------------------------------------------
-r1420 | jelmer | 2009-07-18 18:06:13 +0200 (Sat, 18 Jul 2009) | 1 line
+r3286 | jkerihuel | 2011-10-07 14:17:18 +0200 (Fri, 07 Oct 2011) | 3 lines
 
-Declare a SOVERSION for libmapistore.
+Instantiate mgmt_context from mapistore_context
+
+
 ------------------------------------------------------------------------
-r1421 | jelmer | 2009-07-18 18:06:16 +0200 (Sat, 18 Jul 2009) | 1 line
+r3287 | jkerihuel | 2011-10-07 14:17:59 +0200 (Fri, 07 Oct 2011) | 3 lines
+
+Add *.po to mgmt ignore list
 
-Link libmapiproxy against tdb.
+
 ------------------------------------------------------------------------
-r1422 | jelmer | 2009-07-18 18:06:20 +0200 (Sat, 18 Jul 2009) | 1 line
+r3288 | jkerihuel | 2011-10-07 14:20:43 +0200 (Fri, 07 Oct 2011) | 4 lines
+
+We won't need posix_ipc python module in pylons since mqueue will be initialized and used directly within mapistore
+and pylons will use mapistore through python bindings
+
 
-Update copies of config.guess and config.sub.
 ------------------------------------------------------------------------
-r1423 | jelmer | 2009-07-18 18:06:22 +0200 (Sat, 18 Jul 2009) | 1 line
+r3289 | jkerihuel | 2011-10-07 14:22:20 +0200 (Fri, 07 Oct 2011) | 2 lines
 
-Link libmapistore against tdb.
+Remove PACKAGE variable
+
 ------------------------------------------------------------------------
-r1424 | occl | 2009-07-19 00:00:44 +0200 (Sun, 19 Jul 2009) | 1 line
+r3294 | jkerihuel | 2011-10-07 15:37:13 +0200 (Fri, 07 Oct 2011) | 2 lines
 
-Daily ChangeLog Update
+Merge sogo branch chanegs (NSPI) back into sogo-good
+
 ------------------------------------------------------------------------
-r1432 | bradh | 2009-07-29 06:55:02 +0200 (Wed, 29 Jul 2009) | 2 lines
+r3295 | jkerihuel | 2011-10-07 16:22:33 +0200 (Fri, 07 Oct 2011) | 9 lines
+
+Install OpenChange python bindings in ocsmanager virtual devenv
 
-Update test case to reflect new behaviour
+Add mapistore configuration options for ocsmanager.ini:
+* mapistore_root: the directory where to find openchange.ldb
+* mapistore_data: the directory where to find mapistore data
 
+Instantiate mapistore within environment.py: load backends
+
+
 ------------------------------------------------------------------------
-r1433 | bradh | 2009-07-29 06:57:55 +0200 (Wed, 29 Jul 2009) | 6 lines
+r3296 | jkerihuel | 2011-10-07 16:24:52 +0200 (Fri, 07 Oct 2011) | 2 lines
+
+Store mapistore management object rather than mapistore object
 
-Remove dead / unused code.
+------------------------------------------------------------------------
+r3300 | jkerihuel | 2011-10-07 16:36:07 +0200 (Fri, 07 Oct 2011) | 3 lines
 
-See http://trac.openchange.org/ticket/152#comment:1 for rationale.
+Merge sogo branch r3298, r3299 into sogo-good
 
-Original patch by Erik Hovland - thanks again.
 
 ------------------------------------------------------------------------
-r1436 | occl | 2009-07-30 00:00:40 +0200 (Thu, 30 Jul 2009) | 1 line
+r3301 | jkerihuel | 2011-10-07 16:37:20 +0200 (Fri, 07 Oct 2011) | 3 lines
+
+Check if the specified backend is registered when parsing the newmail notification payload
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1441 | bradh | 2009-08-02 04:10:01 +0200 (Sun, 02 Aug 2009) | 10 lines
+r3303 | jkerihuel | 2011-10-07 20:04:05 +0200 (Fri, 07 Oct 2011) | 10 lines
 
-Fix potentially unused variable.
+Update configure.ac to search for -lrt (required by mqueue)
 
-Tested with mapitest (even though nothing should have been affected) and
-with libmapixx-test and libmapixx-attach under valgrind.
+Add a preliminary asynchronous mqueue implementation for user commands (register, unregister) 
+Add an IDL to process more easily mgmt commands and messages and add user command. 
+Add functions in mapistore_mgmt to register/unregister user
+Add more mapistore error codes
 
-Patch is remaining part of http://trac.openchange.org/ticket/153
+The mqueue code needs update to be useful.
 
-Thanks to Erik Hovland for the patch.
 
+------------------------------------------------------------------------
+r3304 | jkerihuel | 2011-10-07 20:05:25 +0200 (Fri, 07 Oct 2011) | 3 lines
+
+Merge r3302 from sogo.
+
 
 ------------------------------------------------------------------------
-r1442 | bradh | 2009-08-02 04:44:04 +0200 (Sun, 02 Aug 2009) | 3 lines
+r3306 | jkerihuel | 2011-10-09 23:58:45 +0200 (Sun, 09 Oct 2011) | 8 lines
 
-Use array form of delete (error identified with libmapixx-attach test, using valgrind).
+Update mgmt notification code to register again after notification gets received.
+Process pending/existing queue during initialization to flush queue
+Implement a release function for mapistore_mgmt interface: close/unlink queue and release memory
+Fix memory allocation issue with data.data in mq_receive
+Add a function to pull and print user notification command
+Raise error in pymapistore bindings when error occurs
+
+
+------------------------------------------------------------------------
+r3307 | jkerihuel | 2011-10-09 23:59:15 +0200 (Sun, 09 Oct 2011) | 2 lines
 
+Install mapistore and ocpf bindings
 
 ------------------------------------------------------------------------
-r1443 | bradh | 2009-08-02 06:42:30 +0200 (Sun, 02 Aug 2009) | 17 lines
+r3308 | jkerihuel | 2011-10-10 00:00:05 +0200 (Mon, 10 Oct 2011) | 3 lines
 
-Applied modified version of patch from Erik Hovland to address unused variables.
+Add gen_ndr to ignore list
 
-See http://trac.openchange.org/attachment/ticket/160/unused-values for
-the rationale.
 
-This resolves #160.
+------------------------------------------------------------------------
+r3309 | jkerihuel | 2011-10-10 13:01:12 +0200 (Mon, 10 Oct 2011) | 4 lines
 
-My version removes variables (rather than commenting them out) since we don't need
-them now. I also updated the documentation for options that are no longer available
+Process user cmd notifications and add/remove users from the list of registered (active) OpenChange server users.
+Move mgmt structures into a separate header
 
-The origin of the unused PR_FOLDER_CHILD_COUNT is a bit strange. It was introduced
-in r808 (to resolve #103), and looks like it might have been used for debugging - no
-impact on the code. I pulled out the whole lot.
+
+------------------------------------------------------------------------
+r3310 | jkerihuel | 2011-10-10 14:46:38 +0200 (Mon, 10 Oct 2011) | 5 lines
 
-Tested with openchangeclient --fetchmail --folder="Sent Mail" and mapitest.
+Implement a mapistore mgmt function and its associated python bindings code
+to retrieve the list of system users associated to a backend and virtual user
+in real time.
 
 
 ------------------------------------------------------------------------
-r1444 | bradh | 2009-08-02 07:08:12 +0200 (Sun, 02 Aug 2009) | 7 lines
+r3311 | jkerihuel | 2011-10-10 15:45:01 +0200 (Mon, 10 Oct 2011) | 6 lines
 
-Avoid duplicate call to mapi_object_get_logon_id
+Check if the user specified in the newmail payload is registered (loggued onto OpenChange Server).
 
-Based on a patch proposed by Erik Hovland, but adapted to follow the
-pattern used in OpenStream().
+Note: Using asynchronous notifications along with select.select() requires a change in paste httpserver: serve_forever function
+documented on OpenChange tracker.
 
-Resolves issue #163.
 
 ------------------------------------------------------------------------
-r1446 | occl | 2009-08-03 00:00:38 +0200 (Mon, 03 Aug 2009) | 1 line
+r3312 | jkerihuel | 2011-10-10 16:10:20 +0200 (Mon, 10 Oct 2011) | 5 lines
 
-Daily ChangeLog Update
+Add a verbosity boolean to mapistore management to enable or not debugging such as ndr_print
+Add a configuration option in ocsmanager to enable or not debugging
+Add a set_verbosity function in mgmt interface along with Python get/setters
+
+
 ------------------------------------------------------------------------
-r1447 | bradh | 2009-08-03 11:58:34 +0200 (Mon, 03 Aug 2009) | 10 lines
+r3313 | jkerihuel | 2011-10-10 19:17:29 +0200 (Mon, 10 Oct 2011) | 8 lines
+
+Add a management structure to backend pointer on functions
+Add a function which returns a fake context - only return pointer on backend's function (for management use).
+Add a generate_uri function to generate a partial or complete URI from the backend - predictive guess depending on
+input parameters
 
-Apply patch from Erik Hovland, from ticket #162.
+Add an openchangedb function to search for FID given partial URI
 
-From the original patch:
-"The problem is that when you do stat first w/ a file string anyone can
-exploit the time in between to do whatever they want with the file that
-the string is a name for. Instead, try to open straight away. Then fstat
-w/ the file descriptor."
 
-I think the patch is fine, although I didn't run the torture test.
+------------------------------------------------------------------------
+r3314 | jkerihuel | 2011-10-10 19:18:06 +0200 (Mon, 10 Oct 2011) | 3 lines
+
+Commit temporary hacks used while testing async notifications and API
+
 
 ------------------------------------------------------------------------
-r1448 | bradh | 2009-08-03 13:08:08 +0200 (Mon, 03 Aug 2009) | 6 lines
+r3315 | jkerihuel | 2011-10-11 16:29:45 +0200 (Tue, 11 Oct 2011) | 3 lines
 
-Remove unused headers.
+Remove unnecessary talloc_reference call
+Fix return code.
 
-Patch by Erik Hovland - thanks very much,
+------------------------------------------------------------------------
+r3318 | jkerihuel | 2011-10-11 19:11:42 +0200 (Tue, 11 Oct 2011) | 7 lines
 
-Resolves ticket #164.
+Modify mapistore_indexing_record_get_fmid prototype to take an extra partial argument.
+partial is set to True when mapistore_uri includes wildcard '*' (partial URI)
+Add a tdb_traverse function to search partial URI.
+Add a mapistore management function to check if a message is registered
+Add associated python bindings code
 
+
 ------------------------------------------------------------------------
-r1449 | occl | 2009-08-04 00:00:44 +0200 (Tue, 04 Aug 2009) | 1 line
+r3319 | jkerihuel | 2011-10-11 19:15:18 +0200 (Tue, 11 Oct 2011) | 4 lines
+
+Merge in r3317 from sogo branch: 
+openchangedb_get_fid: fix the case where the uri would end with a "/" while the corresponding entry would not
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1450 | jelmer | 2009-08-05 21:20:11 +0200 (Wed, 05 Aug 2009) | 1 line
+r3320 | jkerihuel | 2011-10-12 14:16:00 +0200 (Wed, 12 Oct 2011) | 6 lines
+
+- Do not free the indexing context as it is referenced to mstore_ctx->indexing_ctx.
+  Let the talloc_free call occurs when releasing the context
+- Add a return in one error check, prevent from unregistered users to get registered
+- Add a check whether indexing_ctx exists or not (can't hurt)
+
 
-Add tevent to dependencies.
 ------------------------------------------------------------------------
-r1451 | occl | 2009-08-06 00:00:44 +0200 (Thu, 06 Aug 2009) | 1 line
+r3321 | jkerihuel | 2011-10-12 14:53:54 +0200 (Wed, 12 Oct 2011) | 2 lines
 
-Daily ChangeLog Update
+Fixing return
+
 ------------------------------------------------------------------------
-r1454 | bradh | 2009-08-09 09:59:02 +0200 (Sun, 09 Aug 2009) | 2 lines
+r3323 | jkerihuel | 2011-10-12 18:54:29 +0200 (Wed, 12 Oct 2011) | 5 lines
 
-Update the script version of samba4 to alpha8.
+Backlink openchange.ldb records to the DN of current mailbox
+Change provisioning script and openchange root folder creation code to reflect this
+Add an openchange.ldb function which retrieves openchange username associated to a given (partial or not) URI
 
+
 ------------------------------------------------------------------------
-r1455 | occl | 2009-08-10 00:00:42 +0200 (Mon, 10 Aug 2009) | 1 line
+r3325 | jkerihuel | 2011-10-12 19:01:13 +0200 (Wed, 12 Oct 2011) | 11 lines
+
+Improve NotificationModel behavior upon reception of a newmail notification:
+- We want to register the message for ALL the users which mapistoreURI matches incoming parameters
+- We want to trigger a newmail notification ONLY for users who are registered
 
-Daily ChangeLog Update
+- Update the generate_uri prototype to include a rootURI parameter. a mapistore URI for message or subfolder
+must be the child of a root URI. This additional parameter lets us specify one that we would have calculated somewhere else and
+use it to build the message or subfolder URI.
+
+- Add a python binding function to lookup existing users matching partial or complete URI (and return complete URI + usernames)
+
+
 ------------------------------------------------------------------------
-r1460 | bradh | 2009-08-13 14:04:37 +0200 (Thu, 13 Aug 2009) | 2 lines
+r3328 | jkerihuel | 2011-10-12 21:53:06 +0200 (Wed, 12 Oct 2011) | 2 lines
 
-Remove unused code - no simple tests.
+Change from NULL to 0 for initialization of wildcard_count
 
 ------------------------------------------------------------------------
-r1461 | bradh | 2009-08-13 14:05:19 +0200 (Thu, 13 Aug 2009) | 2 lines
+r3329 | jkerihuel | 2011-10-13 18:54:00 +0200 (Thu, 13 Oct 2011) | 8 lines
 
-Remove unused enum values.
+Add message registration in mapistore management API
+Implement associated python bindings and make calls in ocsmanager
 
+Factorize mapistore_indexing_record_add_fmid code related to tdb into
+a separate function mapistore_mgmt can call directly after adding an indexing
+context on a user.
+
+
 ------------------------------------------------------------------------
-r1462 | occl | 2009-08-14 00:00:47 +0200 (Fri, 14 Aug 2009) | 1 line
+r3332 | jkerihuel | 2011-10-14 14:45:51 +0200 (Fri, 14 Oct 2011) | 8 lines
+
+- Rename mapistore_users into mapistore_ipc
+- Use single message queue for user AND notification commands
+- Update IDL to include a switch on command type
+- Add IDL for mapistore notification support
+- Refactorize user_cmd NDR blob processing into mapistore_mgmt_messages.c
+- Make a switch/case statement on command.type within mqueue callback
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1464 | bradh | 2009-08-14 11:03:08 +0200 (Fri, 14 Aug 2009) | 6 lines
+r3333 | jkerihuel | 2011-10-14 14:50:42 +0200 (Fri, 14 Oct 2011) | 5 lines
 
-Fix error handling case.
+Define command priority on message queue and use these defines in mapistore_mgmt.c
 
-Patch from Erik Hovland - thanks very much.
+USER_UNREGISTER has a higher priority than USER_REGISTER which has a higher priority than USER_NOTIF.
 
-Resolves ticket #175.
 
 ------------------------------------------------------------------------
-r1465 | bradh | 2009-08-14 14:46:21 +0200 (Fri, 14 Aug 2009) | 6 lines
+r3334 | jkerihuel | 2011-10-14 14:52:08 +0200 (Fri, 14 Oct 2011) | 3 lines
 
-Ensure that when we pass --profile to mapitest, that profile
-gets used instead of the default.
+Update priority enum to handle registration and release of notifications.
 
-Also fix a small memory leak when using --profile, and add some
-extra comments.
 
 ------------------------------------------------------------------------
-r1466 | occl | 2009-08-15 00:00:56 +0200 (Sat, 15 Aug 2009) | 1 line
+r3339 | jkerihuel | 2011-10-14 18:43:46 +0200 (Fri, 14 Oct 2011) | 12 lines
+
+Implement code to trigger notification from mapistore'd process to ocsmanager (or mapistore_mgmt'd process):
+- Add code + python bindings to push a register/unregister notification command on mapistore_ipc queue
+- Add code + python bindings to pull notification commands from mapistore_ipc queue and store them
+- Add code to check if a given user has subscribed for a given folder depending on the NotificationFlags values
+
+- move MAPISTORE_MGMT_USER_{REGISTER,UNREGISTER} to MAPISTORE_MGMT_{REGISTER,UNREGISTER} so they can be used by all commands
+requiring register/unregister states.
 
-Daily ChangeLog Update
+Note: we need to update python bindings and NotificationModel to match expected behavior: if the subscription is registered,
+retrieve information and trigger a notification.
+
+
 ------------------------------------------------------------------------
-r1467 | bradh | 2009-08-17 06:05:59 +0200 (Mon, 17 Aug 2009) | 2 lines
+r3343 | jkerihuel | 2011-10-17 19:00:40 +0200 (Mon, 17 Oct 2011) | 7 lines
+
+Implement an interface that sends a newmail notification from notifying process to listener process.
+The listener process (synchronous mode) reads upon reply on message queues it opened and fetches available messages.
+newmail queue have the following naming: %s#newmail where %s is replaced with username
 
-Fix memory leak in mapiprofile utility
+Add MAPISTORE_MGMT_SEND status to reuse existing IDL properly.
 
+
 ------------------------------------------------------------------------
-r1468 | bradh | 2009-08-17 06:18:57 +0200 (Mon, 17 Aug 2009) | 4 lines
+r3344 | jkerihuel | 2011-10-17 19:01:49 +0200 (Mon, 17 Oct 2011) | 3 lines
 
-fix leak in openchangeclient
+Implement sending newmail feature for mapistore mgmt python bindings
+Update ret values for registered subscription function
+
+------------------------------------------------------------------------
+r3345 | jkerihuel | 2011-10-17 19:02:37 +0200 (Mon, 17 Oct 2011) | 2 lines
 
-(as seen with valgrind of "openchangeclient -m")
+Update model to send newmail notification (mqueue) whenever possible (user registered and subscribed for newmail on given folder)
 
 ------------------------------------------------------------------------
-r1471 | bradh | 2009-08-17 08:38:22 +0200 (Mon, 17 Aug 2009) | 2 lines
+r3346 | jkerihuel | 2011-10-17 19:03:28 +0200 (Mon, 17 Oct 2011) | 3 lines
 
-More cleanups of memory leaks for setting up database and an associated failure case.
+Add code to lookup for existing FID within openchangedb AND user indexing db
 
+
 ------------------------------------------------------------------------
-r1472 | bradh | 2009-08-17 10:14:22 +0200 (Mon, 17 Aug 2009) | 6 lines
+r3347 | jkerihuel | 2011-10-18 16:46:12 +0200 (Tue, 18 Oct 2011) | 11 lines
+
+- Associate existing notification implementation with new ocsmanager work on mapistore client side
+- Improve subscription registration and unregistration and associate them to existing notification implementation
+- Open mqueue when newmail notification is asked
+- add talloc_destructor to unlink mqueue upon release
+- add preliminary (untested) code on openchange server to trigger this mqueue data and push a notification payload
+back to the MAPI client.
+
+This complete the other stage of ocsmanager process. MAPI clients can now (synchronously) check for 
+data on queues (for newmail only atm) when processing MAPI responses on openchange server.
 
-Make sure that return values are checked and report that given status if there is an error. 
 
-Patch from Erik Hovland, with minor additional changes. Thanks again for the patch.
+------------------------------------------------------------------------
+r3348 | jkerihuel | 2011-10-19 15:37:06 +0200 (Wed, 19 Oct 2011) | 5 lines
 
-Resolves #176.
+Some MAPI clients do not fallback to homeMDB when homeMTA is not available.
+Set homeMTA to homeMDB value so it returns the same legacyExchangeDN value
+required by these unfriendly MAPI clients.
 
+
 ------------------------------------------------------------------------
-r1473 | bradh | 2009-08-17 12:18:38 +0200 (Mon, 17 Aug 2009) | 6 lines
+r3350 | jkerihuel | 2011-10-19 17:57:11 +0200 (Wed, 19 Oct 2011) | 3 lines
+
+Add PT_NULL case handling in oxcfxics.
 
-Ensure that we check the result of the operation we just performed.
 
-Patch by Erik Hovland. Thanks very much for continuing to provide these.
+------------------------------------------------------------------------
+r3352 | jkerihuel | 2011-10-19 17:58:35 +0200 (Wed, 19 Oct 2011) | 2 lines
 
-This is the third part of the patch in ticket #177. The first two parts are yet to be addressed.
+Fix nlist allocation memory
 
 ------------------------------------------------------------------------
-r1474 | occl | 2009-08-18 00:00:45 +0200 (Tue, 18 Aug 2009) | 1 line
+r3353 | jkerihuel | 2011-10-20 09:19:49 +0200 (Thu, 20 Oct 2011) | 3 lines
+
+Update script to reflect latest API (handle identifier)
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1475 | bradh | 2009-08-19 00:40:15 +0200 (Wed, 19 Aug 2009) | 6 lines
+r3354 | jkerihuel | 2011-10-20 09:29:55 +0200 (Thu, 20 Oct 2011) | 5 lines
 
-Remove unreachable code.
+EcRRegisterNotification doesn't use ulEventMask and should always be 0. 
+Remove ulEventMask requirement across OpenChange API.
+Rename ulEventMask into iRpc to match Exchange documentation.
 
-Patch by Erik Hovland. Thanks very much.
 
-This is the first part of ticket #177.
+------------------------------------------------------------------------
+r3355 | jkerihuel | 2011-10-20 12:23:34 +0200 (Thu, 20 Oct 2011) | 2 lines
 
+Add *.egg to ignore list
+
 ------------------------------------------------------------------------
-r1476 | bradh | 2009-08-19 01:20:44 +0200 (Wed, 19 Aug 2009) | 6 lines
+r3356 | jkerihuel | 2011-10-20 12:34:37 +0200 (Thu, 20 Oct 2011) | 7 lines
 
-Remove unreachable code.
+Explicitely pass a pointer on mapistore context for mapistore_new_subscription
+instead of using conn_info and fetch username and mstore_ctx from there.
 
-Patch by Erik Hovland. Thanks again.
+The reason is that we may need at some point the username to be different from session one.
+Just offer the ability for now, to be removed later if useless or wrong assumption made.
 
-This is the second part of ticket #177. This completes the checkin of that ticket.
 
 ------------------------------------------------------------------------
-r1477 | bradh | 2009-08-19 01:44:03 +0200 (Wed, 19 Aug 2009) | 6 lines
+r3357 | jkerihuel | 2011-10-21 14:10:19 +0200 (Fri, 21 Oct 2011) | 17 lines
+
+Implement last bit of the notification process. This is still proof of concept code 
+but the behavior provides expected results for newmail.
 
-Move initialisation up, to make sure everything is valid in the failure paths
+- Implement UDP bind notification on ocsmanager with associated EcRRegisterPushNotification command
+- Add preliminary code for EcRRegisterPushNotification
+- Provide 2 states for user registration: complete or not. EcRRegisterPushNotification is generally called
+before any mapistore context is created, we need to associate it to a user and feed remaining information later.
+This still needs some work to cover all cases
 
-Patch by Erik Hovland. Thanks once again.
+- rename rgCallbackAddress into rgbCallbackAddress to match Exchange IDL.
 
-This closes out ticket #178.
+- Update notification handling in dcesrv_exchange_emsmdb.c to process pending notifications whithin idle responses.
+- Add NEWMAIL object case in emsmdbp_fill_notification
 
+Now we have a working base, we need polishing, review and bug fix to be done
+
+
 ------------------------------------------------------------------------
-r1482 | occl | 2009-08-24 00:00:50 +0200 (Mon, 24 Aug 2009) | 1 line
+r3358 | jkerihuel | 2011-10-21 16:38:47 +0200 (Fri, 21 Oct 2011) | 3 lines
+
+Move openchangedb folder creation code into openchangedb.c
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1483 | bradh | 2009-08-24 03:48:03 +0200 (Mon, 24 Aug 2009) | 2 lines
+r3361 | jkerihuel | 2011-10-24 12:58:29 +0200 (Mon, 24 Oct 2011) | 2 lines
 
-Minor cleanups.
+Add message creation feature to openchangedb
 
 ------------------------------------------------------------------------
-r1484 | bradh | 2009-08-24 04:37:19 +0200 (Mon, 24 Aug 2009) | 2 lines
+r3365 | jkerihuel | 2011-10-25 11:41:49 +0200 (Tue, 25 Oct 2011) | 4 lines
 
-Minor rewording of description
+Fix naming for some freebusy properties and add alternative names for some properties
+used in openchangedb (forthcoming commits).
 
+
 ------------------------------------------------------------------------
-r1485 | occl | 2009-08-25 00:00:37 +0200 (Tue, 25 Aug 2009) | 1 line
+r3366 | jkerihuel | 2011-10-25 12:00:14 +0200 (Tue, 25 Oct 2011) | 3 lines
+
+Fix freebusy property tag naming in libmapi and utils
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1486 | bradh | 2009-08-29 03:47:43 +0200 (Sat, 29 Aug 2009) | 4 lines
+r3367 | jkerihuel | 2011-10-25 12:05:22 +0200 (Tue, 25 Oct 2011) | 3 lines
 
-Fix some memory leaks and a bug in mapiprofile.
+Fix warnings
 
-I introduced the bug in r1467, there could be others that are similar.
 
 ------------------------------------------------------------------------
-r1487 | bradh | 2009-08-29 12:04:27 +0200 (Sat, 29 Aug 2009) | 5 lines
+r3368 | jkerihuel | 2011-10-25 12:45:15 +0200 (Tue, 25 Oct 2011) | 3 lines
 
-Remove explicit -Wstrict-aliasing=3 from command line.
+Remove set but unused variables - cause warnings on Ubuntu oneiric
 
-This is implied by gcc -Wall option, and icc produces nuisance warnings
-with it enabled (related to the -W option, not the code being compiled).
 
 ------------------------------------------------------------------------
-r1488 | occl | 2009-08-30 00:00:43 +0200 (Sun, 30 Aug 2009) | 1 line
+r3369 | jkerihuel | 2011-10-25 13:46:56 +0200 (Tue, 25 Oct 2011) | 12 lines
+
+Add preliminary support for table and message in openchangedb.
+Tries to mimic backend's object oriented model.
+
+OpenChange Server can now perform following calls using openchangedb:
+- OpenMessage
+- GetProps on messages
+- GetContentsTable
+- FindRow with RES_PROPERTY restriction
 
-Daily ChangeLog Update
+Note that mapi_SRestriction support is highly limited for now.
+
+
 ------------------------------------------------------------------------
-r1489 | bradh | 2009-09-02 11:50:27 +0200 (Wed, 02 Sep 2009) | 2 lines
+r3370 | jkerihuel | 2011-10-25 14:29:12 +0200 (Tue, 25 Oct 2011) | 3 lines
+
+Merge r3263 and 3265 from sogo branch
 
-Correct diagnostics messages.
 
 ------------------------------------------------------------------------
-r1490 | occl | 2009-09-03 00:00:45 +0200 (Thu, 03 Sep 2009) | 1 line
+r3371 | jkerihuel | 2011-10-25 16:26:20 +0200 (Tue, 25 Oct 2011) | 3 lines
 
-Daily ChangeLog Update
+Initialize output blob and prevent openchange server from crashing
+
+
 ------------------------------------------------------------------------
-r1491 | bradh | 2009-09-10 13:55:44 +0200 (Thu, 10 Sep 2009) | 13 lines
+r3373 | jkerihuel | 2011-10-26 12:09:25 +0200 (Wed, 26 Oct 2011) | 4 lines
+
+Restrictions applied during FindRow are temporary for the call. Only calls to RopRestrict apply on the table.
+Restrict scope of openchangedb FindRow restrictions to the call.
 
-Portability fixes for Intel C Compiler.
 
-Set CFLAGS early, otherwise AC_PROG_CC will set
-CFLAGS to "-O2 -g", which later has -O3 appended, which
-icc complains about.
+------------------------------------------------------------------------
+r3374 | jkerihuel | 2011-10-26 12:40:35 +0200 (Wed, 26 Oct 2011) | 3 lines
 
-Check if we're really icc, and if so, turn off some warnings.
-Also turn off the "FORTIFY_SOURCE" define which causes problems
-with missing builtins.
+Add PidTag required when creating a message
 
-The warnings can (and should) be turned back on later, after we
-fix the current issues.
 
 ------------------------------------------------------------------------
-r1492 | occl | 2009-09-11 00:00:43 +0200 (Fri, 11 Sep 2009) | 1 line
+r3375 | jkerihuel | 2011-10-26 12:41:39 +0200 (Wed, 26 Oct 2011) | 4 lines
+
+Provide set_restrictions the ability to reset restrictions and results 
+when specified restrictions are NULL (FindRow reset case)
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1493 | bradh | 2009-09-11 02:51:24 +0200 (Fri, 11 Sep 2009) | 4 lines
+r3376 | jkerihuel | 2011-10-26 12:44:09 +0200 (Wed, 26 Oct 2011) | 5 lines
 
-Remove unused variable, and change a name to avoid a "shadowed declaration" 
-warning.
+- openchangedb filters are now handled directly by openchangedb
+- Clean-up code
+- Add more conditional error case when NULL data has to be returned
 
 
 ------------------------------------------------------------------------
-r1494 | bradh | 2009-09-11 03:51:38 +0200 (Fri, 11 Sep 2009) | 2 lines
+r3377 | jkerihuel | 2011-10-26 12:45:42 +0200 (Wed, 26 Oct 2011) | 3 lines
 
-Match up data types in argument and format string.
+Add PT_NULL case to mapi_SPropValue_CTR union. Prevent from ndr errors when pushing property blobs.
 
+
 ------------------------------------------------------------------------
-r1495 | bradh | 2009-09-11 03:52:25 +0200 (Fri, 11 Sep 2009) | 2 lines
+r3378 | jkerihuel | 2011-10-26 13:56:36 +0200 (Wed, 26 Oct 2011) | 2 lines
 
-Help icc find comparison_fn_t.
+Merge r3372 from sogo branch
 
 ------------------------------------------------------------------------
-r1496 | bradh | 2009-09-11 10:43:05 +0200 (Fri, 11 Sep 2009) | 4 lines
+r3379 | jkerihuel | 2011-10-26 14:08:49 +0200 (Wed, 26 Oct 2011) | 3 lines
 
-Namespace variable in macro, so we don't get noise about shadowing a
-declaration of "i"
+Fix set but unused variables warning.
+Add temporary warning fix for dcesrv_RfrGetFQDNFromLegayDN. Needs further investigation
+
+------------------------------------------------------------------------
+r3380 | jkerihuel | 2011-10-26 14:29:39 +0200 (Wed, 26 Oct 2011) | 2 lines
 
+Remove set but unused variable warning for TransportSend
 
 ------------------------------------------------------------------------
-r1497 | bradh | 2009-09-11 10:45:18 +0200 (Fri, 11 Sep 2009) | 4 lines
+r3381 | jkerihuel | 2011-10-26 15:55:17 +0200 (Wed, 26 Oct 2011) | 8 lines
 
-Add "static" to avoid the need for additional declarations.
+- Move to an object oriented approach for openchangedb messages 
+- Propagate this behavior into OpenChange EMSMDB server
+- refactor setting properties in openchangedb to allow either ldb_results or ldb_message to get passed
+- Do not encode PT_STRING8 and PT_UNICODE strings for openchangedb messages.
+Strings are automatically handled as blobs in LDB and binary_encode_string should
+only be used for filters to avoid injections.
 
-Avoids noise from the intel c compiler.
 
 ------------------------------------------------------------------------
-r1498 | bradh | 2009-09-11 13:08:28 +0200 (Fri, 11 Sep 2009) | 2 lines
+r3382 | jkerihuel | 2011-10-26 15:59:04 +0200 (Wed, 26 Oct 2011) | 3 lines
 
-Remove unreachable code.
+Fix warnings on badly formed debug message and remove deprecated openchangedb call.
 
+
 ------------------------------------------------------------------------
-r1499 | bradh | 2009-09-11 14:10:41 +0200 (Fri, 11 Sep 2009) | 2 lines
+r3383 | jkerihuel | 2011-10-26 16:54:44 +0200 (Wed, 26 Oct 2011) | 2 lines
 
-Use enumerated type instead of integer.
+Merge r3352 from sogo branch
 
 ------------------------------------------------------------------------
-r1500 | bradh | 2009-09-11 14:28:10 +0200 (Fri, 11 Sep 2009) | 5 lines
+r3385 | jkerihuel | 2011-10-26 16:56:42 +0200 (Wed, 26 Oct 2011) | 3 lines
 
-Only pass "-Wmissing-prototypes -Wstrict-prototypes" to CFLAGS,
-not to CXXFLAGS as well.
+Remove unused but set retval variable
 
-Avoids g++ warnings.
 
 ------------------------------------------------------------------------
-r1501 | occl | 2009-09-12 00:00:45 +0200 (Sat, 12 Sep 2009) | 1 line
+r3386 | jkerihuel | 2011-10-26 16:57:58 +0200 (Wed, 26 Oct 2011) | 2 lines
 
-Daily ChangeLog Update
+Merge r3384 from sogo branch
+
 ------------------------------------------------------------------------
-r1502 | bradh | 2009-09-12 03:20:30 +0200 (Sat, 12 Sep 2009) | 4 lines
+r3387 | jkerihuel | 2011-10-26 17:03:54 +0200 (Wed, 26 Oct 2011) | 4 lines
 
-Return a suitable MAPISTATUS if we can't talloc sufficient memory here.
+Revert changes on set_mapi_SPropValue and add a temporary specific function for SOGo
+to be used when retrieved ModifyRecipients rows.
 
-Fixes warning from Intel compiler.
 
 ------------------------------------------------------------------------
-r1503 | bradh | 2009-09-12 09:32:40 +0200 (Sat, 12 Sep 2009) | 4 lines
+r3388 | jkerihuel | 2011-10-26 17:04:34 +0200 (Wed, 26 Oct 2011) | 3 lines
 
-Use enum types where appropriate.
+Update prototype declarations for set_mapi_SPropValue_sogo
 
-Fixes warnings from Intel C compiler.
 
 ------------------------------------------------------------------------
-r1504 | bradh | 2009-09-12 10:09:14 +0200 (Sat, 12 Sep 2009) | 2 lines
+r3389 | jkerihuel | 2011-10-26 17:07:28 +0200 (Wed, 26 Oct 2011) | 4 lines
+
+Enable access to public folder store again. 
+Should work now we have support for message creation and getcontentstable in openchangedb.
 
-Use enums instead of ints / hardcoded values.
 
 ------------------------------------------------------------------------
-r1505 | bradh | 2009-09-12 10:23:53 +0200 (Sat, 12 Sep 2009) | 2 lines
+r3390 | jkerihuel | 2011-10-26 17:08:19 +0200 (Wed, 26 Oct 2011) | 3 lines
 
-Use appropriate enums instead of int types.
+Remove useless commented calls
 
+
 ------------------------------------------------------------------------
-r1506 | bradh | 2009-09-12 10:25:09 +0200 (Sat, 12 Sep 2009) | 3 lines
+r3394 | jkerihuel | 2011-10-26 17:36:08 +0200 (Wed, 26 Oct 2011) | 2 lines
 
-We are supposed to be returning a MAPISTATUS, so switch to using 
-the OPENCHANGE_RETVAL_ERR macro here.
+Merge r3391 from sogo branch
 
 ------------------------------------------------------------------------
-r1507 | bradh | 2009-09-12 12:31:25 +0200 (Sat, 12 Sep 2009) | 2 lines
+r3395 | jkerihuel | 2011-10-26 18:25:53 +0200 (Wed, 26 Oct 2011) | 3 lines
 
-Update users of FindRow to use enums.
+add missing break statement
 
+
 ------------------------------------------------------------------------
-r1508 | bradh | 2009-09-12 15:02:59 +0200 (Sat, 12 Sep 2009) | 2 lines
+r3396 | jkerihuel | 2011-10-26 18:26:41 +0200 (Wed, 26 Oct 2011) | 3 lines
+
+folders within Public Folder branch have no mailboxDN.
 
-Use enums where appropriate.
 
 ------------------------------------------------------------------------
-r1509 | bradh | 2009-09-12 15:03:57 +0200 (Sat, 12 Sep 2009) | 2 lines
+r3400 | jkerihuel | 2011-10-27 11:27:41 +0200 (Thu, 27 Oct 2011) | 3 lines
 
-Use enum for OpenEmbeddedMessage call.
+Merge r3397, 3398, 3399 from sogo branch
 
+
 ------------------------------------------------------------------------
-r1510 | bradh | 2009-09-12 15:04:34 +0200 (Sat, 12 Sep 2009) | 2 lines
+r3401 | jkerihuel | 2011-10-28 14:00:45 +0200 (Fri, 28 Oct 2011) | 3 lines
+
+Add IDL implementation for EcDoRpcExt (0x9) emsmdb RPC call.
 
-Use appropriate enum here.
 
 ------------------------------------------------------------------------
-r1511 | bradh | 2009-09-12 15:05:10 +0200 (Sat, 12 Sep 2009) | 2 lines
+r3421 | jkerihuel | 2011-11-02 13:49:38 +0100 (Wed, 02 Nov 2011) | 2 lines
 
-Update to match API change.
+Merge in commits 3402-3419
 
 ------------------------------------------------------------------------
-r1512 | bradh | 2009-09-12 15:07:03 +0200 (Sat, 12 Sep 2009) | 2 lines
+r3422 | jkerihuel | 2011-11-02 15:05:42 +0100 (Wed, 02 Nov 2011) | 3 lines
 
-Update API to use MAPITAGS enum.
+Fix warnings.
 
+
 ------------------------------------------------------------------------
-r1513 | occl | 2009-09-13 00:00:42 +0200 (Sun, 13 Sep 2009) | 1 line
+r3423 | jkerihuel | 2011-11-02 19:13:54 +0100 (Wed, 02 Nov 2011) | 8 lines
+
+- Add new notifications
+- Replace newmail with a serie of notifications (fnevObjectModified/Inbox + fnevObjectCreated/Email).
+- Handle NotificationFlags more properly, we don't have to get fnevNewMail flag set to trigger notifications
+- Improve removal of subscribed notifications
+
+There is quite a reasonable amount of commented code and hardcoded data that will be removed in further commits.
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1514 | bradh | 2009-09-14 12:58:11 +0200 (Mon, 14 Sep 2009) | 4 lines
+r3439 | jkerihuel | 2011-11-04 19:01:42 +0100 (Fri, 04 Nov 2011) | 3 lines
 
-Update the properties list.
+Commit preliminary dovecot plugin for triggering newmail notification to ocsmanager
 
-Patch from Girish Venkatachalam <girish at gayatri-hitech.com>
 
 ------------------------------------------------------------------------
-r1515 | occl | 2009-09-15 00:01:04 +0200 (Tue, 15 Sep 2009) | 1 line
+r3441 | jkerihuel | 2011-11-07 18:41:14 +0100 (Mon, 07 Nov 2011) | 3 lines
+
+Fix problems with auto-generated files being removed but not recreated automatically.
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1516 | bradh | 2009-09-16 07:50:23 +0200 (Wed, 16 Sep 2009) | 5 lines
+r3442 | jkerihuel | 2011-11-08 13:00:16 +0100 (Tue, 08 Nov 2011) | 6 lines
 
-Whitespace cleanup.
+Merge r3419-3440 from sogo branch to sogo-good.
+Manual merge of r3428 and 3431 about emsmdbp_object.c since
+changes committed on sogo-good branch didn't get replicated
+on sogo branch prior remerging.
 
-Patch by Erik Hovland <erik at hovland.org>
 
+------------------------------------------------------------------------
+r3458 | jkerihuel | 2011-11-18 16:09:11 +0100 (Fri, 18 Nov 2011) | 2 lines
 
+Merge in commits from sogo r3440-3457
+
 ------------------------------------------------------------------------
-r1517 | occl | 2009-09-17 00:00:43 +0200 (Thu, 17 Sep 2009) | 1 line
+r3459 | jkerihuel | 2011-11-18 16:48:08 +0100 (Fri, 18 Nov 2011) | 3 lines
+
+Revert merge from sogo r3340-HEAD. Will do it again manually to avoid problems with openchangedb API change.
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1518 | bradh | 2009-09-19 07:24:06 +0200 (Sat, 19 Sep 2009) | 9 lines
+r3460 | jkerihuel | 2011-11-18 17:17:13 +0100 (Fri, 18 Nov 2011) | 5 lines
 
-Implement GetValidAttachments ROP (0x52).
+Remerge properly this time: merge sogo branch changes from 3440:3457
+Avoid commit 3451 and apply relevant changes manually since openchangedb.c
+hasn't been merged properly in sogo branch prior this merge back attempt.
 
-Includes IDL, implementation and mapitest.
 
-mapitest also checks DeleteAttach behaviour, which I don't think we previously
-covered anywhere. 
+------------------------------------------------------------------------
+r3461 | jkerihuel | 2011-11-18 17:26:47 +0100 (Fri, 18 Nov 2011) | 2 lines
 
-Also includes a comment fix in the mapitest code.
+Forgot to merge 3452-3454 (dry-run idiom)
 
 ------------------------------------------------------------------------
-r1519 | bradh | 2009-09-19 13:54:15 +0200 (Sat, 19 Sep 2009) | 9 lines
+r3462 | jkerihuel | 2011-11-18 17:28:56 +0100 (Fri, 18 Nov 2011) | 2 lines
+
+Merge r3455
 
-Implement RopReloadCachedInformation (0x10).
+------------------------------------------------------------------------
+r3502 | jkerihuel | 2011-11-29 11:56:18 +0100 (Tue, 29 Nov 2011) | 5 lines
 
-Minor change to IDL (previously implemented), and adds
-implementaiton and mapitest code.
+Merge r3466,3467 from sogo branch
 
-Also editorial comment fix in some related mapitest stuff.
+Enable auto-creation of named properties within GetIdsFromNames
 
-Resolves ticket #186
 
 ------------------------------------------------------------------------
-r1520 | occl | 2009-09-20 00:00:56 +0200 (Sun, 20 Sep 2009) | 1 line
+r3503 | jkerihuel | 2011-11-29 12:12:28 +0100 (Tue, 29 Nov 2011) | 3 lines
+
+Manual merge in of r3468 from sogo branch
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1521 | bradh | 2009-09-20 02:50:15 +0200 (Sun, 20 Sep 2009) | 4 lines
+r3504 | jkerihuel | 2011-11-29 12:17:25 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Modify mapi_object_set_logon_id() to be able to report errors.
+Manual merge in of r3469 from sogo branch
 
-Original patch by Erik Hovland, I made some changes.
 
 ------------------------------------------------------------------------
-r1522 | occl | 2009-09-21 00:00:44 +0200 (Mon, 21 Sep 2009) | 1 line
+r3505 | jkerihuel | 2011-11-29 13:04:34 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Daily ChangeLog Update
+Fix r3470 conflict from sogo branch
+
+
 ------------------------------------------------------------------------
-r1523 | bradh | 2009-09-26 07:56:15 +0200 (Sat, 26 Sep 2009) | 3 lines
+r3506 | jkerihuel | 2011-11-29 13:05:49 +0100 (Tue, 29 Nov 2011) | 3 lines
+
+Merge in r3471 from sogo branch
 
-Ensure that the libmapi++ messages example works even if there is no
-PR_CONVERSATION_TOPIC (subject).
 
 ------------------------------------------------------------------------
-r1524 | bradh | 2009-09-26 08:57:34 +0200 (Sat, 26 Sep 2009) | 6 lines
+r3507 | jkerihuel | 2011-11-29 13:06:56 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Make sure that the string given by what() can be used. 
+Merge in r3472: improve NspiModLinkAtt IDL output (replace uint32_t with enum MAPITAGS)
+
+
+------------------------------------------------------------------------
+r3508 | jkerihuel | 2011-11-29 13:08:01 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Patch by Erik Hovland - thanks very much.
+Merge in r 3473 from sogo branch: Add support for PR_EMS_AB_OBJECT_GUID in NSPI server
 
-Resolves ticket #179.
 
 ------------------------------------------------------------------------
-r1525 | jelmer | 2009-09-26 13:04:34 +0200 (Sat, 26 Sep 2009) | 1 line
+r3509 | jkerihuel | 2011-11-29 13:09:21 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Add 'make dist'.
+Merge in r3474 from sogo branch: Add properties required for delegation
+
+
 ------------------------------------------------------------------------
-r1526 | occl | 2009-09-27 00:00:45 +0200 (Sun, 27 Sep 2009) | 1 line
+r3510 | jkerihuel | 2011-11-29 13:10:11 +0100 (Tue, 29 Nov 2011) | 3 lines
+
+Merge in r3476 from sogo branch
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1527 | bradh | 2009-10-06 10:44:21 +0200 (Tue, 06 Oct 2009) | 11 lines
+r3511 | jkerihuel | 2011-11-29 13:10:57 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Alternative solution to ticket #179, provided by Alan Alvarez.
+Merge in r3477 from sogo branch
 
-This alternative avoids the need for the user to clean up the string returned by what().
 
-Also includes a test case, which I've used to validate that the original (prior to r1524) code 
-is faulty, and that both fixes (From Erik Hovland and from Alan Alvarez) deal with it.
+------------------------------------------------------------------------
+r3512 | jkerihuel | 2011-11-29 13:12:53 +0100 (Tue, 29 Nov 2011) | 5 lines
 
-Resolves Ticket #179 (again).
+Merge in r3478 from sogo branch
 
+Adjust RopLogon handling with regards to the mailbox username validation (spec compliance)
 
 
 ------------------------------------------------------------------------
-r1528 | occl | 2009-10-07 00:01:03 +0200 (Wed, 07 Oct 2009) | 1 line
+r3513 | jkerihuel | 2011-11-29 13:14:10 +0100 (Tue, 29 Nov 2011) | 3 lines
+
+Merge in r3479 from sogo branch: Adjust handling of "Origin" field for large table (spec compliance)
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1529 | bradh | 2009-10-08 12:08:27 +0200 (Thu, 08 Oct 2009) | 5 lines
+r3514 | jkerihuel | 2011-11-29 13:15:08 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Update buildsystem to avoid using bash-specific (well, not sh-supported) +=
-mechanism.
+Merge in r3480 from sogo branch: Fix const * warning
 
-Should allow FreeBSD to be supported.
 
 ------------------------------------------------------------------------
-r1530 | occl | 2009-10-09 00:00:38 +0200 (Fri, 09 Oct 2009) | 1 line
+r3515 | jkerihuel | 2011-11-29 13:16:44 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Daily ChangeLog Update
-------------------------------------------------------------------------
-r1531 | clsk | 2009-10-09 11:02:12 +0200 (Fri, 09 Oct 2009) | 1 line
+Merge in r3481 from sogo branch: add filter-type argument to emsmdbp_object_table_get_row_props
+
 
-Added libmapi++ wrapper function for CreateProfileStore
 ------------------------------------------------------------------------
-r1532 | occl | 2009-10-10 00:00:49 +0200 (Sat, 10 Oct 2009) | 1 line
+r3516 | jkerihuel | 2011-11-29 13:17:36 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Daily ChangeLog Update
+Merge in r3482 from sogo branch: Use live-filtered queries for RopFindRow
+
+
 ------------------------------------------------------------------------
-r1534 | clsk | 2009-10-18 10:38:17 +0200 (Sun, 18 Oct 2009) | 2 lines
+r3517 | jkerihuel | 2011-11-29 13:18:31 +0100 (Tue, 29 Nov 2011) | 3 lines
+
+Merge in r3483 from sogo branch: enhance live-filtering capability for openchangedb_table
 
-Use mapi_profile_get_ldif_path to find ldif path when one is not given
 
 ------------------------------------------------------------------------
-r1535 | occl | 2009-10-19 00:01:01 +0200 (Mon, 19 Oct 2009) | 1 line
+r3518 | jkerihuel | 2011-11-29 13:19:21 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Daily ChangeLog Update
+Merge in r3484: Add support for FAI messages in openchangedb
+
+
 ------------------------------------------------------------------------
-r1536 | bradh | 2009-10-19 10:06:58 +0200 (Mon, 19 Oct 2009) | 2 lines
+r3519 | jkerihuel | 2011-11-29 13:20:24 +0100 (Tue, 29 Nov 2011) | 3 lines
+
+Merge in r3485 from sogo branch: Fix openchangedb_table_set_sort_order
 
-spello fixes.
 
 ------------------------------------------------------------------------
-r1537 | occl | 2009-10-20 00:00:51 +0200 (Tue, 20 Oct 2009) | 1 line
+r3520 | jkerihuel | 2011-11-29 13:21:17 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Daily ChangeLog Update
+Merge in r3486 from sogo branch: Fid undefinied pointed error
+
+
 ------------------------------------------------------------------------
-r1538 | jkerihuel | 2009-10-21 20:44:48 +0200 (Wed, 21 Oct 2009) | 6 lines
+r3521 | jkerihuel | 2011-11-29 13:24:41 +0100 (Tue, 29 Nov 2011) | 7 lines
+
+Merge in r3487,3488,3489,3490 from sogo branch
 
-Patches provided by raboof:
-- Ticket #213 deprecated include directive removal
-- Ticket #214 missing sanity check
-- Ticket #215 fix some DEBUG macro level for sain ouput
+- Ensure table sort criteria is set to NULL when parameter is NULL
+- reset table->res to NULL in openchangedb_table_set_restrictions
+- Reindentation and small code factorization for fetches records
 
 
 ------------------------------------------------------------------------
-r1539 | occl | 2009-10-22 00:00:59 +0200 (Thu, 22 Oct 2009) | 1 line
+r3522 | jkerihuel | 2011-11-29 13:26:11 +0100 (Tue, 29 Nov 2011) | 4 lines
 
-Daily ChangeLog Update
+Merge in r3491 from sogo branch: Fix memory handling in case of errors during live filtering
+Also convert PR_FID to PR_PARENT_FID when the table is not hierarchical
+
+
 ------------------------------------------------------------------------
-r1540 | bradh | 2009-11-02 10:14:48 +0100 (Mon, 02 Nov 2009) | 7 lines
+r3523 | jkerihuel | 2011-11-29 13:27:25 +0100 (Tue, 29 Nov 2011) | 3 lines
+
+Merge in r3492: fix warnings
 
-Fix build problem using Sun Studio compiler.
 
-Reported by Brian Lu (Sun), including a patch (Ticket #219)
+------------------------------------------------------------------------
+r3524 | jkerihuel | 2011-11-29 13:28:51 +0100 (Tue, 29 Nov 2011) | 6 lines
 
-I slightly modified the patch, but nothing substantial.
+Merge in 3493, 3494 from sogo branch:
 
+- Add mapistore error code for privileges
+- Turn mapistore errors into an enum
 
+
 ------------------------------------------------------------------------
-r1541 | occl | 2009-11-03 00:00:54 +0100 (Tue, 03 Nov 2009) | 1 line
+r3525 | jkerihuel | 2011-11-29 13:30:30 +0100 (Tue, 29 Nov 2011) | 5 lines
+
+Merge in r3495 from sogo branch
 
-Daily ChangeLog Update
+- Add new function openchangedb_get_owner that returns the username of the owner of a folder
+
+
 ------------------------------------------------------------------------
-r1542 | bradh | 2009-11-07 06:25:38 +0100 (Sat, 07 Nov 2009) | 7 lines
+r3526 | jkerihuel | 2011-11-29 13:38:03 +0100 (Tue, 29 Nov 2011) | 5 lines
 
-Remove MAP_FILE flag from mmap(). Looks like this is only required on really
-old unix systems (e.g. NetBSD prior to 1.0), which we probably won't ever support.
+Manual merge in of r3496 from sogo branch
 
-Patch by Brian Lu (Sun) - thanks very much.
+Now retrieve the username of the owner of the parent folder instead of using the active login name
 
-Partly resolves ticket #220 - still need to handle the first patch.
 
 ------------------------------------------------------------------------
-r1543 | bradh | 2009-11-07 07:36:44 +0100 (Sat, 07 Nov 2009) | 8 lines
+r3527 | jkerihuel | 2011-11-29 13:41:29 +0100 (Tue, 29 Nov 2011) | 8 lines
+
+Merge in r3497 and r3498 from sogo branch
 
-Additional portability fixes for SunOS.
+- Rename username to owner for clarification
+- remove openchangedb_get_owner and replace it with emsmdbp_get_owner
+- ensure indexing.tdb and replica_mapping.tdb associated with an emsmbp_session
+  are the ones of the mailbox owner instead of the active user
 
-Based on a patch (ticket #220) by Brian Lu (Sun). Thanks very much.
 
-I modified the patch to try to use autoconf where possible.
+------------------------------------------------------------------------
+r3528 | jkerihuel | 2011-11-29 13:42:44 +0100 (Tue, 29 Nov 2011) | 3 lines
 
-Resolves ticket #220.
+Fix warning in fasttransfer sample code
 
+
 ------------------------------------------------------------------------
-r1544 | occl | 2009-11-08 00:00:40 +0100 (Sun, 08 Nov 2009) | 1 line
+r3529 | jkerihuel | 2011-11-29 13:43:57 +0100 (Tue, 29 Nov 2011) | 5 lines
+
+Merge in r3500 from sogo branch
 
-Daily ChangeLog Update
+Improve display of folder ids to show both hex and dec formats
+
+
 ------------------------------------------------------------------------
-r1545 | bradh | 2009-11-09 10:56:23 +0100 (Mon, 09 Nov 2009) | 6 lines
+r3530 | jkerihuel | 2011-11-29 13:45:07 +0100 (Tue, 29 Nov 2011) | 5 lines
 
-Adding missing include.
+Merge in r3501 from sogo branch
 
-Ticket #220.
+Fix value passed to build entryid of the 'Reminders' folder
 
-Patch from Brian Lu (Sun). Thanks very much.
 
 ------------------------------------------------------------------------
-r1546 | occl | 2009-11-10 00:00:43 +0100 (Tue, 10 Nov 2009) | 1 line
+r3531 | jkerihuel | 2011-11-29 13:50:01 +0100 (Tue, 29 Nov 2011) | 3 lines
+
+Fix warnings in pymapistore.c
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1547 | bradh | 2009-11-13 04:53:06 +0100 (Fri, 13 Nov 2009) | 10 lines
+r3560 | jkerihuel | 2012-01-05 18:36:22 +0100 (Thu, 05 Jan 2012) | 11 lines
+
+Fix context registration and use namespace+uri in backend_ctx->uri rather than uri.
+This fix context reusing rather than new context creation
+
+Also fix reference count both on backend and indexing:
+- backends were never incrementing indexing on reuse, causing indexing to be released
+prior to backend
+- backends with a ref_count of 1 returned MAPISTORE_ERR_REF_COUNT while they should be deleted
+mapistore_backend_add_context set ref_count to 1 by default
 
-Add support for the SunStudio compiler.
 
-I previously special-cased the Intel C compiler, and relied on some ugly ordering requirements to
-ensure it all worked.
 
-This approach is cleaner, allowing options to be build up separately for each compiler, and for
-the C and C++ versions.
+------------------------------------------------------------------------
+r3627 | jkerihuel | 2012-02-17 15:11:47 +0100 (Fri, 17 Feb 2012) | 2 lines
 
-Tested on Linux with all three compilers.
+Merge sogo branch into sogo-good for further "back to trunk" merge
 
 ------------------------------------------------------------------------
-r1548 | occl | 2009-11-14 00:00:40 +0100 (Sat, 14 Nov 2009) | 1 line
+r3628 | jkerihuel | 2012-02-17 15:22:37 +0100 (Fri, 17 Feb 2012) | 3 lines
+
+Reenable authentication on server side, fix some warning and minor diffs between sogo/sogo-good branches
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1549 | bradh | 2009-11-19 07:01:52 +0100 (Thu, 19 Nov 2009) | 18 lines
+r3629 | jkerihuel | 2012-02-17 15:41:04 +0100 (Fri, 17 Feb 2012) | 4 lines
 
-Add coverage testing support.
+Re-enable authentication for nspi and rfr pipes
+Continue difference fixing between branches
 
-./configure now supports --enable-coverage, which builds with the right options
-to support gcov. Also adds a new makefile target ("coverage") that runs the
-required post-processing steps.
 
-Also added a test script that does a range of openchange related (client side)
-operations. This is useful for generating the test load for coverage checks.
+------------------------------------------------------------------------
+r3630 | jkerihuel | 2012-02-17 15:45:32 +0100 (Fri, 17 Feb 2012) | 3 lines
 
-So the basic recipe here is
-1. Add the --enable-coverage option at configure time.
-2. Do a clean build
-3. Install it, or otherwise ensure that coverage-enabled libs are used
-4. generate the test load (e.g. run ./script/smoketest.sh)
-5. "make coverage"
-6. Inspect the results in ./covresults
+Remove hardcoded named properties now we should support on purpose creation of named properties in openchange server.
 
 
 ------------------------------------------------------------------------
-r1550 | bradh | 2009-11-19 10:14:08 +0100 (Thu, 19 Nov 2009) | 2 lines
+r3631 | jkerihuel | 2012-02-17 15:47:56 +0100 (Fri, 17 Feb 2012) | 2 lines
 
-Revert inadvertent part from previous commit (r1549)
+Remove unknown PSETID
 
 ------------------------------------------------------------------------
-r1551 | bradh | 2009-11-19 20:38:43 +0100 (Thu, 19 Nov 2009) | 4 lines
+r3637 | jkerihuel | 2012-02-20 14:03:49 +0100 (Mon, 20 Feb 2012) | 6 lines
 
-Improved Sun Studio compiler support.
+Commit a modified version of Matthieu Patou <mat@matws.net> path on disabling tdb2 with latest samba git version.
+The only modification brought is the PKG_CONFIG_PATH determined depending on SAMBA_DIR path rather than hardcoded and
+update of existing PKG_CONFIG_PATH rather than overwrite.
 
-Patch by Brian Lu (Sun) - thanks again.
 
-------------------------------------------------------------------------
-r1552 | occl | 2009-11-20 00:00:46 +0100 (Fri, 20 Nov 2009) | 1 line
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1553 | bradh | 2009-11-22 08:09:29 +0100 (Sun, 22 Nov 2009) | 4 lines
+r3638 | jkerihuel | 2012-02-20 14:05:56 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-Introduce a compile time definition that is set for SVN snapshot releases.
+Merge in trunk r3546
 
-The intent is to use this to protect assert() calls that indicate incomplete code.
 
 ------------------------------------------------------------------------
-r1554 | bradh | 2009-11-22 08:14:07 +0100 (Sun, 22 Nov 2009) | 13 lines
+r3639 | jkerihuel | 2012-02-20 14:06:58 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-Minor cleanups for mapidump functions.
+Remove deprecated references to samba4 util.h header file
 
-- Add support for dumping property tags using PT_SHORT.
-- Modify the tag for PR_whatever_ERROR results to include the _ERROR bit
-- Minor format change for PT_BINARY (training colon)
-- Ensure PT_SYSTIME respects the seperator value (API change)
-- Add a conditional assert() using infrastructure introduced in r1553.
 
-Implement mapitest support for all of libmapi/mapidump.c
+------------------------------------------------------------------------
+r3640 | jkerihuel | 2012-02-20 14:09:54 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-Update openchangeclient for the API change.
+Merge r3632-3636 from sogo branch into sogo-good
 
 
 ------------------------------------------------------------------------
-r1555 | bradh | 2009-11-22 10:44:00 +0100 (Sun, 22 Nov 2009) | 2 lines
+r3641 | jkerihuel | 2012-02-20 14:33:31 +0100 (Mon, 20 Feb 2012) | 2 lines
 
-Add test for get_proptag_value().
+Replace previously remove util.h references with samba_util.h as committed in trunk r3359
 
 ------------------------------------------------------------------------
-r1556 | occl | 2009-11-23 00:01:02 +0100 (Mon, 23 Nov 2009) | 1 line
+r3642 | jkerihuel | 2012-02-20 14:34:52 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-Daily ChangeLog Update
+Merge r3223 from trunk: Fix small leak in FXICS tests.
+
+
 ------------------------------------------------------------------------
-r1557 | bradh | 2009-11-23 03:16:06 +0100 (Mon, 23 Nov 2009) | 4 lines
+r3643 | jkerihuel | 2012-02-20 14:42:18 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-Avoid use-after-free for the number of rows in the SRowSet.
+Merge in r3222 from trunk: Update path for downloading samba4 tarballs. Avoid one level of redirection.
 
-Resolves issue #212, which has the valgrind error.
 
 ------------------------------------------------------------------------
-r1558 | occl | 2009-11-24 00:00:55 +0100 (Tue, 24 Nov 2009) | 1 line
+r3644 | jkerihuel | 2012-02-20 14:44:05 +0100 (Mon, 20 Feb 2012) | 2 lines
+
+Merge in r3221 from trunk: fix memory leak, ticket #369
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1559 | bradh | 2009-11-25 11:06:31 +0100 (Wed, 25 Nov 2009) | 6 lines
+r3645 | jkerihuel | 2012-02-20 14:47:58 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-Add additional mapidump functions for notifications
+Merge in r3211 from trunk: ticket #366 - Switch the session list to be allocated on main context.
+
+
+------------------------------------------------------------------------
+r3646 | jkerihuel | 2012-02-20 15:03:16 +0100 (Mon, 20 Feb 2012) | 4 lines
 
-This is a patch from Johnny Jacob (Novell), with unit tests and some extra checks by me.
+Merge r3210 from trunk: Fix handling of 0x101f (StringArrayW type)
+Also commit additional changes required by this change with more recent code.
 
-Maintains good test coverage for this file.
 
 ------------------------------------------------------------------------
-r1560 | bradh | 2009-11-25 11:45:03 +0100 (Wed, 25 Nov 2009) | 4 lines
+r3647 | jkerihuel | 2012-02-20 15:04:18 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-Ensure API documentation gets generated for utilities functions.
+Merge in r3069 from trunk
 
-Some undocumented stuff in here to look at later.
 
 ------------------------------------------------------------------------
-r1561 | occl | 2009-11-26 00:00:49 +0100 (Thu, 26 Nov 2009) | 1 line
+r3648 | jkerihuel | 2012-02-20 15:04:53 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-Daily ChangeLog Update
+Merge in r3068 from trunk
+
+
 ------------------------------------------------------------------------
-r1562 | bradh | 2009-11-26 06:34:21 +0100 (Thu, 26 Nov 2009) | 2 lines
+r3649 | jkerihuel | 2012-02-20 15:05:42 +0100 (Mon, 20 Feb 2012) | 2 lines
 
-Fix attribution, per IRC discussion.
+Merge in r3048 from trunk
 
 ------------------------------------------------------------------------
-r1563 | occl | 2009-11-27 00:01:16 +0100 (Fri, 27 Nov 2009) | 1 line
+r3650 | jkerihuel | 2012-02-20 15:11:17 +0100 (Mon, 20 Feb 2012) | 3 lines
+
+Merge in r3046 from trunk
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1564 | bradh | 2009-11-27 04:00:47 +0100 (Fri, 27 Nov 2009) | 4 lines
+r3651 | jkerihuel | 2012-02-20 15:14:35 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-Ensure we get output if sqlite3 isn't found at configure time.
+Merge in r3036 from trunk
 
-Now outputs "no" instead of a blank.
 
 ------------------------------------------------------------------------
-r1565 | occl | 2009-11-29 00:00:55 +0100 (Sun, 29 Nov 2009) | 1 line
+r3652 | jkerihuel | 2012-02-20 15:16:18 +0100 (Mon, 20 Feb 2012) | 3 lines
+
+Merge in r3030 from trunk
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1566 | jkerihuel | 2009-12-02 16:08:25 +0100 (Wed, 02 Dec 2009) | 6 lines
+r3653 | jkerihuel | 2012-02-20 15:22:18 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-- Update openchange code to work with samba4-alpha9 release
-- Apply minor fix to ldb_wrap_connect (number of parameters)
-- Update mapiproxy code to handle new Samba4 assoc_group implementation properly
-- Update samba4 version script to match alpha9 and related git commit
+Check merge r2971 from trunk
 
 
 ------------------------------------------------------------------------
-r1567 | jkerihuel | 2009-12-02 17:52:20 +0100 (Wed, 02 Dec 2009) | 4 lines
+r3654 | jkerihuel | 2012-02-20 15:25:21 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-- Update openchange libraries to 0.9: close trac ticket #165
-- Propagate pkgconfig solution in trac ticket #94 to other libs
+Merge in r2968 from trunk
 
 
 ------------------------------------------------------------------------
-r1568 | jkerihuel | 2009-12-02 18:07:35 +0100 (Wed, 02 Dec 2009) | 2 lines
+r3655 | jkerihuel | 2012-02-20 15:49:19 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-Fix a cast warning at compilation time for libmapi++
+Merge in r2904 from trunk: #359 - Fix some string handling issues
 
+
 ------------------------------------------------------------------------
-r1569 | occl | 2009-12-03 00:00:47 +0100 (Thu, 03 Dec 2009) | 1 line
+r3656 | jkerihuel | 2012-02-20 15:56:25 +0100 (Mon, 20 Feb 2012) | 2 lines
 
-Daily ChangeLog Update
+Merge in r2875 from trunk
+
 ------------------------------------------------------------------------
-r1570 | jkerihuel | 2009-12-08 19:18:11 +0100 (Tue, 08 Dec 2009) | 6 lines
+r3657 | jkerihuel | 2012-02-20 16:40:58 +0100 (Mon, 20 Feb 2012) | 2 lines
+
+Merge in r2334:2407 from trunk
 
-- Fix OpenChange server provisioning (exchange classes and attribute only)
-- Remove deprecated provisioning steps
-- OpenChange user provisioning is still broken at this point, but will be
-fixed in further revisions.
+------------------------------------------------------------------------
+r3658 | jkerihuel | 2012-02-20 17:00:23 +0100 (Mon, 20 Feb 2012) | 2 lines
 
+Merge in r2410 from trunk
 
 ------------------------------------------------------------------------
-r1571 | occl | 2009-12-09 00:00:50 +0100 (Wed, 09 Dec 2009) | 1 line
+r3659 | jkerihuel | 2012-02-20 17:01:36 +0100 (Mon, 20 Feb 2012) | 2 lines
 
-Daily ChangeLog Update
+Merge in r2411 from trunk
+
 ------------------------------------------------------------------------
-r1572 | jkerihuel | 2009-12-09 13:40:02 +0100 (Wed, 09 Dec 2009) | 2 lines
+r3660 | jkerihuel | 2012-02-20 17:19:01 +0100 (Mon, 20 Feb 2012) | 2 lines
 
-Forgot to commit this LDIF modifications for openchange provisioning
+Merge in r2532 from trunk
 
 ------------------------------------------------------------------------
-r1573 | jkerihuel | 2009-12-09 14:31:56 +0100 (Wed, 09 Dec 2009) | 3 lines
+r3661 | jkerihuel | 2012-02-20 17:33:39 +0100 (Mon, 20 Feb 2012) | 2 lines
+
+Merge in r2527 from trunk
 
-Fix openchange user provisioning scripts
+------------------------------------------------------------------------
+r3662 | jkerihuel | 2012-02-20 17:41:42 +0100 (Mon, 20 Feb 2012) | 2 lines
 
+Merge r2533 from trunk
 
 ------------------------------------------------------------------------
-r1574 | occl | 2009-12-10 00:00:41 +0100 (Thu, 10 Dec 2009) | 1 line
+r3663 | jkerihuel | 2012-02-20 18:08:55 +0100 (Mon, 20 Feb 2012) | 2 lines
 
-Daily ChangeLog Update
+Merge in r2535 from trunk
+
 ------------------------------------------------------------------------
-r1575 | jkerihuel | 2009-12-10 17:24:34 +0100 (Thu, 10 Dec 2009) | 12 lines
+r3664 | jkerihuel | 2012-02-20 18:28:39 +0100 (Mon, 20 Feb 2012) | 2 lines
 
-Fix OpenChange server code and access to Samba4 databases.
-Starting with samba4-alpha9, there is no more configuration.ldb or users.ldb.
-All information can be accessed through a single access to SamDB and configuration records
-accessed through ldb_get_config_basedn.
+Merge in r2537 from trunk
 
-The following implementation has been tested and is working with:
-- mapiprofile profile creation
-- openchangeclient --mailbox
-- Outlook 2003 account creation
-- Outlook 2003 mailbox opening
+------------------------------------------------------------------------
+r3665 | jkerihuel | 2012-02-20 18:30:22 +0100 (Mon, 20 Feb 2012) | 2 lines
 
+Merge in r2538 from trunk
 
 ------------------------------------------------------------------------
-r1576 | bradh | 2009-12-11 04:30:14 +0100 (Fri, 11 Dec 2009) | 7 lines
+r3666 | jkerihuel | 2012-02-20 18:50:49 +0100 (Mon, 20 Feb 2012) | 3 lines
 
-Roll to the latest Samba4 version.
+Merge in r2551:2552 from trunk
+
+
+------------------------------------------------------------------------
+r3667 | jkerihuel | 2012-02-20 18:55:58 +0100 (Mon, 20 Feb 2012) | 2 lines
 
-This should have no noticeable difference over the
-Samba4 alpha9 release, but its nice to use the latest
-version, and it might make a difference on the server
-side.
+Add Doxyfile to ignore list
 
 ------------------------------------------------------------------------
-r1577 | bradh | 2009-12-11 08:01:33 +0100 (Fri, 11 Dec 2009) | 2 lines
+r3668 | jkerihuel | 2012-02-21 12:24:21 +0100 (Tue, 21 Feb 2012) | 4 lines
 
-Update docs to match those in mapiproxy doxygen docs.
+Merge in r2563:2564 from trunk
+Add additional MAPISTORE_RETVAL_IF macro calls where needed
 
+
 ------------------------------------------------------------------------
-r1578 | jkerihuel | 2009-12-11 15:39:42 +0100 (Fri, 11 Dec 2009) | 5 lines
+r3669 | jkerihuel | 2012-02-21 15:24:41 +0100 (Tue, 21 Feb 2012) | 4 lines
 
-Fix samdb_connect warning.
-Add function prototype to nsp,emsmdb header files.
-Change samdb_ctx from void * to ldb_context *
+Merge in r2597:2601 from trunk: Introduce makepropslist script from Brad again.
+Modify script to handle missing properties used in latest openchange server version
 
 
 ------------------------------------------------------------------------
-r1579 | jkerihuel | 2009-12-11 16:49:49 +0100 (Fri, 11 Dec 2009) | 12 lines
+r3670 | jkerihuel | 2012-02-21 15:30:05 +0100 (Tue, 21 Feb 2012) | 2 lines
 
-- Replace emsabp_get_server_GUID with samdb_ntds_objectGUID Samba4
-  function.
-- Change the way we initially fetched server GUID
+Merge in LDIF file generation part of r2604 from trunk
 
-Credits to Kamen Mazdrashki <kamen.mazdrashki@postpath.com> for
-initial patch and associated research:
+------------------------------------------------------------------------
+r3671 | jkerihuel | 2012-02-21 15:33:03 +0100 (Tue, 21 Feb 2012) | 3 lines
 
-It turns out MS implementation for NSPI reads the guid from: "CN=NTDS
-Settings,CN=<NETBIOS_NAME>,CN=Servers,CN=Default-First-Site-Name,CN=Sites,<CONFIG_DN>" entry.
+Merge in r2605 from trunk and run updated makepropslist script
+ 
 
+------------------------------------------------------------------------
+r3672 | jkerihuel | 2012-02-21 15:36:36 +0100 (Tue, 21 Feb 2012) | 2 lines
 
+Merge in r2608 from trunk
 
 ------------------------------------------------------------------------
-r1580 | jkerihuel | 2009-12-11 17:08:18 +0100 (Fri, 11 Dec 2009) | 6 lines
+r3673 | jkerihuel | 2012-02-21 15:45:48 +0100 (Tue, 21 Feb 2012) | 3 lines
 
-Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+Merge in 2611 from trunk but do not remove named properties generation through mparse.pl yet.
 
-emsabp_set_PermanentEntryID() implements MS specification more
-closely.  For reference: [MS-NSPI] and [MS-OXOABK]
 
+------------------------------------------------------------------------
+r3674 | jkerihuel | 2012-02-21 15:48:42 +0100 (Tue, 21 Feb 2012) | 2 lines
 
+Merge in r2620 from trunk
+
 ------------------------------------------------------------------------
-r1581 | jkerihuel | 2009-12-11 17:23:25 +0100 (Fri, 11 Dec 2009) | 10 lines
+r3675 | jkerihuel | 2012-02-21 15:49:31 +0100 (Tue, 21 Feb 2012) | 2 lines
 
-Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+Merge in r2621 from trunk
 
-- Extend NspiDNToMId() to search in Configuration and Domain
-  partitions.
+------------------------------------------------------------------------
+r3676 | jkerihuel | 2012-02-21 16:53:26 +0100 (Tue, 21 Feb 2012) | 3 lines
 
-- NspiDNToMId() has been extended to cache returned data properly,
-  i.e. DNs from Configuration partition are cached in ttb_ctx db, DNs
-  from Domain partition are cached in in-memory db ttdb_ctx.
+Merge in r2627 from trunk and adapt it to reflect current server implementation
 
 
 ------------------------------------------------------------------------
-r1582 | jkerihuel | 2009-12-11 17:36:32 +0100 (Fri, 11 Dec 2009) | 5 lines
+r3677 | jkerihuel | 2012-02-21 16:57:27 +0100 (Tue, 21 Feb 2012) | 2 lines
 
-Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>
+Merge in r2642 from trunk
 
-Add PR_ADDRTYPE_UNICODE and PR_EMS_AB_PROXY_ADDRESSES_UNICODE getters.
+------------------------------------------------------------------------
+r3678 | jkerihuel | 2012-02-21 17:16:30 +0100 (Tue, 21 Feb 2012) | 2 lines
 
+Fix problem on a property
 
 ------------------------------------------------------------------------
-r1583 | jkerihuel | 2009-12-11 17:57:14 +0100 (Fri, 11 Dec 2009) | 5 lines
+r3679 | jkerihuel | 2012-02-21 17:17:20 +0100 (Tue, 21 Feb 2012) | 3 lines
 
-Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+Merge in r2644 from trunk
 
-Implement PR_SEARCH_KEY attribute getter
+
+------------------------------------------------------------------------
+r3680 | jkerihuel | 2012-02-21 17:21:43 +0100 (Tue, 21 Feb 2012) | 2 lines
 
+Merge in r2647 from trunk
 
 ------------------------------------------------------------------------
-r1584 | jkerihuel | 2009-12-11 23:24:49 +0100 (Fri, 11 Dec 2009) | 9 lines
+r3681 | jkerihuel | 2012-02-21 18:19:23 +0100 (Tue, 21 Feb 2012) | 3 lines
 
-Path from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+Merge in libocpf from latest trunk revision.
 
-Propagate dwFlags for incoming call to get EntryIDs correctly.
 
-Actually we need to propagate dwFlags so that emsabp_query()
-function to be able to determine whether EphemeralEntryID
-or PermanentEntryID is requested to be built.
+------------------------------------------------------------------------
+r3682 | jkerihuel | 2012-02-21 18:23:31 +0100 (Tue, 21 Feb 2012) | 2 lines
 
+Merge libmapiadmin to latest trunk rev
 
 ------------------------------------------------------------------------
-r1585 | occl | 2009-12-12 00:01:01 +0100 (Sat, 12 Dec 2009) | 1 line
+r3683 | jkerihuel | 2012-02-21 18:24:11 +0100 (Tue, 21 Feb 2012) | 2 lines
 
-Daily ChangeLog Update
+Merge in r2722 from trunk
+
 ------------------------------------------------------------------------
-r1586 | jkerihuel | 2009-12-12 14:03:06 +0100 (Sat, 12 Dec 2009) | 11 lines
+r3684 | jkerihuel | 2012-02-21 18:33:24 +0100 (Tue, 21 Feb 2012) | 2 lines
+
+Merge in r2746 from trunk
 
-Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+------------------------------------------------------------------------
+r3685 | jkerihuel | 2012-02-21 18:39:45 +0100 (Tue, 21 Feb 2012) | 2 lines
 
-NspiGetProps() reimplemented to match [MS-NSPI] specification more
-closely.
+Merge in latest exchange2mbox version from trunk
 
-As a side-effect, emsabp_fetch_attrs() was altered to return
-MAPI_E_INVALID_BOOKMARK in case requested MId is not found.  This way
-the function returns more meaningful error codes - if requested MId is
-not found this surely means InvalidBookmark rather than CorruptStore
+------------------------------------------------------------------------
+r3686 | jkerihuel | 2012-02-21 18:40:48 +0100 (Tue, 21 Feb 2012) | 2 lines
 
+Merge in r2807 from trunk
 
 ------------------------------------------------------------------------
-r1587 | jkerihuel | 2009-12-12 15:43:54 +0100 (Sat, 12 Dec 2009) | 11 lines
+r3687 | jkerihuel | 2012-02-21 18:44:03 +0100 (Tue, 21 Feb 2012) | 2 lines
+
+Merge in r2810 from trunk
 
-Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+------------------------------------------------------------------------
+r3688 | jkerihuel | 2012-02-21 18:53:17 +0100 (Tue, 21 Feb 2012) | 2 lines
 
-- Add server side implementation for NspiResolveNamesW
-- Refactor and split emsabp_verify_user in two functions
+Merge in r2811:2875 from trunk
 
-A new function emsabp_get_account_info() implemented to fetch info
-about given user name.  emsabp_verify_user() uses the above function
-check if authenticated account_name is valid mail account and if so,
-account_name is cached in emsabp context for future use
+------------------------------------------------------------------------
+r3689 | jkerihuel | 2012-02-21 19:07:27 +0100 (Tue, 21 Feb 2012) | 2 lines
 
+Merge in remaining rev from trunk
 
 ------------------------------------------------------------------------
-r1588 | jkerihuel | 2009-12-12 16:32:40 +0100 (Sat, 12 Dec 2009) | 14 lines
+r3690 | jkerihuel | 2012-02-21 19:13:29 +0100 (Tue, 21 Feb 2012) | 3 lines
+
+Rollback module changes with loadparm_context
 
-Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
 
-Implement NspiQueryRows() address list enumeration
+------------------------------------------------------------------------
+r3691 | jkerihuel | 2012-02-22 11:39:37 +0100 (Wed, 22 Feb 2012) | 3 lines
 
-We can now run openchangeclient --userlist on OpenChange NSPI server
-and Outlook 2003 is able to query GAL.
+Complete merge in libmapi from trunk
 
-Note: the initial patch was proposing:
-"(&%s(showInAddressBook=*))", purportedSearch
+
+------------------------------------------------------------------------
+r3692 | jkerihuel | 2012-02-22 12:57:50 +0100 (Wed, 22 Feb 2012) | 3 lines
 
-I replaced it with "%s", purportedSearch only since we don't have yet
-any showInAddressBook attribute in AD.
+Add 2 missing properties used by SOGo backend
 
 
 ------------------------------------------------------------------------
-r1589 | jkerihuel | 2009-12-12 16:42:17 +0100 (Sat, 12 Dec 2009) | 8 lines
+r3693 | jkerihuel | 2012-02-22 13:24:13 +0100 (Wed, 22 Feb 2012) | 2 lines
 
-Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+Add more sed entries - replace MS-OXCPROPS typo
 
-bugfix: Bugs in abp_tdb layer fixed.
+------------------------------------------------------------------------
+r3694 | jkerihuel | 2012-02-22 13:26:10 +0100 (Wed, 22 Feb 2012) | 3 lines
 
-emsabp_tdb_traverse_MId() returns 'false' (i.e. not found) in most of
-the cases.
+Update makepropslist auto-generated files
 
 
 ------------------------------------------------------------------------
-r1590 | jkerihuel | 2009-12-12 16:53:37 +0100 (Sat, 12 Dec 2009) | 5 lines
+r3695 | jkerihuel | 2012-02-22 13:34:12 +0100 (Wed, 22 Feb 2012) | 3 lines
+
+Add support for depracted PidTagConversationKey
+
 
-Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+------------------------------------------------------------------------
+r3696 | jkerihuel | 2012-02-22 18:36:54 +0100 (Wed, 22 Feb 2012) | 3 lines
 
-Fix MAPI Warning error codes
+Fix make install: ocpf.so from pyopenchange is not generated atm
 
 
 ------------------------------------------------------------------------
-r1591 | jkerihuel | 2009-12-12 17:14:53 +0100 (Sat, 12 Dec 2009) | 7 lines
+r3697 | jkerihuel | 2012-02-22 18:37:44 +0100 (Wed, 22 Feb 2012) | 6 lines
 
-Patch from Erik Hovland <erik@hovland.org>:
+Fix 11/12 of ./setup/openchange_provision.
 
-NotificationData 'could' be null. Check it before handing it to
-notification-callback(). This is important because eventually
-NotificationData will be dereferenced in the code path.
+There is a remaining error when processing modify_ldif with
+AD/oc_provision_schema_modify.ldif
 
 
 ------------------------------------------------------------------------
-r1592 | jkerihuel | 2009-12-12 17:18:04 +0100 (Sat, 12 Dec 2009) | 8 lines
+r3698 | jkerihuel | 2012-02-23 13:48:39 +0100 (Thu, 23 Feb 2012) | 9 lines
 
-Patch from Erik Hovland <erik@hovland.org>:
+Well ... sounds like our provision scripts was finally still working properly.
+However it was required to set dsdb:schema update allowed" to yes to allow schema updates.
 
-fid might be null. Check it before dereferencing in the
-ocpf_folder_lookup() call. Similar behavior fixed in openchangeclient
-folder_lookup() function.
+Conclusion:
+- Rollback to previous add/modify provision functions
+- Keep prefixmap change
+- add dsdb:schema update allowed", "yes" to allow schema changes
 
+
+------------------------------------------------------------------------
+r3699 | jkerihuel | 2012-02-23 15:34:10 +0100 (Thu, 23 Feb 2012) | 2 lines
 
+Introduce back get_property_type function used by dcesrv_exchange_emsmdb.so (oxcprop)
 
 ------------------------------------------------------------------------
-r1593 | jkerihuel | 2009-12-12 17:22:16 +0100 (Sat, 12 Dec 2009) | 8 lines
+r3700 | jkerihuel | 2012-02-23 15:34:42 +0100 (Thu, 23 Feb 2012) | 2 lines
 
-Temporary bug fix in emsabp.c - If restrictions are NULL in
-emsabp_search, return MAPI_E_INVALID_OBJECT. This prevents from using
-invalid res pointer leading in segmentation fault.
+Fix samba init module function define
 
-Initial fix proposed by Erik Hovland <erik@hovland.org>
+------------------------------------------------------------------------
+r3701 | jkerihuel | 2012-02-23 15:54:30 +0100 (Thu, 23 Feb 2012) | 3 lines
 
+Reintroduce support for PidTagDisplayName_string8 tag
 
 
 ------------------------------------------------------------------------
-r1594 | jkerihuel | 2009-12-12 21:02:54 +0100 (Sat, 12 Dec 2009) | 8 lines
+r3702 | jkerihuel | 2012-02-23 16:07:12 +0100 (Thu, 23 Feb 2012) | 4 lines
 
-Patch from Bryan Lu <brian.lu@sun.com>:
+Reintroduce support for PidTagEmailAddress STRING8
+Lack of support for this property was preventing mapiprofile
+from fetching mailbox address and caused emsmdb_connect to segfault
 
-Create symbol link only on Solaris
+------------------------------------------------------------------------
+r3703 | jkerihuel | 2012-02-23 16:07:49 +0100 (Thu, 23 Feb 2012) | 4 lines
 
-This closes ticket #221 and makes it possible to compile openchange
-on Solaris.
+Prevent openchange tools to segfault if userDN (profile's mailbox attr)
+does not exist
 
 
 ------------------------------------------------------------------------
-r1595 | occl | 2009-12-13 00:00:34 +0100 (Sun, 13 Dec 2009) | 1 line
+r3704 | jelmer | 2012-02-23 16:09:05 +0100 (Thu, 23 Feb 2012) | 5 lines
+
+Install DCE/RPC server module into location indicated by
+dcerpc_server pkg-config file.
 
-Daily ChangeLog Update
+This requires a recent git snapshot of Samba.
+
 ------------------------------------------------------------------------
-r1596 | bradh | 2009-12-13 02:40:38 +0100 (Sun, 13 Dec 2009) | 6 lines
+r3705 | jelmer | 2012-02-23 16:09:07 +0100 (Thu, 23 Feb 2012) | 1 line
 
-Add support for manually creating the library symlinks for FreeBSD
+Add modules directories to pkg-config files.
+------------------------------------------------------------------------
+r3706 | jelmer | 2012-02-23 16:09:09 +0100 (Thu, 23 Feb 2012) | 1 line
 
-This is a somewhat speculative commit. 
+Load modules from module directory.
+------------------------------------------------------------------------
+r3707 | jkerihuel | 2012-02-23 17:12:40 +0100 (Thu, 23 Feb 2012) | 3 lines
 
-Also fixes a couple of cosmetic whitespace issues.
+Prevent from symbol conflict with samba4 latest git where tdb_wrap sounds
+available to openchange. Rename copied functions with mapistore prefix
 
 ------------------------------------------------------------------------
-r1597 | bradh | 2009-12-13 04:53:10 +0100 (Sun, 13 Dec 2009) | 2 lines
+r3708 | jkerihuel | 2012-02-23 18:04:41 +0100 (Thu, 23 Feb 2012) | 5 lines
 
-Trivial fix (newline) for warning on FreeBSD compiler.
+- Fix code generation \n for reintroduced get_property_type function
+- Turn 0x in openchangedb_property into PidTag tiny names
+- update generated code
 
+
 ------------------------------------------------------------------------
-r1598 | jkerihuel | 2009-12-13 16:00:26 +0100 (Sun, 13 Dec 2009) | 5 lines
+r3709 | jkerihuel | 2012-02-24 12:01:01 +0100 (Fri, 24 Feb 2012) | 4 lines
 
-This doesn't really fix ticket #149, but this should
-at least prevent from triggering segmentation fault when
-PR_EMAIL_ADDRESS_UNICODE doesn't have any cn=Recipients,cn= substring 
+remove duplicate msExch-Proxy-Gen-Options
+Unsure why it wasn't catched earlier
 
 
 ------------------------------------------------------------------------
-r1599 | occl | 2009-12-14 00:00:40 +0100 (Mon, 14 Dec 2009) | 1 line
+r3710 | jkerihuel | 2012-02-24 12:55:27 +0100 (Fri, 24 Feb 2012) | 2 lines
 
-Daily ChangeLog Update
+Upgrade required version to samba4-alpha18
+
 ------------------------------------------------------------------------
-r1600 | bradh | 2009-12-14 10:14:41 +0100 (Mon, 14 Dec 2009) | 4 lines
+r3713 | jkerihuel | 2012-02-24 13:29:00 +0100 (Fri, 24 Feb 2012) | 3 lines
 
-Add documentation for set_SPropTagArray().
+Replace trunk with sogo-good branch
 
-Thanks to Brian Lu (Sun) for reporting.
 
 ------------------------------------------------------------------------
-r1601 | occl | 2009-12-15 00:00:42 +0100 (Tue, 15 Dec 2009) | 1 line
+r3714 | jkerihuel | 2012-02-24 14:23:22 +0100 (Fri, 24 Feb 2012) | 2 lines
+
+Fix warnings
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1602 | jkerihuel | 2009-12-15 18:35:27 +0100 (Tue, 15 Dec 2009) | 8 lines
+r3715 | jkerihuel | 2012-02-24 14:23:32 +0100 (Fri, 24 Feb 2012) | 2 lines
 
-- Make OpenChange natively working with Exchange 2010
-- Factorize binding string construction code within a single function
-- the seal flag is mandatory to connect to Exchange 2010
-- add seal boolean value to MAPI profile creation and mapi_profile
-  structure
-- add --encrypt option to mapiprofile to set the seal value
+Fix warnings
 
+------------------------------------------------------------------------
+r3716 | jkerihuel | 2012-02-24 14:44:09 +0100 (Fri, 24 Feb 2012) | 2 lines
 
+Fix server-side compilation warnings
+
 ------------------------------------------------------------------------
-r1603 | jkerihuel | 2009-12-15 19:47:29 +0100 (Tue, 15 Dec 2009) | 4 lines
+r3717 | jkerihuel | 2012-02-24 14:44:27 +0100 (Fri, 24 Feb 2012) | 3 lines
 
-Automatically switch from connect to seal on the emsmdb pipe if
-ecNotEncrypted is returned by EcDoConnect.
+Fix libmapiadmin and exchange2mbox compilation warnings
 
 
 ------------------------------------------------------------------------
-r1604 | occl | 2009-12-16 00:00:56 +0100 (Wed, 16 Dec 2009) | 1 line
+r3718 | jkerihuel | 2012-02-24 14:52:28 +0100 (Fri, 24 Feb 2012) | 2 lines
+
+Fix compilation warnings for mapistore_mgmt_messages
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1605 | bradh | 2009-12-16 01:27:24 +0100 (Wed, 16 Dec 2009) | 2 lines
+r3719 | bradh | 2012-02-25 03:33:00 +0100 (Sat, 25 Feb 2012) | 2 lines
 
-Fix a couple of typos that trash CFLAGS during build.
+Trivial docs fix
 
 ------------------------------------------------------------------------
-r1606 | jkerihuel | 2009-12-16 01:29:20 +0100 (Wed, 16 Dec 2009) | 3 lines
+r3720 | bradh | 2012-02-25 06:04:05 +0100 (Sat, 25 Feb 2012) | 2 lines
 
-Fix compilation warnings
+Update configure test for G++ to work with new autoconf.
 
+------------------------------------------------------------------------
+r3721 | bradh | 2012-02-25 06:05:51 +0100 (Sat, 25 Feb 2012) | 2 lines
 
+Don't try to install missing LDIF files.
+
 ------------------------------------------------------------------------
-r1607 | jkerihuel | 2009-12-16 02:25:16 +0100 (Wed, 16 Dec 2009) | 3 lines
+r3722 | jkerihuel | 2012-02-27 14:27:17 +0100 (Mon, 27 Feb 2012) | 10 lines
 
-Fix segfaults in mapitest launched with exchange2010
+Commit patch for issue #385:
 
+Akhil found an issue [1] in OpenChange's code, that dcerpc_EcRRegisterPushNotification_r 
+inside emsmdb_register_notification can succeed, but the retval can still be false. 
+In this case the emsmdb_register_notification returns success, but it should return failure, 
+because notifications aren't available. Evolution-mapi depends on this result code and Subscribe 
+to notifications only if this succeeded.
 
-------------------------------------------------------------------------
-r1608 | bradh | 2009-12-16 08:17:51 +0100 (Wed, 16 Dec 2009) | 2 lines
 
-Add documentation for new mapiprofile --encrypt option, introduced in r1602.
 
 ------------------------------------------------------------------------
-r1609 | bradh | 2009-12-16 22:29:02 +0100 (Wed, 16 Dec 2009) | 6 lines
+r3723 | jkerihuel | 2012-02-27 14:31:57 +0100 (Mon, 27 Feb 2012) | 9 lines
 
-Add missing -L directory specifier.
+Fix issue #384, patch from Milan Crha:
 
-Looks like this was tolerated by gnu ld, but not by opensolaris ld.
+The nspi_GetMatches currently hardcodes search result limit to 5000, 
+which results in [1], and MAPI_E_TABLE_TOO_BIG errors. It would be nice 
+to provide a new argument for the search result size limit, rather than 
+hard code it.
 
-Patch by Brian Lu (Sun). Thanks again.
 
-------------------------------------------------------------------------
-r1610 | occl | 2009-12-17 00:01:18 +0100 (Thu, 17 Dec 2009) | 1 line
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1611 | jkerihuel | 2009-12-17 08:07:31 +0100 (Thu, 17 Dec 2009) | 3 lines
+r3724 | jkerihuel | 2012-02-27 14:43:33 +0100 (Mon, 27 Feb 2012) | 8 lines
+
+Fix issue #382
+
+Patch from Olly Betts:
 
-Fix 'unused variable' warning on FreeBSD for exchange2mbox
+Avoid needlessly lpProps allocation before calling GetProps
 
 
+
 ------------------------------------------------------------------------
-r1612 | bradh | 2009-12-17 08:50:10 +0100 (Thu, 17 Dec 2009) | 2 lines
+r3725 | jkerihuel | 2012-02-27 14:56:01 +0100 (Mon, 27 Feb 2012) | 15 lines
+
+Fix issue #372, Path from Milan Crha:
+
+Proposing to return enum MAPISTATUS from RfrGetNewDSA, 
+because not doing so hides network errors, because when 
+the server is unreachable, then this function returns NULL, 
+which is later used to build_binding_string, which also returns NULL, 
+thus the provider_rpc_connection returns status INVALID_ARGUMENT, 
+thus instead of correct MAPI_E_NETWORK_ERROR as a result of Logon() 
+caller receives MAPI_E_LOGON_FAILED, thus it's hard to distinguish what to do next, 
+because this can mean also that password is incorrect. 
 
-Warning fix.
+With unreachable server is returned NT_STATUS_OBJECT_NAME_NOT_FOUND, 
+which I added to the list of known codes to map to MAPI_E_NETWORK_ERROR.
 
+
 ------------------------------------------------------------------------
-r1613 | bradh | 2009-12-17 10:47:12 +0100 (Thu, 17 Dec 2009) | 2 lines
+r3726 | jkerihuel | 2012-02-27 15:46:02 +0100 (Mon, 27 Feb 2012) | 5 lines
+
+Fix issue #376, patch from Milan Crha:
+
+Decrease usage of NULL talloc contexts to minimum
 
-Add documentation for the --freebusy option.
 
 ------------------------------------------------------------------------
-r1614 | occl | 2009-12-18 00:01:01 +0100 (Fri, 18 Dec 2009) | 1 line
+r3727 | jkerihuel | 2012-02-27 16:28:09 +0100 (Mon, 27 Feb 2012) | 5 lines
+
+Fix issue #375 - Patch from Milan Crha:
+
+Pass TALLOC_CTX directly instead of mapi_context to mapi_id_array_init
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1615 | bradh | 2009-12-18 12:22:32 +0100 (Fri, 18 Dec 2009) | 4 lines
+r3728 | jkerihuel | 2012-02-27 16:50:57 +0100 (Mon, 27 Feb 2012) | 5 lines
 
-Minor updates to provisioning instructions.
+Fix issue #377 - Patch from Milan Crha:
 
-Thanks to Girish Venkatachalam for some suggestions.
+Fix RES_NOT restriction on client side
 
+
 ------------------------------------------------------------------------
-r1616 | occl | 2009-12-19 00:01:08 +0100 (Sat, 19 Dec 2009) | 1 line
+r3729 | jkerihuel | 2012-02-28 13:17:28 +0100 (Tue, 28 Feb 2012) | 2 lines
 
-Daily ChangeLog Update
+Enable named properties back
+
 ------------------------------------------------------------------------
-r1617 | bradh | 2009-12-19 01:14:30 +0100 (Sat, 19 Dec 2009) | 7 lines
+r3730 | jkerihuel | 2012-02-28 13:36:02 +0100 (Tue, 28 Feb 2012) | 3 lines
+
+Fix duplicate define for named properties
 
-Merge in Ryan Lepinski's Google Summer of Code work on exchange2ical.
 
-See the gsoc_exchange2ical branch history for commits.
+------------------------------------------------------------------------
+r3731 | jkerihuel | 2012-02-28 13:36:33 +0100 (Tue, 28 Feb 2012) | 2 lines
 
-I also made a change to address ticket #216, and
-fixed a couple of typos.
+Prepare for 1.0 BORG release
 
 ------------------------------------------------------------------------
-r1618 | bradh | 2009-12-19 01:56:21 +0100 (Sat, 19 Dec 2009) | 3 lines
+r3732 | jkerihuel | 2012-02-28 14:32:56 +0100 (Tue, 28 Feb 2012) | 3 lines
 
-Add some missing newlines to reduce compilation noise.
+Fix issue #386 - base over patch from Milan Crha:
 
 
 ------------------------------------------------------------------------
-r1619 | jkerihuel | 2009-12-19 14:58:47 +0100 (Sat, 19 Dec 2009) | 2 lines
+r3733 | jkerihuel | 2012-02-28 14:49:05 +0100 (Tue, 28 Feb 2012) | 3 lines
 
-Minor indentation fix
+Fix issue #379
 
+
 ------------------------------------------------------------------------
-r1620 | jkerihuel | 2009-12-19 17:13:46 +0100 (Sat, 19 Dec 2009) | 9 lines
+r3734 | jkerihuel | 2012-02-28 14:57:16 +0100 (Tue, 28 Feb 2012) | 3 lines
+
+Fix issue #374 - Patch from Milan Crha
 
-- Add a macro to mparse.pl to free both mapi_response 
-  and mem_ctx within OpenChange calls implementation.
-  For the moment it is only implemented in OpenUserMailbox call.
 
-- Fix a memory leak in OpenUserMailbox: When the call failed 
-  (ecUnknownUser or ecUseEnryption) mapi_response was not free'd
-  properly.
+------------------------------------------------------------------------
+r3735 | jkerihuel | 2012-02-28 15:00:56 +0100 (Tue, 28 Feb 2012) | 2 lines
 
+Fix issue #373 - Patch from Milan Crha
 
 ------------------------------------------------------------------------
-r1621 | occl | 2009-12-20 00:00:34 +0100 (Sun, 20 Dec 2009) | 1 line
+r3736 | jkerihuel | 2012-02-28 15:15:09 +0100 (Tue, 28 Feb 2012) | 3 lines
+
+Fix issue #370. Patch from Aaron Small.
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1622 | bradh | 2009-12-20 09:14:02 +0100 (Sun, 20 Dec 2009) | 2 lines
+r3737 | jkerihuel | 2012-02-28 16:20:25 +0100 (Tue, 28 Feb 2012) | 4 lines
 
-Minor API documentation fixes.
+Revert r2750. Calling GetIDsFromNames REQUIRES proptag
+to be allocated with talloc. There's no need to reallocate there.
 
+
 ------------------------------------------------------------------------
-r1623 | jkerihuel | 2009-12-20 12:13:02 +0100 (Sun, 20 Dec 2009) | 30 lines
+r3738 | jkerihuel | 2012-02-28 16:20:48 +0100 (Tue, 28 Feb 2012) | 2 lines
 
-This patch fixes most of the leaks coming from pull_emsmdb_property() function.
-pull_emsmdb_property is using pointers and allocate memory to prevent from
-returning a local variable address. Such pointers include PT_I2, PT_I8, PT_LONG, 
-PT_ERROR or PT_BOOLEAN. Pointer's values are assigned in set_SPropValue but were
-never released/free'd. This patch implements free_emsmdb_property to fix this problem.
+Remove talloc_autofree_context call from libmapiadmin
 
-valgrind before patch (mapitest):
-==26674== LEAK SUMMARY:
-==26674==    definitely lost: 0 bytes in 0 blocks
-==26674==    indirectly lost: 0 bytes in 0 blocks
-==26674==      possibly lost: 3,264,485 bytes in 23,387 blocks
-==26674==    still reachable: 345 bytes in 2 blocks
-==26674==         suppressed: 0 bytes in 0 blocks
-==26674==
-==26674== For counts of detected and suppressed errors, rerun with: -v
-==26674== ERROR SUMMARY: 2370 errors from 2370 contexts (suppressed: 45 from 10)
+------------------------------------------------------------------------
+r3739 | jkerihuel | 2012-02-28 17:14:23 +0100 (Tue, 28 Feb 2012) | 2 lines
 
-valgrind after patch (mapitest):
-==27270== LEAK SUMMARY:
-==27270==    definitely lost: 0 bytes in 0 blocks
-==27270==    indirectly lost: 0 bytes in 0 blocks
-==27270==      possibly lost: 3,127,733 bytes in 23,293 blocks
-==27270==    still reachable: 345 bytes in 2 blocks
-==27270==         suppressed: 0 bytes in 0 blocks
-==27270==
-==27270== For counts of detected and suppressed errors, rerun with: -v
-==27270== ERROR SUMMARY: 2348 errors from 2348 contexts (suppressed: 45 from 10)
+Fix typo err
 
+------------------------------------------------------------------------
+r3740 | jkerihuel | 2012-02-28 17:15:03 +0100 (Tue, 28 Feb 2012) | 2 lines
 
+Fix typo err in AbortSubmit
 
 ------------------------------------------------------------------------
-r1624 | jkerihuel | 2009-12-20 13:33:04 +0100 (Sun, 20 Dec 2009) | 36 lines
+r3741 | jkerihuel | 2012-02-28 18:09:32 +0100 (Tue, 28 Feb 2012) | 2 lines
 
-Sanitize RfrGetNewDSA function and memory usage.
+Fix talloc parent
 
-The function was returning either a const char * passed in parameter
-or the string returned by RfrGetNewDSA call. Furthermore we were using
-the session pointer for the memory context. Finally the function description
-was not matching its behavior.
+------------------------------------------------------------------------
+r3743 | jkerihuel | 2012-02-29 13:43:30 +0100 (Wed, 29 Feb 2012) | 3 lines
 
-What this patch does:
-- use a named memory context for RfrGetNewDSA call
-- return an allocated string on success otherwise NULL
-- release RFR memory context properly
+Fix for #387 - Patch from Milan Crha
 
-valgrind before patch (mapitest):
-==28876== LEAK SUMMARY:
-==28876==    definitely lost: 0 bytes in 0 blocks
-==28876==    indirectly lost: 0 bytes in 0 blocks
-==28876==      possibly lost: 3,193,529 bytes in 23,296 blocks
-==28876==    still reachable: 345 bytes in 2 blocks
-==28876==         suppressed: 0 bytes in 0 blocks
-==28876==
-==28876== For counts of detected and suppressed errors, rerun with: -v
-==28876== ERROR SUMMARY: 2351 errors from 2351 contexts (suppressed: 45 from 10)
+
+------------------------------------------------------------------------
+r3744 | jkerihuel | 2012-02-29 16:05:32 +0100 (Wed, 29 Feb 2012) | 5 lines
 
-valgrind after patch (mapitest):
-==29083== LEAK SUMMARY:
-==29083==    definitely lost: 0 bytes in 0 blocks
-==29083==    indirectly lost: 0 bytes in 0 blocks
-==29083==      possibly lost: 3,190,285 bytes in 23,256 blocks
-==29083==    still reachable: 345 bytes in 2 blocks
-==29083==         suppressed: 0 bytes in 0 blocks
-==29083==
-==29083== For counts of detected and suppressed errors, rerun with: -v
-==29083== ERROR SUMMARY: 2338 errors from 2338 contexts (suppressed: 45 from 10)
+Fix issue #387. Patch from Milan Crha:
 
+NULL terminated utf8 strings are expected
 
 
 ------------------------------------------------------------------------
-r1625 | jkerihuel | 2009-12-20 14:57:26 +0100 (Sun, 20 Dec 2009) | 3 lines
+r3745 | ekacnet | 2012-02-29 23:18:43 +0100 (Wed, 29 Feb 2012) | 1 line
 
-Missing mapi_object_release leading in small leaks.
+Profile: zero profile, it eases to spot initialized fields
+------------------------------------------------------------------------
+r3746 | ekacnet | 2012-02-29 23:19:47 +0100 (Wed, 29 Feb 2012) | 1 line
 
+Profile: initialize the profile's context
+------------------------------------------------------------------------
+r3747 | ekacnet | 2012-02-29 23:20:02 +0100 (Wed, 29 Feb 2012) | 1 line
 
+Use nspi_GetMatches in duplicateprofile for populating the UserEmail field, with exchange 2010 the email has a couple of random chars at the end
 ------------------------------------------------------------------------
-r1626 | jkerihuel | 2009-12-20 15:14:02 +0100 (Sun, 20 Dec 2009) | 10 lines
+r3748 | jkerihuel | 2012-03-01 12:16:23 +0100 (Thu, 01 Mar 2012) | 2 lines
 
-Clarify the developer's task when using GetPropList.
+Fix compilation error: fix older than API update
 
-We were allocating the SPropTag proptag array with the session context
-pointer, which was not released with a MAPIFreeBuffer(SPropTagArray).
+------------------------------------------------------------------------
+r3749 | jkerihuel | 2012-03-01 13:37:55 +0100 (Thu, 01 Mar 2012) | 4 lines
 
-We are now using SPropTagArray pointer as parent context and clarify
-that the developer must pass an allocated SPropTagArray pointer to the
-function.
+Rollback r3728 change as it breaks pull operation on server side
+for complex Outlook restrictions.
 
 
 ------------------------------------------------------------------------
-r1627 | jkerihuel | 2009-12-20 15:40:13 +0100 (Sun, 20 Dec 2009) | 4 lines
+r3750 | jkerihuel | 2012-03-01 14:34:45 +0100 (Thu, 01 Mar 2012) | 3 lines
 
-Fix store version info assignment - Exchange version now works again
-in mapitest.
+Add mapping for PidLidRemoteTransferSize
 
 
 ------------------------------------------------------------------------
-r1628 | occl | 2009-12-21 00:01:15 +0100 (Mon, 21 Dec 2009) | 1 line
+r3751 | jkerihuel | 2012-03-01 15:12:51 +0100 (Thu, 01 Mar 2012) | 2 lines
 
-Daily ChangeLog Update
+Disable init of sam.ldb as it causes init issues with ocsmanager
+
 ------------------------------------------------------------------------
-r1629 | jkerihuel | 2009-12-21 12:27:45 +0100 (Mon, 21 Dec 2009) | 16 lines
+r3752 | jkerihuel | 2012-03-02 14:30:21 +0100 (Fri, 02 Mar 2012) | 6 lines
+
+- Add sanity check when building named_properties.ldb from ldif file (ensure provisioning worked as expected)
+- Reenable named_properties.ldif generation from mparse for now
+- Reenable installation of named_properties.ldif file
+- Remove mapi_nameid.h from libmapi.h to prevent duplicate issue in server when mapistore_nameid.h is included
+
 
-- Fix important memory leaks within the OpenChange stack. Most of the
-  leaks came from the pipe memory context used in emsmdb_transaction
-  which was only released on MAPIUninitialize and sometimes leaded in
-  lost blocks. This fix makes extensive usage of the temporary memory
-  context used in top MAPI calls implementation. This context is
-  passed in argument to emsmdb_transaction and used for dcerpc_*
-  operations.
+------------------------------------------------------------------------
+r3753 | jkerihuel | 2012-03-02 15:13:55 +0100 (Fri, 02 Mar 2012) | 5 lines
 
-  When we return from any libmapi call implementation, this context is
-  destroyed. This guarantee no extra memory within NDR layer is kept.
+Remove deprecated mapistore fsocpf module.
 
-  The only requirement for this patch to work is to make sure the data
-  we return from MAPI calls is either reparent to another memory
-  context or copied properly.
+Planned to be replaced with something new soon
 
 
 ------------------------------------------------------------------------
-r1630 | jkerihuel | 2009-12-21 12:32:55 +0100 (Mon, 21 Dec 2009) | 3 lines
+r3754 | jkerihuel | 2012-03-02 15:14:31 +0100 (Fri, 02 Mar 2012) | 3 lines
 
-Return (const void *) instead of (void *) where missing
+Remove Makefile rules for mapistore fsocpf backend
 
 
 ------------------------------------------------------------------------
-r1631 | jkerihuel | 2009-12-21 12:35:02 +0100 (Mon, 21 Dec 2009) | 3 lines
+r3755 | jkerihuel | 2012-03-02 16:22:49 +0100 (Fri, 02 Mar 2012) | 4 lines
 
-Minor changes to match our coding convention more closely
+Fix the case where properties in MS-OXCPROPS have the same propID but different prop type.
+This was for example preventing PidTagHtml from being generated.
 
 
 ------------------------------------------------------------------------
-r1632 | jkerihuel | 2009-12-21 12:38:21 +0100 (Mon, 21 Dec 2009) | 2 lines
+r3756 | jkerihuel | 2012-03-02 16:30:00 +0100 (Fri, 02 Mar 2012) | 3 lines
 
-Minor cosmetic change
+Add additional props not referenced by MS-OXCPROPS
 
+
 ------------------------------------------------------------------------
-r1633 | jkerihuel | 2009-12-21 13:13:28 +0100 (Mon, 21 Dec 2009) | 12 lines
+r3762 | jelmer | 2012-03-02 18:40:19 +0100 (Fri, 02 Mar 2012) | 2 lines
 
-- Fix important memory leaks in OpenChange NSPI stack. The memory
-  context modifications applied to the EMSMDB stack have been
-  propagated to the NSPI one. NSPI dcerpc_* functions now rely on a
-  temporary context passed in parameter to the nspi_* functions from
-  libmapi/nspi.c.
+Fix typo in $(DESTDIR).
 
-- Changes propagated to torture, mapitest, IProfAdmin interface and
-  ResolveNames function to match the internal API.
+------------------------------------------------------------------------
+r3768 | jkerihuel | 2012-03-05 15:14:47 +0100 (Mon, 05 Mar 2012) | 3 lines
 
-- Add missing MAPIFreeBuffer call in mapitest modules
+Add debug statements to help backend implementors identify missing backend calls
 
 
 ------------------------------------------------------------------------
-r1634 | jkerihuel | 2009-12-21 13:31:52 +0100 (Mon, 21 Dec 2009) | 4 lines
+r3770 | jelmer | 2012-03-05 17:12:10 +0100 (Mon, 05 Mar 2012) | 2 lines
 
-Open Profile Store using global_mapi_ctx for the memory context. This
-fix removes 20 context errors when running valgrind on mapitest.
+Remove pymapi - it's no longer built and was never anywhere near complete.
 
+------------------------------------------------------------------------
+r3773 | jelmer | 2012-03-05 19:49:19 +0100 (Mon, 05 Mar 2012) | 1 line
+
+README: Remove references to pymapi.
+------------------------------------------------------------------------
+r3774 | jelmer | 2012-03-05 19:49:28 +0100 (Mon, 05 Mar 2012) | 1 line
 
+Add mapiproxy/libmapistore/mapistore_nameid.h to bzr ignore list.
 ------------------------------------------------------------------------
-r1635 | jkerihuel | 2009-12-21 13:53:05 +0100 (Mon, 21 Dec 2009) | 6 lines
+r3775 | jelmer | 2012-03-05 19:49:34 +0100 (Mon, 05 Mar 2012) | 2 lines
 
-Patch from Johnny Jacob <johnnyjacob@gmail.com>:
+mkversion.sh: Atomically write to libmapi/version.h to prevent gcc warnings when doing parallel builds.
 
-Changed MonitorNotification to be non-blocking.
-Also checks whether to process notifications using a callback.
+------------------------------------------------------------------------
+r3779 | jkerihuel | 2012-03-06 11:01:47 +0100 (Tue, 06 Mar 2012) | 3 lines
 
+Merge in r3771:3778 from trunk
 
+
 ------------------------------------------------------------------------
-r1636 | occl | 2009-12-22 00:00:32 +0100 (Tue, 22 Dec 2009) | 1 line
+r3782 | jkerihuel | 2012-03-06 12:58:22 +0100 (Tue, 06 Mar 2012) | 4 lines
+
+Patch from Shaheed Haque <srhaque@theiet.org>:
+nspi_SeekEntries does not update the stored value
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1637 | bradh | 2009-12-22 00:22:30 +0100 (Tue, 22 Dec 2009) | 3 lines
+r3796 | jkerihuel | 2012-03-07 12:35:49 +0100 (Wed, 07 Mar 2012) | 3 lines
 
-Change the format of the server version, so it matches the Microsoft
-way of doing versions.
+Merge in r3786-3788,3794-3795 from sogo branch
 
+
 ------------------------------------------------------------------------
-r1638 | bradh | 2009-12-22 00:23:23 +0100 (Tue, 22 Dec 2009) | 3 lines
+r3797 | jkerihuel | 2012-03-07 12:52:09 +0100 (Wed, 07 Mar 2012) | 5 lines
+
+Patch from Milan Crha <mcrha@redhat.com>:
 
-Add support for skipping tests that don't apply to some
-server versions.
+Add PT_MV_CLSID support in cast_mapi_SPropValue
+
+
+------------------------------------------------------------------------
+r3806 | ekacnet | 2012-03-08 05:22:52 +0100 (Thu, 08 Mar 2012) | 1 line
 
+Fix wrong property size
 ------------------------------------------------------------------------
-r1639 | bradh | 2009-12-22 05:39:23 +0100 (Tue, 22 Dec 2009) | 2 lines
+r3839 | jelmer | 2012-03-12 21:55:34 +0100 (Mon, 12 Mar 2012) | 1 line
 
-Remove this file - converted it to trac tasks.
+Link against samba-credentials library.
+------------------------------------------------------------------------
+r3840 | jelmer | 2012-03-12 21:55:39 +0100 (Mon, 12 Mar 2012) | 1 line
 
+Link libmapipp against libmapi.
 ------------------------------------------------------------------------
-r1640 | bradh | 2009-12-22 07:07:58 +0100 (Tue, 22 Dec 2009) | 2 lines
+r3841 | jkerihuel | 2012-03-13 11:52:50 +0100 (Tue, 13 Mar 2012) | 2 lines
 
-temporary fix for building on FreeBSD 7.2.
+Merge in sogo revs r3786-3829
 
 ------------------------------------------------------------------------
-r1641 | bradh | 2009-12-22 08:33:22 +0100 (Tue, 22 Dec 2009) | 2 lines
+r3842 | jkerihuel | 2012-03-13 11:53:59 +0100 (Tue, 13 Mar 2012) | 2 lines
 
-Minor documentation update to reflect GSoC exchange2ical merge.
+deprecated TODO
 
 ------------------------------------------------------------------------
-r1642 | occl | 2009-12-23 00:00:53 +0100 (Wed, 23 Dec 2009) | 1 line
+r3843 | jkerihuel | 2012-03-13 12:10:34 +0100 (Tue, 13 Mar 2012) | 4 lines
+
+Fix a merge error in server
+Remove useless warning
+
 
-Daily ChangeLog Update
 ------------------------------------------------------------------------
-r1643 | bradh | 2009-12-23 07:03:39 +0100 (Wed, 23 Dec 2009) | 7 lines
+r3844 | jkerihuel | 2012-03-13 12:18:23 +0100 (Tue, 13 Mar 2012) | 3 lines
 
-Handle all day events for UTC+  timezones.
+Update howto.txt provisioning instructions
 
-This resolves ticket #217. Thanks to Arnout Engelen for both reporting
-the problem, and providing a patch. In the end I heavily modified the 
-patch, and implemented a much simpler version while we sort out the
-timezone identifier problems.
 
 ------------------------------------------------------------------------
-r1644 | bradh | 2009-12-23 23:45:21 +0100 (Wed, 23 Dec 2009) | 6 lines
+r3846 | jelmer | 2012-03-13 15:15:36 +0100 (Tue, 13 Mar 2012) | 1 line
 
-Add protection against null CN values.
+build ldb and samba4 with ccan as builtin-library to prevent problems with symbols.
+------------------------------------------------------------------------
+r3855 | jkerihuel | 2012-03-13 17:58:28 +0100 (Tue, 13 Mar 2012) | 4 lines
 
-Resolves ticket #232.
+Merge in r3852 from mapistore_python branch:
+Remove useless lp_ctx parameter in some emsmdb function
 
-Thanks to Arnout Engelen for the bug report and the patch to fix the problem.
 
 ------------------------------------------------------------------------
-r1645 | bradh | 2009-12-23 23:54:27 +0100 (Wed, 23 Dec 2009) | 3 lines
+r3859 | jkerihuel | 2012-03-14 09:26:51 +0100 (Wed, 14 Mar 2012) | 3 lines
 
-Fix property tag array count, so we get the language in Summary
-lines in the ical output.
+Merge latest changes from sogo branch r3841:3858
 
+
 ------------------------------------------------------------------------
-r1646 | occl | 2009-12-24 00:01:12 +0100 (Thu, 24 Dec 2009) | 1 line
+r3864 | jkerihuel | 2012-03-14 14:42:49 +0100 (Wed, 14 Mar 2012) | 3 lines
+
+Add a samba4 patch when running make samba for alpha18 on Fedora operating system
 
-Daily ChangeLog Update
+
 ------------------------------------------------------------------------
-r1647 | bradh | 2009-12-24 00:42:56 +0100 (Thu, 24 Dec 2009) | 2 lines
+r3865 | jkerihuel | 2012-03-14 16:50:07 +0100 (Wed, 14 Mar 2012) | 3 lines
 
-Fix some exchange2ical memory leaks / "still reachable" memory.
+Remove po generated files for mapistore management API
 
+
 ------------------------------------------------------------------------
-r1648 | bradh | 2009-12-24 04:30:48 +0100 (Thu, 24 Dec 2009) | 2 lines
+r3866 | jkerihuel | 2012-03-14 17:31:24 +0100 (Wed, 14 Mar 2012) | 3 lines
 
-Minor API documentation fix.
+fix implicit declaration for tevent nested loop
+fix small mgmt printf warning with ssize_t/int diff
 
 ------------------------------------------------------------------------
-r1649 | jkerihuel | 2009-12-24 14:11:15 +0100 (Thu, 24 Dec 2009) | 9 lines
+r3867 | jkerihuel | 2012-03-14 17:39:27 +0100 (Wed, 14 Mar 2012) | 3 lines
+
+Fix pymapistore.c warning
+Remove strict-aliasing requirement for python bindings
 
-New ModifyRecipients IDL and implementation.
+------------------------------------------------------------------------
+r3868 | jkerihuel | 2012-03-14 17:51:19 +0100 (Wed, 14 Mar 2012) | 2 lines
 
-This patch improves the logic within the RecipientFlags bitmask
-calculation function and make use of different MAPI properties for
-ModifyRecipients. 
+Fix warning
 
-Fix trac ticket #125 and https://bugzilla.gnome.org/show_bug.cgi?id=568763
+------------------------------------------------------------------------
+r3869 | jkerihuel | 2012-03-14 17:51:27 +0100 (Wed, 14 Mar 2012) | 2 lines
 
+Remove warning
 
 ------------------------------------------------------------------------
-r1650 | jkerihuel | 2009-12-24 14:16:45 +0100 (Thu, 24 Dec 2009) | 3 lines
+r3871 | jkerihuel | 2012-03-15 13:49:19 +0100 (Thu, 15 Mar 2012) | 5 lines
+
+Merge r3870 from sogo branch:
 
-Fix format string warnings.
+Fixed setup_path to work both from source directory or from system installation
 
 
 ------------------------------------------------------------------------
-r1651 | jkerihuel | 2009-12-24 14:21:29 +0100 (Thu, 24 Dec 2009) | 4 lines
+r3872 | jkerihuel | 2012-03-15 14:50:43 +0100 (Thu, 15 Mar 2012) | 4 lines
 
-Rename libmapi into openchange in our release script.
-Makes more sense given the scope of our releases.
+Fix python-dev cflags and libs detection
+Make it an openchange build system requirement
 
 
 ------------------------------------------------------------------------

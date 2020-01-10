@@ -2,12 +2,17 @@
 # Written by Jelmer Vernooij <jelmer@openchange.org>
 
 AC_PREREQ(2.57)
-AC_INIT(openchange, 0.9, [openchange@openchange.org])
+AC_INIT(openchange, 1.0, [openchange@openchange.org])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
 AC_DEFINE(_GNU_SOURCE, 1, [Use GNU extensions])
 
 PKG_PROG_PKG_CONFIG([0.20])
+
+if test -z "$CFLAGS";
+then
+  CFLAGS="-g";
+fi
 
 CFLAGS="-I. $CFLAGS"
 
@@ -36,7 +41,7 @@ AC_SUBST(MANUALLY_CREATE_SYMLINKS)
 AC_DEFUN([OC_CHECK_SAMBA_PATH],
 [
 	old_PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
-	PKG_CONFIG_PATH="$1/lib/pkgconfig"
+	PKG_CONFIG_PATH="$1/lib64/pkgconfig:$1/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 	export PKG_CONFIG_PATH
 	PKG_CHECK_EXISTS([samba-hostconfig], [found=1], [found=0])
 	PKG_CONFIG_PATH="$old_PKG_CONFIG_PATH"
@@ -56,7 +61,10 @@ AC_ARG_WITH(samba,
 ],[
  for p in "$prefix" /usr/local/samba /usr/local /usr
  do
-	 OC_CHECK_SAMBA_PATH($p, [sambaprefix="$p"])
+	OC_CHECK_SAMBA_PATH($p, [sambaprefix="$p"])
+	if test -n "${sambaprefix:-}"; then
+	break
+	fi
  done
 ])
 AC_SUBST(sambaprefix)
@@ -109,7 +117,7 @@ if test "x$1_set" != "xset"; then
 		AC_SUBST(OC_$2_INSTALLHEADER)
 		AC_SUBST(OC_$2_INSTALLLIB)
 	;;
-	TOOLS|TORTURE)
+	TOOLS)
 		OC_$2="$OC_$2 $1"
 		OC_$2_INSTALL="$OC_$2_INSTALL $1-install"
    		OC_$2_UNINSTALL="$OC_$2_UNINSTALL $1-uninstall"
@@ -136,7 +144,7 @@ dnl ##################################################################
 dnl Some general portability stuff
 dnl ##################################################################
 AC_CHECK_HEADERS( sys/cdefs.h string.h sys/sockio.h)
-AC_CHECK_FUNCS( strcasestr )
+AC_CHECK_FUNCS(strcasestr)
 
 
 
@@ -228,16 +236,16 @@ dnl Sun Studio Compiler
     LDFLAGS="$LDFLAGS -z ignore -R '\$\$ORIGIN/../lib'"
 elif test x"$ac_cv_c_compiler_icc" = x"yes"; then
 dnl Intel Compiler
-    COMPILER_OPTIONS_SHARED="-O3 -Wall -g3 -fstrict-aliasing -Wmissing-prototypes -Wstrict-prototypes -wd2259,188,593,869,981,181,1419,2218"
+    COMPILER_OPTIONS_SHARED="-Wall -fstrict-aliasing -Wmissing-prototypes -Wstrict-prototypes -wd2259,188,593,869,981,181,1419,2218"
     COMPILER_OPTIONS_C="$COMPILER_OPTIONS_SHARED"
     COMPILER_OPTIONS_CXX="$COMPILER_OPTIONS_SHARED"
 else
 dnl GNU Compiler
-    COMPILER_OPTIONS_SHARED="-Wall -g3 -fstrict-aliasing -Wp,-D_FORTIFY_SOURCE=2"
+    COMPILER_OPTIONS_SHARED="-Wall -fstrict-aliasing -Wp,-D_FORTIFY_SOURCE=2"
     if test "x$use_cov" = "xyes"; then
         COMPILER_OPTIONS_SHARED="-O0 $COMPILER_OPTIONS_SHARED"
     else
-        COMPILER_OPTIONS_SHARED="-O3 $COMPILER_OPTIONS_SHARED"
+        COMPILER_OPTIONS_SHARED="$COMPILER_OPTIONS_SHARED"
     fi
     COMPILER_OPTIONS_C="$COMPILER_OPTIONS_SHARED -Wmissing-prototypes -Wstrict-prototypes"
     if test "x$use_cov" = "xyes"; then
@@ -245,6 +253,10 @@ dnl GNU Compiler
         LDFLAGS="$LDFLAGS -lgcov --coverage"
     fi
     COMPILER_OPTIONS_CXX="$COMPILER_OPTIONS_SHARED"
+    if test "x$use_cov" = "xyes"; then
+        COMPILER_OPTIONS_CXX="$COMPILER_OPTIONS_CXX -fprofile-arcs -ftest-coverage"
+        LDFLAGS="$LDFLAGS -lgcov --coverage"
+    fi
 fi
 AC_SUBST(COMPILER_OPTIONS_C)
 AC_SUBST(COMPILER_OPTIONS_CXX)
@@ -291,13 +303,33 @@ dnl ---------------------------------------------------------------------------
 dnl Check for Python
 dnl ---------------------------------------------------------------------------
 
-AC_PATH_PROG(PYTHON,python)
-AC_PATH_PROG(PYTHON_CONFIG,python-config)
+AC_PATH_PROG(PYTHON, python)
+if test x"$PYTHON" = x""; then
+	AC_MSG_WARN([No version of python was found!])
+	AC_MSG_ERROR([Please install python])
+fi
+AC_SUBST(PYTHON)
+
+AC_PATH_PROG(PYTHON_CONFIG, python-config)
+if test x"$PYTHON_CONFIG" = x""; then
+	AC_MSG_WARN([No version of python-config was found!])
+	AC_MSG_ERROR([Please install python-dev 2.7])
+fi
+AC_SUBST(PYTHON_CONFIG)
+
+AC_MSG_CHECKING(python cflags)
+PYTHON_CFLAGS=`$PYTHON_CONFIG --cflags`
+AC_MSG_RESULT($PYTHON_CFLAGS)
+AC_SUBST(PYTHON_CFLAGS)
+
+AC_MSG_CHECKING(python libs)
+PYTHON_LIBS=`$PYTHON_CONFIG --libs`
+AC_MSG_RESULT($PYTHON_LIBS)
+AC_SUBST(PYTHON_LIBS)
 
 AC_MSG_CHECKING(python library directory)
 pythondir=`$PYTHON -c "from distutils import sysconfig; print sysconfig.get_python_lib(1, 0, '\\${prefix}')"`
 AC_MSG_RESULT($pythondir)
-
 AC_SUBST(pythondir)
 
 dnl ----------------------------------------------------------------------------
@@ -328,7 +360,8 @@ dnl ---------------------------------------------------------------------------
 dnl Samba4 modules
 dnl ---------------------------------------------------------------------------
 PKG_CHECK_MODULES(TALLOC, talloc)
-PKG_CHECK_MODULES(SAMBA, dcerpc ndr samba-hostconfig tevent)
+PKG_CHECK_MODULES(SAMBA, dcerpc ndr samba-hostconfig samba-util tevent samba-credentials)
+PKG_CHECK_MODULES(SAMBASERVER, dcerpc_server samdb)
 PKG_CHECK_MODULES(TDB, tdb)
 PKG_CHECK_MODULES(LDB, ldb)
 
@@ -346,6 +379,11 @@ AC_CHECK_HEADER([samba/version.h],, AC_MSG_ERROR([Could not find Samba4 headers.
 OC_CHECK_SAMBA_VERSION([$SAMBA4_RELEASE],[$SAMBA4_GIT_VER-GIT-$SAMBA4_GIT_REV])
 CPPFLAGS="$oc_save_CPPFLAGS"
 
+AC_MSG_CHECKING([for DCE/RPC server modules directory])
+DCERPC_SERVER_MODULESDIR=`$PKG_CONFIG --variable=modulesdir dcerpc_server`
+AC_SUBST(DCERPC_SERVER_MODULESDIR)
+AC_MSG_RESULT($DCERPC_SERVER_MODULESDIR)
+
 dnl ---------------------------------------------------------------------------
 dnl Finally add libmapi to the library list
 dnl ---------------------------------------------------------------------------
@@ -355,6 +393,62 @@ dnl nasty hack: only compile IDL if we have a library
 dnl libraries require libmapi and libmapi require IDL
 OC_IDL="idl"
 AC_SUBST(OC_IDL)
+
+dnl ---------------------------------------------------------------------------
+dnl Check for dl libs
+dnl ---------------------------------------------------------------------------
+
+AC_CHECK_LIB([dl], [dlopen],
+	    [
+		 	DL_LIBS="-ldl"
+			AC_SUBST(DL_LIBS)
+		],
+		[
+			AC_CHECK_FUNCS(dlopen, [
+				DL_LIBS=""
+				AC_SUBST(DL_LIBS)
+			], [
+				AC_MSG_ERROR([unable to find dlopen])
+		 	])
+		])
+
+dnl ---------------------------------------------------------------------------
+dnl Check for pthread libs
+dnl ---------------------------------------------------------------------------
+enable_pthread=no
+enable_thread_lib=""
+AC_CHECK_LIB([pthread], [pthread_mutex_init],
+	     [
+		AC_DEFINE(HAVE_PTHREADS, 1, [Define if you want to use pthread for thread safety])
+		THREAD_LIBS=-lpthread
+	     	enable_pthread="yes"
+		enable_thread_lib="(pthread)"
+	     ],
+	     [
+	     AC_MSG_WARN([pthread is missing - library is not thread safe])
+	     enable_pthread="no"
+	     ])
+
+if test x"$enable_pthread" = x"no"; then
+	dnl Check for gthread-2.0 / glib based implementation
+   	PKG_CHECK_MODULES(GTHREAD, gthread-2.0, 
+		[
+			AC_DEFINE(HAVE_GTHREAD, 1, [Define if you want to use gthread for thread safety])
+			THREAD_LIBS=$GTHREAD_LIBS
+			THREAD_CFLAGS=$GTHREAD_CFLAGS
+			enable_pthread=yes
+			enable_thread_lib="(gthread)"
+		], 
+		[
+			enable_pthread=no
+		])
+fi
+
+AC_SUBST(THREAD_LIBS)
+AC_SUBST(THREAD_CFLAGS)
+
+dnl Additional thread library detection is required here:
+dnl FreeBSD (pthreads), glib etc.
 
 dnl ###########################################################################
 dnl libmapi++ dependencies
@@ -366,7 +460,7 @@ dnl ---------------------------------------------------------------------------
 AC_CACHE_CHECK([C++ compiler availability], [ac_cv_libmapixx_gxx_works],
 	       [
 		AC_LANG_PUSH([C++])
-		AC_COMPILE_IFELSE([int main() { return 0; }], 
+		AC_COMPILE_IFELSE([AC_LANG_SOURCE([[int main() { return 0; }]])], 
 				  [ac_cv_libmapixx_gxx_works=yes],
 				  [ac_cv_libmapixx_gxx_works=no])
 		AC_LANG_POP([C++])
@@ -432,7 +526,7 @@ PKG_CHECK_EXISTS([ dcerpc_samr ],
 		])
 
 if test x"$enable_libmapiadmin" = x"yes"; then
-   	PKG_CHECK_MODULES(SAMR, dcerpc_samr)
+   	PKG_CHECK_MODULES(SAMR, dcerpc_samr ndr_standard)
 	OC_RULE_ADD(libmapiadmin, LIBS)
 fi
 
@@ -448,6 +542,8 @@ dnl --------------------------------------------------------------------------
 PKG_CHECK_MODULES([ICAL], [libical], [have_libical="yes"], [have_libical="no"])
 AC_SUBST(ICAL_CFLAGS)
 AC_SUBST(ICAL_LIBS)
+PKG_CHECK_MODULES([ICAL_0_46], [libical >= 0.46], [have_libical_0_46="1"], [have_libical_0_46="0"])
+AC_SUBST(have_libical_0_46)
 
 dnl --------------------------------------------------------------------------
 dnl Check for popt
@@ -471,17 +567,22 @@ if test x"$enable_libpopt" = x"yes"; then
 
 	if test x"$enable_libocpf" = x"yes"; then
 	   OC_RULE_ADD(openchangeclient, TOOLS)
+           #	   OC_RULE_ADD(mapistore_fsocpf, MAPISTORE)
 	fi
 
 	if test x"$have_libical" = x"yes"; then
 	    OC_RULE_ADD(exchange2ical, TOOLS)
 	fi
 
+	MAPISTORE_TEST=mapistore_test
 	OC_RULE_ADD(mapiprofile, TOOLS)
 	OC_RULE_ADD(openchangemapidump, TOOLS)
 	OC_RULE_ADD(schemaIDGUID, TOOLS)
-	OC_RULE_ADD(locale_codepage, TOOLS)
+
+	OC_RULE_ADD(check_fasttransfer, TOOLS)
+	OC_RULE_ADD(test_asyncnotif, TOOLS)
 fi
+AC_SUBST(MAPISTORE_TEST)
 
 dnl --------------------------------------------------------------------------
 dnl Check for libmagic
@@ -508,36 +609,36 @@ if test x"$enable_libmagic" = x"yes"; then
 	fi
 fi
 
+dnl ##########################################################################
+dnl libmapistore dependencies
+dnl ##########################################################################
+
+AC_CHECK_LIB([rt], [mq_open],
+	    [
+		 	RT_LIBS="-lrt"
+			AC_SUBST(RT_LIBS)
+		],
+		[
+			AC_CHECK_FUNCS(mq_open, [
+				RT_LIBS=""
+				AC_SUBST(RT_LIBS)
+			], [
+				AC_MSG_ERROR([unable to find mq_open])
+		 	])
+		])
 
 dnl ##########################################################################
 dnl libmapistore backends dependencies
 dnl ##########################################################################
 
-dnl --------------------------------------------------------------------------
-dnl Check for sqlite3
-dnl --------------------------------------------------------------------------
-PKG_CHECK_MODULES(SQLITE, sqlite3, SQLITEFOUND=yes, [SQLITEFOUND=no])
-AC_SUBST(SQLITE_CFLAGS)
-AC_SUBST(SQLITE_LIBS)
-
-if test x"$SQLITEFOUND" = x"yes"; then
-   OC_RULE_ADD(mapistore_sqlite3, MAPISTORE)
-else
-   enable_mapistore_sqlite3="no"
-fi
-
-
-dnl ##########################################################################
-dnl torture dependencies
-dnl ##########################################################################
-AC_PATH_PROG([SMBTORTURE], [smbtorture], no)
-
-if test x"$SMBTORTURE" != x""; then
-   	TORTURE_MODULESDIR=`$PKG_CONFIG --variable=modulesdir torture`
-   	AC_SUBST(TORTURE_MODULESDIR)
-   	OC_RULE_ADD(torture, TORTURE)
-fi
-
+OC_MAPISTORE=
+OC_MAPISTORE_CLEAN=
+OC_MAPISTORE_INSTALL=
+OC_MAPISTORE_UNINSTALL=
+AC_SUBST(OC_MAPISTORE)
+AC_SUBST(OC_MAPISTORE_CLEAN)
+AC_SUBST(OC_MAPISTORE_INSTALL)
+AC_SUBST(OC_MAPISTORE_UNINSTALL)
 
 dnl ##########################################################################
 dnl mapiproxy server
@@ -554,50 +655,24 @@ AC_ARG_WITH(modulesdir,
 AC_SUBST(modulesdir)
 
 dnl ##########################################################################
-dnl Swig bindings dependencies
-dnl ##########################################################################
-AC_ARG_ENABLE(swig-perl, AC_HELP_STRING([--enable-swig-perl],
-			   [build SWIG interfaces for Perl]),
-			   enable_perlswig="$enableval")
-if test "x${enable_perlswig}" = xyes; then
-   AC_PATH_PROG(SWIG, swig)
-
-   if test -z "$SWIG"
-      then
-	AC_MSG_ERROR(Please install swig)
-   fi
-
-   SWIGDIRSALL="swigperl-all"
-   SWIGDIRSINSTALL="swigperl-install"
-   SWIGDIRSUNINSTALL="swigperl-uninstall"
-fi
-
-PERL5DIR=`$PERL -e 'use Config; my $dir = $Config{sitelib}; print $dir'`
-AC_SUBST(PERL5DIR)
-
-AC_SUBST(SWIGDIRSALL)
-AC_SUBST(SWIGDIRSINSTALL)
-AC_SUBST(SWIGDIRSUNINSTALL)
-
-dnl ##########################################################################
 dnl Python bindings dependencies
 dnl ##########################################################################
 AC_ARG_ENABLE(pymapi, AC_HELP_STRING([--enable-pymapi],
 			   [build Python bindings for libmapi]),
 			   enable_pymapi="$enableval",
 			   enable_pymapi=no)
-if test "x${enable_pymapi}" = xyes; then
-   PYMAPIALL="pymapi"
-   PYMAPIINSTALL="pymapi-install"
-   PYMAPIUNINSTALL="pymapi-uninstall"
-fi
-
 PYCDIR=`$PYTHON -c "import distutils.sysconfig; print distutils.sysconfig.get_python_lib(1, prefix='\\$(prefix)')"`
 AC_SUBST(PYCDIR)
+
+dnl Enable pyopenchange by default
+PYMAPIALL="$PYMAPIALL pyopenchange"
+PYMAPIINSTALL="$PYMAPIALLINSTALL pyopenchange-install"
+PYMAPIUNINSTALL="$PYMAPIUNINSTALL pyopenchange-uninstall"
 
 AC_SUBST(PYMAPIALL)
 AC_SUBST(PYMAPIINSTALL)
 AC_SUBST(PYMAPIUNINSTALL)
+
 
 dnl ##########################################################################
 dnl Documentation dependencies
@@ -611,13 +686,57 @@ else
 	AC_SUBST(DOXYGEN)
 fi
 
+dnl ##########################################################################
+dnl (Optional) subunit support in mapitest
+dnl ##########################################################################
+PKG_CHECK_MODULES(SUBUNIT, libsubunit, found_subunit=yes, found_subunit=no)
+AC_SUBST(SUBUNIT_CFLAGS)
+AC_SUBST(SUBUNIT_LIBS)
+
+if test x"$found_subunit" = x"yes"; then
+	AC_DEFINE(HAVE_SUBUNIT, 1, [Define if you want to use subunit])
+	have_subunit="yes"
+else
+	have_subunit="no"
+fi
+
+dnl ##########################################################################
+dnl Qt4 support
+dnl ##########################################################################
+AC_ARG_ENABLE(openchange-qt4,
+              AC_HELP_STRING([--enable-openchange-qt4],
+                             [Compile OpenChange Qt4 wrapper.]),
+              enable_openchange_qt4=$enableval,
+              enable_openchange_qt4="no")
+if test x$enable_openchange_qt4 = xyes; then
+  PKG_CHECK_MODULES(Qt4,
+                    QtCore >= 4.3.0 QtGui >= 4.3.0)
+  MOC=`$PKG_CONFIG --variable=moc_location QtCore`
+elif test x$enable_openchange_qt4 = xtry; then
+  PKG_CHECK_MODULES(Qt4,
+                    QtCore >= 4.3.0 QtGui >= 4.3.0,
+                    [enable_openchange_qt4="yes"
+                     MOC=`$PKG_CONFIG --variable=moc_location QtCore`],
+                    [enable_openchange_qt4="no"])
+fi
+
+AC_SUBST(Qt4_CFLAGS)
+AC_SUBST(Qt4_LIBS)
+AC_SUBST(MOC)
+
+if test "x$enable_openchange_qt4" = "xyes"; then
+   OPENCHANGE_QT4="openchange_qt4"
+fi
+AC_SUBST(OPENCHANGE_QT4)
+
 dnl ***********************
 dnl Makefiles 
 dnl ***********************
 AC_CONFIG_FILES([config.mk libmapi.pc libmapiadmin.pc libocpf.pc mapiproxy/libmapiproxy.pc
-		 mapiproxy/libmapiserver.pc mapiproxy/libmapistore.pc Doxyfile libmapi++/Doxyfile 
-		 libocpf/Doxyfile libmapiadmin/Doxyfile libmapi/Doxyfile mapiproxy/Doxyfile 
-		 utils/mapitest/Doxyfile])
+		 mapiproxy/libmapiserver.pc mapiproxy/libmapistore.pc libmapi++.pc
+		 Doxyfile libmapi++/Doxyfile libocpf/Doxyfile libmapiadmin/Doxyfile
+		 libmapi/Doxyfile mapiproxy/Doxyfile utils/mapitest/Doxyfile
+		 mapiproxy/libmapistore/Doxyfile])
 AC_OUTPUT
 
 
@@ -638,25 +757,19 @@ OC_SETVAL(exchange2ical)
 OC_SETVAL(mapitest)
 OC_SETVAL(openchangemapidump)
 OC_SETVAL(schemaIDGUID)
-OC_SETVAL(locale_codepage)
 OC_SETVAL(mapiproxy)
 
-OC_SETVAL(torture)
 OC_SETVAL(doxygen)
-OC_SETVAL(perlswig)
 
 AC_MSG_RESULT([
 
 ===============================================================
 OpenChange Configuration (Please review)
 
-	   * Install:
-	     - prefix:			$prefix
-
-	   * OpenChange MAPI library:	$enable_libmapi
-
 	   * OpenChange Libraries:
-	     - libmapi++:		$enable_libmapixx
+	     - libmapi (C library):	$enable_libmapi
+		      Thread support:	$enable_pthread $enable_thread_lib
+	     - libmapi++ (C++ library):	$enable_libmapixx
 	     - libmapiadmin:		$enable_libmapiadmin
 	     - libocpf:			$enable_libocpf
 
@@ -664,7 +777,7 @@ OpenChange Configuration (Please review)
 	     - mapiproxy:		$enable_mapiproxy
 
 	   * OpenChange mapistore backends:
-	     - sqlite3:			$enable_mapistore_sqlite3
+	     - backends dependencies goes here
 
 	   * OpenChange Tools:
 	     - openchangeclient:	$enable_openchangeclient
@@ -675,18 +788,17 @@ OpenChange Configuration (Please review)
 	     - mapitest:		$enable_mapitest
 	     - openchangemapidump:	$enable_openchangemapidump
 	     - schemaIDGUID:		$enable_schemaIDGUID
-	     - locale_codepage:		$enable_locale_codepage
 
-	   * OpenChange Torture Suite:	$enable_torture
+	   * subunit format (mapitest):	$have_subunit
 
 	   * OpenChange Documentation:	$enable_doxygen
 
 	   * Coverage Tests:		$use_cov
 
 	   * OpenChange Bindings:
-	     - Perl:			$enable_perlswig
-	     - Python:			$enable_pymapi
+	     - Qt4:			$enable_openchange_qt4
 
+	   * Installation prefix:	$prefix
 
 ===============================================================
 

@@ -21,6 +21,8 @@
 
 #include "mapiproxy/dcesrv_mapiproxy.h"
 #include "mapiproxy/dcesrv_mapiproxy_proto.h"
+#include "libmapi/mapidefs.h"
+#include "libmapi/property_altnames.h"
 
 /**
    \file dcesrv_mapiproxy_nspi.c
@@ -100,9 +102,9 @@ bool mapiproxy_NspiGetProps(struct dcesrv_call_state *dce_call, struct NspiGetPr
 	/* Step 3. Modify Exchange binding strings and only return ncacn_ip_tcp */
 	slpstr->cValues = 1;
 	slpstr->lppszA[0] = talloc_asprintf(dce_call, "ncacn_ip_tcp:%s.%s", 
-					    lp_netbios_name(dce_call->conn->dce_ctx->lp_ctx), 
-					    lp_realm(dce_call->conn->dce_ctx->lp_ctx));
-	strlower_m((char *)slpstr->lppszA[0]);
+					    lpcfg_netbios_name(dce_call->conn->dce_ctx->lp_ctx), 
+					    lpcfg_realm(dce_call->conn->dce_ctx->lp_ctx));
+	slpstr->lppszA[0] = strlower_talloc(dce_call, slpstr->lppszA[0]);
 
 	return true;
 }
@@ -158,14 +160,14 @@ bool mapiproxy_NspiQueryRows(struct dcesrv_call_state *dce_call, struct NspiQuer
 	if (private->exchname) {
 		if (strstr(lpProp->value.lpszA, private->exchname)) {
 			lpProp->value.lpszA = string_sub_talloc((TALLOC_CTX *) dce_call, lpProp->value.lpszA, private->exchname, 
-								lp_netbios_name(dce_call->conn->dce_ctx->lp_ctx));	
+								lpcfg_netbios_name(dce_call->conn->dce_ctx->lp_ctx));	
 		}
 	} else {
 		lpszA = talloc_strdup(dce_call, lpProp->value.lpszA);
 		if ((exchname = x500_get_servername(lpszA))) {
 			private->exchname = talloc_strdup(NULL, exchname);
 			lpProp->value.lpszA = string_sub_talloc((TALLOC_CTX *) dce_call, lpProp->value.lpszA, exchname, 
-								lp_netbios_name(dce_call->conn->dce_ctx->lp_ctx));
+								lpcfg_netbios_name(dce_call->conn->dce_ctx->lp_ctx));
 			talloc_free(exchname);
 		}
 		talloc_free(lpszA);
@@ -193,7 +195,7 @@ bool mapiproxy_NspiDNToMId(struct dcesrv_call_state *dce_call, struct NspiDNToMI
 	uint32_t			i;
 
 	private = dce_call->context->private_data;
-	proxyname = lp_netbios_name(dce_call->conn->dce_ctx->lp_ctx);
+	proxyname = lpcfg_netbios_name(dce_call->conn->dce_ctx->lp_ctx);
 
 	if (!private->exchname) return false;
 

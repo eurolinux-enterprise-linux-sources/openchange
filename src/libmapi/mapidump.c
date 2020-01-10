@@ -1,7 +1,7 @@
 /*
    OpenChange MAPI implementation.
 
-   Copyright (C) Julien Kerihuel 2007-2008.
+   Copyright (C) Julien Kerihuel 2007-2011.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,9 +17,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/mapidump.h>
-#include <libmapi/defs_private.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
+#include "libmapi/mapi_nameid.h"
+#include "libmapi/mapidump.h"
 #include <time.h>
 
 #ifdef ENABLE_ASSERTS
@@ -35,12 +36,21 @@
    \brief Functions for displaying various data structures, mainly for debugging
  */
 
+/**
+  Output one property tag and value
+
+  \param lpProp the property to print
+  \param sep a separator / spacer to insert in front of the label
+*/
 _PUBLIC_ void mapidump_SPropValue(struct SPropValue lpProp, const char *sep)
 {
 	const char			*proptag;
 	const void			*data;
 	TALLOC_CTX			*mem_ctx = NULL;
 	const struct StringArray_r	*StringArray_r = NULL;
+	const struct StringArrayW_r	*StringArrayW_r = NULL;
+	const struct BinaryArray_r	*BinaryArray_r = NULL;
+	const struct LongArray_r	*LongArray_r = NULL;
 	uint32_t			i;
 
 	proptag = get_proptag_name(lpProp.ulPropTag);
@@ -55,6 +65,15 @@ _PUBLIC_ void mapidump_SPropValue(struct SPropValue lpProp, const char *sep)
 		data = get_SPropValue_data(&lpProp);
 		printf("%s%s: 0x%x\n", sep?sep:"", proptag, (*(const uint16_t *)data));
 		break;
+	case PT_LONG:
+	case PT_OBJECT:
+		data = get_SPropValue_data(&lpProp);
+		printf("%s%s: %u\n", sep?sep:"", proptag, (*(const uint32_t *)data));
+		break;
+	case PT_DOUBLE:
+		data = get_SPropValue_data(&lpProp);
+		printf("%s%s: %f\n", sep?sep:"", proptag, (*(const double *)data));
+		break;
 	case PT_BOOLEAN:
 		data = get_SPropValue_data(&lpProp);
 		printf("%s%s: 0x%x\n", sep?sep:"", proptag, (*(const uint8_t *)data));
@@ -66,7 +85,17 @@ _PUBLIC_ void mapidump_SPropValue(struct SPropValue lpProp, const char *sep)
 	case PT_STRING8:
 	case PT_UNICODE:
 		data = get_SPropValue_data(&lpProp);
-		printf("%s%s: %s\n", sep?sep:"", proptag, (data && (*(const uint32_t *)data) != MAPI_E_NOT_FOUND) ? (const char *)data : "NULL");
+		printf("%s%s:", sep?sep:"", proptag);
+		if (data && ((*(const uint16_t *)data) == 0x0000)) {
+			/* its an empty string */
+			printf("\n");
+		} else if (data && ((*(enum MAPISTATUS *)data) != MAPI_E_NOT_FOUND)) {
+			/* its a valid string */
+			printf(" %s\n", (const char *)data);
+		} else {
+			/* its a null or otherwise problematic string */
+			printf(" (NULL)\n");
+		}
 		break;
 	case PT_SYSTIME:
 		mapidump_date_SPropValue(lpProp, proptag, sep);
@@ -75,14 +104,33 @@ _PUBLIC_ void mapidump_SPropValue(struct SPropValue lpProp, const char *sep)
 		data = get_SPropValue_data(&lpProp);
 		printf("%s%s_ERROR: 0x%.8x\n", sep?sep:"", proptag, (*(const uint32_t *)data));
 		break;
-	case PT_LONG:
-		data = get_SPropValue_data(&lpProp);
-		printf("%s%s: %u\n", sep?sep:"", proptag, (*(const uint32_t *)data));
+	case PT_CLSID:
+	{
+	  const uint8_t *ab = (const uint8_t *) get_SPropValue_data(&lpProp);
+		printf("%s%s: ", sep?sep:"", proptag);
+		for (i = 0; i < 15; ++i) {
+			printf("%02x ", ab[i]);
+		}
+		printf("%x\n", ab[15]);
 		break;
+	}
+	case PT_SVREID:
 	case PT_BINARY:
 		data = get_SPropValue_data(&lpProp);
-		printf("%s%s:\n", sep?sep:"", proptag);
-		dump_data(0, ((const struct Binary_r *)data)->lpb, ((const struct Binary_r *)data)->cb);
+		if (data) {
+			printf("%s%s:\n", sep?sep:"", proptag);
+			dump_data(0, ((const struct Binary_r *)data)->lpb, ((const struct Binary_r *)data)->cb);
+		} else {
+			printf("%s%s: (NULL)\n", sep?sep:"", proptag);
+		}
+		break;
+	case PT_MV_LONG:
+		LongArray_r = (const struct LongArray_r *) get_SPropValue_data(&lpProp);
+		printf("%s%s ", sep?sep:"", proptag);
+		for (i = 0; i < LongArray_r->cValues - 1; i++) {
+			printf("0x%.8x, ", LongArray_r->lpl[i]);
+		}
+		printf("0x%.8x\n", LongArray_r->lpl[i]);
 		break;
 	case PT_MV_STRING8:
 		StringArray_r = (const struct StringArray_r *) get_SPropValue_data(&lpProp);
@@ -91,6 +139,22 @@ _PUBLIC_ void mapidump_SPropValue(struct SPropValue lpProp, const char *sep)
 			printf("%s, ", StringArray_r->lppszA[i]);
 		}
 		printf("%s\n", StringArray_r->lppszA[i]);
+		break;
+	case PT_MV_UNICODE:
+		StringArrayW_r = (const struct StringArrayW_r *) get_SPropValue_data(&lpProp);
+		printf("%s%s: ", sep?sep:"", proptag);
+		for (i = 0; i < StringArrayW_r->cValues - 1; i++) {
+			printf("%s, ", StringArrayW_r->lppszW[i]);
+		}
+		printf("%s\n", StringArrayW_r->lppszW[i]);
+		break;
+	case PT_MV_BINARY:
+		BinaryArray_r = (const struct BinaryArray_r *) get_SPropValue_data(&lpProp);
+		printf("%s%s: ARRAY(%d)\n", sep?sep:"", proptag, BinaryArray_r->cValues);
+		for (i = 0; i < BinaryArray_r->cValues; i++) {
+			printf("\tPT_MV_BINARY [%d]:\n", i);
+			dump_data(0, BinaryArray_r->lpbin[i].lpb, BinaryArray_r->lpbin[i].cb);
+		}
 		break;
 	default:
 		/* If you hit this assert, you'll need to implement whatever type is missing */
@@ -144,7 +208,17 @@ _PUBLIC_ void mapidump_SRow(struct SRow *aRow, const char *sep)
 	}
 }
 
-
+/**
+  Output a row of the public address book
+  
+  \param aRow one row of the public address book (Global Address List)
+  
+  This function is usually used with GetGALTable, which can obtain several
+  rows at once - you'll need to iterate over the rows.
+  
+  The SRow is assumed to contain entries for PR_ADDRTYPE_UNICODE, PR_DISPLAY_NAME_UNICODE,
+  PR_EMAIL_ADDRESS_UNICODE and PR_ACCOUNT_UNICODE.
+*/
 _PUBLIC_ void mapidump_PAB_entry(struct SRow *aRow)
 {
 	const char	*addrtype;
@@ -163,13 +237,13 @@ _PUBLIC_ void mapidump_PAB_entry(struct SRow *aRow)
 }
 
 
-_PUBLIC_ void mapidump_Recipients(const char **usernames, struct SRowSet *rowset, struct SPropTagArray *flaglist)
+_PUBLIC_ void mapidump_Recipients(const char **usernames, struct SRowSet *rowset, struct PropertyTagArray_r *flaglist)
 {
 	uint32_t		i;
 	uint32_t		j;
 
 	for (i = 0, j= 0; i < flaglist->cValues; i++) {
-		switch (flaglist->aulPropTag[i]) {
+	  switch ((int)flaglist->aulPropTag[i]) {
 		case MAPI_UNRESOLVED:
 			printf("\tUNRESOLVED (%s)\n", usernames[i]);
 			break;
@@ -244,6 +318,62 @@ _PUBLIC_ void mapidump_date_SPropValue(struct SPropValue lpProp, const char *lab
 }
 
 /**
+   \details This function dumps message information retrieved from
+   OpenMessage call. It provides a quick method to print message
+   summaries with information such as subject and recipients.
+
+   \param obj_message pointer to the MAPI message object to use
+ */
+_PUBLIC_ void mapidump_message_summary(mapi_object_t *obj_message)
+{
+	mapi_object_message_t		*msg;
+	int				*recipient_type;
+	const char			*recipient;
+	uint32_t			i;
+
+	if (!obj_message) return;
+	if (!obj_message->private_data) return;
+
+	msg = (mapi_object_message_t *) obj_message->private_data;
+
+	printf("Subject: ");
+	if (msg->SubjectPrefix) {
+		printf("[%s] ", msg->SubjectPrefix);
+	}
+
+	if (msg->NormalizedSubject) {
+		printf("%s", msg->NormalizedSubject);
+	}
+	printf("\n");
+
+	if (!&(msg->SRowSet)) return;
+	for (i = 0; i < msg->SRowSet.cRows; i++) {
+		recipient_type = (int *) find_SPropValue_data(&(msg->SRowSet.aRow[i]), PR_RECIPIENT_TYPE);
+		recipient = (const char *) find_SPropValue_data(&(msg->SRowSet.aRow[i]), PR_SMTP_ADDRESS_UNICODE);
+		if (!recipient) {
+			recipient = (const char *) find_SPropValue_data(&(msg->SRowSet.aRow[i]), PR_SMTP_ADDRESS);
+		}
+		if (recipient_type && recipient) {
+			switch (*recipient_type) {
+			case MAPI_ORIG:
+				printf("From: %s\n", recipient);
+				break;
+			case MAPI_TO:
+				printf("To: %s\n", recipient);
+				break;
+			case MAPI_CC:
+				printf("Cc: %s\n", recipient);
+				break;
+			case MAPI_BCC:
+				printf("Bcc: %s\n", recipient);
+				break;
+			}
+		}
+	}
+	printf("\n");
+}
+
+/**
    \details This function dumps the properties relating to an email message to standard output
 
    The expected way to obtain the properties array is to use OpenMessage() to obtain the
@@ -251,10 +381,11 @@ _PUBLIC_ void mapidump_date_SPropValue(struct SPropValue lpProp, const char *lab
 
    \param properties array of message properties
    \param id identification to display for the message (can be NULL)
+   \param obj_msg pointer to the message MAPI object (can be NULL)
 
    \sa mapidump_appointment, mapidump_contact, mapidump_task, mapidump_note
 */
-_PUBLIC_ void mapidump_message(struct mapi_SPropValue_array *properties, const char *id)
+_PUBLIC_ void mapidump_message(struct mapi_SPropValue_array *properties, const char *id, mapi_object_t *obj_msg)
 {
 	const char			*msgid;
 	const char			*from;
@@ -267,21 +398,32 @@ _PUBLIC_ void mapidump_message(struct mapi_SPropValue_array *properties, const c
 	const struct SBinary_short	*html = NULL;
 	const uint8_t			*has_attach;
 	const uint32_t       		*cp;
-	ssize_t				len;
 
-	msgid = (const char *)find_mapi_SPropValue_data(properties, PR_INTERNET_MESSAGE_ID);
-	subject = (const char *) find_mapi_SPropValue_data(properties, PR_CONVERSATION_TOPIC);
-	body = (const char *) find_mapi_SPropValue_data(properties, PR_BODY);
+	msgid = (const char *)find_mapi_SPropValue_data(properties, PR_INTERNET_MESSAGE_ID_UNICODE);
+	if (!msgid)
+		msgid = (const char *)find_mapi_SPropValue_data(properties, PR_INTERNET_MESSAGE_ID);
+	subject = (const char *) find_mapi_SPropValue_data(properties, PR_CONVERSATION_TOPIC_UNICODE);
+	if (!subject)
+		subject = (const char *) find_mapi_SPropValue_data(properties, PR_CONVERSATION_TOPIC);
+	body = (const char *) find_mapi_SPropValue_data(properties, PR_BODY_UNICODE);
 	if (!body) {
-		body = (const char *) find_mapi_SPropValue_data(properties, PR_BODY_UNICODE);
+		body = (const char *) find_mapi_SPropValue_data(properties, PR_BODY);
 		if (!body) {
 			html = (const struct SBinary_short *) find_mapi_SPropValue_data(properties, PR_HTML);
 		}
 	}
-	from = (const char *) find_mapi_SPropValue_data(properties, PR_SENT_REPRESENTING_NAME);
-	to = (const char *) find_mapi_SPropValue_data(properties, PR_DISPLAY_TO);
-	cc = (const char *) find_mapi_SPropValue_data(properties, PR_DISPLAY_CC);
-	bcc = (const char *) find_mapi_SPropValue_data(properties, PR_DISPLAY_BCC);
+	from = (const char *) find_mapi_SPropValue_data(properties, PR_SENT_REPRESENTING_NAME_UNICODE);
+	if (!from)
+		from = (const char *) find_mapi_SPropValue_data(properties, PR_SENT_REPRESENTING_NAME);
+	to = (const char *) find_mapi_SPropValue_data(properties, PR_DISPLAY_TO_UNICODE);
+	if (!to)
+		to = (const char *) find_mapi_SPropValue_data(properties, PR_DISPLAY_TO);
+	cc = (const char *) find_mapi_SPropValue_data(properties, PR_DISPLAY_CC_UNICODE);
+	if (!cc)
+		cc = (const char *) find_mapi_SPropValue_data(properties, PR_DISPLAY_CC);
+	bcc = (const char *) find_mapi_SPropValue_data(properties, PR_DISPLAY_BCC_UNICODE);
+	if (!bcc)
+		bcc = (const char *) find_mapi_SPropValue_data(properties, PR_DISPLAY_BCC);
 
 	has_attach = (const uint8_t *)find_mapi_SPropValue_data(properties, PR_HASATTACH);
 
@@ -312,11 +454,15 @@ _PUBLIC_ void mapidump_message(struct mapi_SPropValue_array *properties, const c
 
 	printf("+-------------------------------------+\n");
 	printf("message id: %s %s\n", msgid ? msgid : "", id?id:"");
-	printf("subject: %s\n", subject ? subject : "");
-	printf("From: %s\n", from ? from : "");
-	printf("To:  %s\n", to ? to : "");
-	printf("Cc:  %s\n", cc ? cc : "");
-	printf("Bcc: %s\n", bcc ? bcc : "");
+	if (obj_msg) {
+		mapidump_message_summary(obj_msg);
+	} else {
+		printf("subject: %s\n", subject ? subject : "");
+		printf("From: %s\n", from ? from : "");
+		printf("To:  %s\n", to ? to : "");
+		printf("Cc:  %s\n", cc ? cc : "");
+		printf("Bcc: %s\n", bcc ? bcc : "");
+	}
 	if (has_attach) {
 		printf("Attachment: %s\n", *has_attach ? "True" : "False");
 	}
@@ -326,8 +472,8 @@ _PUBLIC_ void mapidump_message(struct mapi_SPropValue_array *properties, const c
 	if (body) {
 		printf("%s\n", body);
 	} else if (html) {
-		len = write(1, html->lpb, html->cb);
-		len = write(1, "\n", 1);
+		write(1, html->lpb, html->cb);
+		write(1, "\n", 1);
 		fflush(0);
 	}
 }
@@ -545,7 +691,7 @@ _PUBLIC_ void mapidump_task(struct mapi_SPropValue_array *properties, const char
 	const double			*complete = 0;
 	const uint32_t			*status;
 	const uint32_t			*importance;
-	const uint8_t			*private;
+	const uint8_t			*private_tag;
 	uint32_t       			i;
 
 	contacts = (const struct mapi_SLPSTRArray *)find_mapi_SPropValue_data(properties, PidLidContacts);
@@ -554,7 +700,7 @@ _PUBLIC_ void mapidump_task(struct mapi_SPropValue_array *properties, const char
 	complete = (const double *)find_mapi_SPropValue_data(properties, PidLidPercentComplete);
 	status = (const uint32_t *)find_mapi_SPropValue_data(properties, PidLidTaskStatus);
 	importance = (const uint32_t *)find_mapi_SPropValue_data(properties, PR_IMPORTANCE);
-	private = (const uint8_t *)find_mapi_SPropValue_data(properties, PidLidPrivate);
+	private_tag = (const uint8_t *)find_mapi_SPropValue_data(properties, PidLidPrivate);
 
 	printf("|== %s ==| %s\n", subject?subject:"", id?id:"");
 	fflush(0);
@@ -583,8 +729,8 @@ _PUBLIC_ void mapidump_task(struct mapi_SPropValue_array *properties, const char
 	mapidump_date(properties, PidLidTaskDueDate,"Due Date");
 	mapidump_date(properties, PidLidTaskStartDate, "Start Date");
 
-	if (private) {
-		printf("\tPrivate: %s\n", (*private == true)?"True":"False");
+	if (private_tag) {
+		printf("\tPrivate: %s\n", (*private_tag == true)?"True":"False");
 		fflush(0);
 	} else {
 		printf("\tPrivate: false\n");
@@ -689,7 +835,7 @@ _PUBLIC_ void mapidump_foldercreated(struct FolderCreatedNotification *data, con
 	fflush(0);
 	printf("%sFolder Entry ID: 0x%"PRIx64"\n", sep?sep:"", data->FID);
 	fflush(0);
-	mapidump_tags (data->Tags, data->TagCount, sep);
+	mapidump_tags (data->NotificationTags.Tags, data->TagCount, sep);
 }
 
 _PUBLIC_ void mapidump_folderdeleted(struct FolderDeletedNotification *data, const char *sep)
@@ -743,7 +889,9 @@ _PUBLIC_ void mapidump_messagecreated(struct MessageCreatedNotification *data, c
 	fflush(0);
 	printf("%sMessage Entry ID: 0x%"PRIx64"\n", sep?sep:"", data->MID);
 	fflush(0);
-	mapidump_tags (data->Tags, data->TagCount, sep);
+        if (data->TagCount != 0xffff) {
+                mapidump_tags (data->NotificationTags.Tags, data->TagCount, sep);
+        }
 }
 
 _PUBLIC_ void mapidump_messagemodified(struct MessageModifiedNotification *data, const char *sep)
@@ -849,7 +997,7 @@ _PUBLIC_ void mapidump_freebusy_event(struct Binary_r *bin, uint32_t month, uint
 	uint32_t	day;
 	const char	*month_name;
 	uint32_t	last;
-	uint32_t	minutes;
+	uint32_t	minutes = 0;
 
 	if (!bin) return;
 	/* bin.cb must be a multiple of 4 */
@@ -864,27 +1012,35 @@ _PUBLIC_ void mapidump_freebusy_event(struct Binary_r *bin, uint32_t month, uint
 		event_end = (bin->lpb[i + 3] << 8) | bin->lpb[i + 2];
 
 		for (hour = 0; hour < 24; hour++) {
-			if (!((event_start - (60 * hour)) % 1440)) {
+			if (!(((event_start - (60 * hour)) % 1440) && (((event_start - (60 * hour)) % 1440) - 30))) {
 				day = ((event_start - (60 * hour)) / 1440) + 1;
+				minutes = (event_start - (60 * hour)) % 1440;
 				last = event_end - event_start;
 #if defined (__FreeBSD__)
-				DEBUG(0, ("%s %u %s %u at %u hours and lasts ", sep ? sep : "", day, month_name, year, hour));
+				DEBUG(0, ("%s %u %s %u at %.2u%.2u hrs and lasts ", sep ? sep : "", day, month_name, year, hour, minutes));
 #else
-				DEBUG(0, ("%s %u %s %u at %u hours and lasts ", sep ? sep : "", day, month_name, year, hour + daylight));
+				DEBUG(0, ("%s %u %s %u at %.2u%.2u hrs and lasts ", sep ? sep : "", day, month_name, year, hour + daylight, minutes));
 #endif
 				if (last < 60) {
-					DEBUG(0, ("%u minutes\n", last));
+					DEBUG(0, ("%u mins\n", last));
 				} else {
 					hours = last / 60;
 					minutes = last - hours * 60;
 					if (minutes > 0) {
-						DEBUG(0, ("%u hours and %u minutes\n", hours, minutes));
+						DEBUG(0, ("%u hrs %u mins\n", hours, minutes));
 					} else {
-						DEBUG(0, ("%u hours\n", hours));
+						DEBUG(0, ("%u hrs\n", hours));
 					}
 				}
 			}
 		}
-		
 	}	
+}
+
+/**
+   \details print the list of languages OpenChange supports
+ */
+_PUBLIC_ void mapidump_languages_list(void)
+{
+	mapi_get_language_list();
 }

@@ -4,7 +4,7 @@
    OpenChange Project - FOLDER OBJECT PROTOCOL operations
 
    Copyright (C) Julien Kerihuel 2008
-   Copyright (C) Brad Hards 2009
+   Copyright (C) Brad Hards 2009-2010
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
 #include "utils/mapitest/mapitest.h"
 #include "utils/mapitest/proto.h"
 
@@ -165,6 +164,117 @@ _PUBLIC_ bool mapitest_oxcfold_OpenFolder(struct mapitest *mt)
 	return true;
 }
 
+/**
+   \details Test the CreateFolder (0x1c) and DeleteFolder (0x1d) operations
+
+   This is a simpler version of the CreateFolder test below.
+
+   This function:
+	-# Log on the user private mailbox
+	-# Open the top information folder
+        -# Create a test directory
+	-# Delete the folder
+
+   \param mt the top-level mapitest structure
+
+   \return true on success, otherwise false
+ */
+_PUBLIC_ bool mapitest_oxcfold_CreateDeleteFolder(struct mapitest *mt)
+{
+	enum MAPISTATUS		retval;
+	mapi_object_t		obj_store;
+	mapi_object_t		obj_folder;
+	mapi_object_t		obj_top;
+	mapi_object_t		obj_child;
+	mapi_object_t		obj_grandchild;
+	mapi_id_t		id_folder;
+	bool			ret = true;
+
+	mapi_object_init(&obj_store);
+	mapi_object_init(&obj_folder);
+	mapi_object_init(&obj_top);
+	mapi_object_init(&obj_child);
+	mapi_object_init(&obj_grandchild);
+
+	/* Step 1. Logon */
+	retval = OpenMsgStore(mt->session, &obj_store);
+	mapitest_print_retval(mt, "OpenMsgStore");
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 2. Open Top Information Store folder */
+	retval = GetDefaultFolder(&obj_store, &id_folder, olFolderTopInformationStore);
+	mapitest_print_retval(mt, "GetDefaultFolder");
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+	retval = OpenFolder(&obj_store, id_folder, &obj_folder);
+	mapitest_print_retval(mt, "OpenFolder");
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 3. Create the top test folder */
+	mapitest_print(mt, "* Create GENERIC \"%s\" folder\n", MT_DIRNAME_TOP);
+	retval = CreateFolder(&obj_folder, FOLDER_GENERIC, MT_DIRNAME_TOP, NULL,
+			      OPEN_IF_EXISTS, &obj_top);
+	mapitest_print_retval(mt, "CreateFolder - top");
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 4. Create child folder */
+	mapitest_print(mt, "* Create GENERIC child folder\n");
+	retval = CreateFolder(&obj_top, FOLDER_GENERIC, "MT Child folder", NULL,
+			      OPEN_IF_EXISTS, &obj_child);
+	mapitest_print_retval(mt, "CreateFolder - child");
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 5. Create child of the child (grandchild) folder */
+	mapitest_print(mt, "* Create GENERIC grandchild folder\n");
+	retval = CreateFolder(&obj_child, FOLDER_GENERIC, "MT grandchild folder", NULL,
+			      OPEN_IF_EXISTS, &obj_grandchild);
+	mapitest_print_retval(mt, "CreateFolder - grandchild");
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 6. DeleteFolder on the child (and recurse to grandchild) */
+	retval = DeleteFolder(&obj_top, mapi_object_get_id(&obj_child),
+			      DEL_MESSAGES|DEL_FOLDERS|DELETE_HARD_DELETE, NULL);
+	mapitest_print_retval(mt, "DeleteFolder - child");
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+	}
+
+	/* Step 7. DeleteFolder on the top folder */
+	retval = DeleteFolder(&obj_folder, mapi_object_get_id(&obj_top),
+			      DELETE_HARD_DELETE, NULL);
+	mapitest_print_retval(mt, "DeleteFolder - top");
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+	}
+
+cleanup:
+	/* Release */
+	mapi_object_release(&obj_grandchild);
+	mapi_object_release(&obj_child);
+	mapi_object_release(&obj_top);
+	mapi_object_release(&obj_folder);
+	mapi_object_release(&obj_store);
+
+	return ret;
+}
+
 
 /**
    \details Test the CreateFolder (0x1c) operation
@@ -191,31 +301,39 @@ _PUBLIC_ bool mapitest_oxcfold_CreateFolder(struct mapitest *mt)
 	mapi_object_t		obj_child;
 	mapi_id_t		id_folder;
 	int			i;
+	bool			ret = true;
 
 	/* Step 1. Logon */
 	mapi_object_init(&obj_store);
+	mapi_object_init(&obj_folder);
+	mapi_object_init(&obj_top);
 	retval = OpenMsgStore(mt->session, &obj_store);
 	mapitest_print_retval(mt, "OpenMsgStore");
-	if (GetLastError() != MAPI_E_SUCCESS) {
-		return false;
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
 	}
 
 	/* Step 2. Open Top Information Store folder */
-	mapi_object_init(&obj_folder);
 	retval = GetDefaultFolder(&obj_store, &id_folder, olFolderTopInformationStore);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
 	retval = OpenFolder(&obj_store, id_folder, &obj_folder);
-	if (GetLastError() != MAPI_E_SUCCESS) {
-		return false;
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
 	}
 
 	/* Step 3. Create the top test folder */
 	mapitest_print(mt, "* Create GENERIC \"%s\" folder\n", MT_DIRNAME_TOP);
-	mapi_object_init(&obj_top);
 	retval = CreateFolder(&obj_folder, FOLDER_GENERIC, MT_DIRNAME_TOP, NULL,
 			      OPEN_IF_EXISTS, &obj_top);
 	mapitest_print_retval(mt, "CreateFolder");
-	if (GetLastError() != MAPI_E_SUCCESS) {
-		return false;
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
 	}
 
 	/* Step 4. Create sub directories */
@@ -227,12 +345,22 @@ _PUBLIC_ bool mapitest_oxcfold_CreateFolder(struct mapitest *mt)
 		retval = CreateFolder(&obj_top, FOLDER_GENERIC, subfolders[i].name, NULL,
 				      OPEN_IF_EXISTS, &obj_child);
 		mapitest_print_retval_fmt(mt, "CreateFolder", "(%s)", subfolders[i].name);
-
+		if (retval != MAPI_E_SUCCESS) {
+			mapitest_deindent();
+			mapi_object_release(&obj_child);
+			ret = false;
+			goto cleanup;
+		}
 		/* Step 4.2. Set its container class */
 		set_SPropValue_proptag(&lpProp[0], PR_CONTAINER_CLASS, (const void *) subfolders[i].class);
-		retval = SetProps(&obj_child, lpProp, 1);
+		retval = SetProps(&obj_child, 0, lpProp, 1);
 		mapitest_print_retval_fmt(mt, "SetProps", "(%s)", subfolders[i].name);		
-
+		if (retval != MAPI_E_SUCCESS) {
+			mapitest_deindent();
+			mapi_object_release(&obj_child);
+			ret = false;
+			goto cleanup;
+		}
 		mapi_object_release(&obj_child);
 	}
 	mapitest_deindent();
@@ -240,20 +368,201 @@ _PUBLIC_ bool mapitest_oxcfold_CreateFolder(struct mapitest *mt)
 	/* Step 5. Empty Folder */
 	retval = EmptyFolder(&obj_top);
 	mapitest_print_retval(mt, "EmptyFolder");
+	if (retval != MAPI_E_SUCCESS) {
+	      ret = false;
+	      goto cleanup;
+	}
 
 	/* Step 6. DeleteFolder */
 	retval = DeleteFolder(&obj_folder, mapi_object_get_id(&obj_top),
 			      DEL_MESSAGES|DEL_FOLDERS|DELETE_HARD_DELETE, NULL);
 	mapitest_print_retval(mt, "DeleteFolder");
-	
+	if (retval != MAPI_E_SUCCESS) {
+	      ret = false;
+	      goto cleanup;
+	}
+
+cleanup:
 	/* Release */
 	mapi_object_release(&obj_top);
 	mapi_object_release(&obj_folder);
 	mapi_object_release(&obj_store);
 
-	return true;
+	return ret;
 }
 
+/**
+   \details Test the CreateFolder (0x1c) operations
+
+   This tests different combinations of folder creation.
+
+   This function:
+	-# Log on the user private mailbox
+	-# Open the top information folder
+	-# Create a test directory (or open the directory if it already exists)
+	-# Delete the test directory
+	-# Create the test directory again (it should not exist)
+	-# Try to create another directory with the same name (should error out)
+	-# Try to create another directory with the same name, but use open if exists
+	-# Create a generic subfolder
+	-# Try to create another generic subfolder with the same name (should error out)
+	-# Try to create another generic subfolder with the same name, but use open if exists
+	-# Delete the generic subfolder
+	-# Delete the test directory
+   \param mt the top-level mapitest structure
+
+   \return true on success, otherwise false
+ */
+_PUBLIC_ bool mapitest_oxcfold_CreateFolderVariants(struct mapitest *mt)
+{
+	enum MAPISTATUS		retval;
+	mapi_object_t		obj_store;
+	mapi_object_t		obj_folder;
+	mapi_object_t		obj_top1, obj_top2, obj_top3;
+	mapi_object_t		obj_child1, obj_child2, obj_child3;
+	mapi_id_t		id_folder;
+	bool			ret = true;
+
+	mapi_object_init(&obj_store);
+	mapi_object_init(&obj_folder);
+	mapi_object_init(&obj_top1);
+	mapi_object_init(&obj_top2);
+	mapi_object_init(&obj_top3);
+	mapi_object_init(&obj_child1);
+	mapi_object_init(&obj_child2);
+	mapi_object_init(&obj_child3);
+
+	/* Step 1. Logon */
+	retval = OpenMsgStore(mt->session, &obj_store);
+	mapitest_print_retval_clean(mt, "OpenMsgStore", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 2. Open Top Information Store folder */
+	retval = GetDefaultFolder(&obj_store, &id_folder, olFolderTopInformationStore);
+	mapitest_print_retval_clean(mt, "GetDefaultFolder", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+	retval = OpenFolder(&obj_store, id_folder, &obj_folder);
+	mapitest_print_retval_clean(mt, "OpenFolder", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 3. Create the top test folder */
+	mapitest_print(mt, "* Create GENERIC \"%s\" folder\n", MT_DIRNAME_TOP);
+	retval = CreateFolder(&obj_folder, FOLDER_GENERIC, MT_DIRNAME_TOP, NULL,
+			      OPEN_IF_EXISTS, &obj_top1);
+	mapitest_print_retval_clean(mt, "CreateFolder - top", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 4. DeleteFolder on the top folder */
+	retval = DeleteFolder(&obj_folder, mapi_object_get_id(&obj_top1),
+			      DEL_MESSAGES|DEL_FOLDERS|DELETE_HARD_DELETE, NULL);
+	mapitest_print_retval_clean(mt, "DeleteFolder - top", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 5. Create the top test folder (again) */
+	mapitest_print(mt, "* Create GENERIC \"%s\" folder\n", MT_DIRNAME_TOP);
+	retval = CreateFolder(&obj_folder, FOLDER_GENERIC, MT_DIRNAME_TOP, NULL,
+			      0, &obj_top1);
+	mapitest_print_retval_clean(mt, "CreateFolder - top", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 6. Create the top test folder (again) - should error out*/
+	mapitest_print(mt, "* Create GENERIC \"%s\" folder (duplicate name - expect collision)\n", MT_DIRNAME_TOP);
+	retval = CreateFolder(&obj_folder, FOLDER_GENERIC, MT_DIRNAME_TOP, NULL,
+			      0, &obj_top2);
+	mapitest_print_retval_clean(mt, "CreateFolder - top", retval);
+	if (retval != MAPI_E_COLLISION) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 7. Create the top test folder (again), using OPEN_IF_EXISTS */
+	mapitest_print(mt, "* Create GENERIC \"%s\" folder (open if exists)\n", MT_DIRNAME_TOP);
+	retval = CreateFolder(&obj_folder, FOLDER_GENERIC, MT_DIRNAME_TOP, NULL,
+			      OPEN_IF_EXISTS, &obj_top3);
+	mapitest_print_retval_clean(mt, "CreateFolder - top", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 8. Create child folder */
+	mapitest_print(mt, "* Create GENERIC child folder\n");
+	retval = CreateFolder(&obj_top3, FOLDER_GENERIC, "MT Child folder", NULL,
+			      0, &obj_child1);
+	mapitest_print_retval_clean(mt, "CreateFolder - child", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 9. Create the child test folder (again) - should error out*/
+	mapitest_print(mt, "* Create GENERIC child folder (duplicate name - expect collision)\n");
+	retval = CreateFolder(&obj_top3, FOLDER_GENERIC, "MT Child folder", NULL,
+			      0, &obj_child2);
+	mapitest_print_retval_clean(mt, "CreateFolder - child", retval);
+	if (retval != MAPI_E_COLLISION) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 10. Create the child test folder (again), using OPEN_IF_EXISTS */
+	mapitest_print(mt, "* Create GENERIC child folder (open if exists)\n");
+	retval = CreateFolder(&obj_top3, FOLDER_GENERIC, MT_DIRNAME_TOP, NULL,
+			      OPEN_IF_EXISTS, &obj_child3);
+	mapitest_print_retval_clean(mt, "CreateFolder - child", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+	
+	/* Step 11. DeleteFolder on the child */
+	retval = DeleteFolder(&obj_top3, mapi_object_get_id(&obj_child3),
+			      DELETE_HARD_DELETE, NULL);
+	mapitest_print_retval_clean(mt, "DeleteFolder - child", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		/* we want to fall through on the off-chance this fails */
+	}
+
+	/* Step 12. DeleteFolder on the top folder */
+	retval = DeleteFolder(&obj_folder, mapi_object_get_id(&obj_top3),
+			      DEL_MESSAGES|DEL_FOLDERS|DELETE_HARD_DELETE, NULL);
+	mapitest_print_retval_clean(mt, "DeleteFolder - top", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+cleanup:
+	/* Release */
+	mapi_object_release(&obj_child3);
+	mapi_object_release(&obj_child2);
+	mapi_object_release(&obj_child1);
+	mapi_object_release(&obj_top3);
+	mapi_object_release(&obj_top2);
+	mapi_object_release(&obj_top1);
+	mapi_object_release(&obj_folder);
+	mapi_object_release(&obj_store);
+
+	return ret;
+}
 
 /**
    \details Test the GetHierarchyTable (0x4) operation
@@ -269,7 +578,6 @@ _PUBLIC_ bool mapitest_oxcfold_CreateFolder(struct mapitest *mt)
  */
 _PUBLIC_ bool mapitest_oxcfold_GetHierarchyTable(struct mapitest *mt)
 {
-	enum MAPISTATUS		retval;
 	mapi_object_t		obj_store;
 	mapi_object_t		obj_folder;
 	mapi_object_t		obj_htable;
@@ -278,7 +586,7 @@ _PUBLIC_ bool mapitest_oxcfold_GetHierarchyTable(struct mapitest *mt)
 
 	/* Step 1. Logon */
 	mapi_object_init(&obj_store);
-	retval = OpenMsgStore(mt->session, &obj_store);
+	OpenMsgStore(mt->session, &obj_store);
 	mapitest_print_retval(mt, "OpenMsgStore");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
@@ -287,10 +595,10 @@ _PUBLIC_ bool mapitest_oxcfold_GetHierarchyTable(struct mapitest *mt)
 	/* Step 2. Open Top Information Store folder */
 	mapi_object_init(&obj_folder);
 
-	retval = GetDefaultFolder(&obj_store, &id_folder, olFolderTopInformationStore);
+	GetDefaultFolder(&obj_store, &id_folder, olFolderTopInformationStore);
 	mapitest_print_retval(mt, "GetDefaultFolder");
 
-	retval = OpenFolder(&obj_store, id_folder, &obj_folder);
+	OpenFolder(&obj_store, id_folder, &obj_folder);
 	mapitest_print_retval(mt, "OpenFolder");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
@@ -298,7 +606,7 @@ _PUBLIC_ bool mapitest_oxcfold_GetHierarchyTable(struct mapitest *mt)
 
 	/* Step 3. Get the Hierarchy Table */
 	mapi_object_init(&obj_htable);
-	retval = GetHierarchyTable(&obj_folder, &obj_htable, 0, &RowCount);
+	GetHierarchyTable(&obj_folder, &obj_htable, 0, &RowCount);
 	mapitest_print_retval_fmt(mt, "GetHierarchyTable", "(%d rows)", RowCount);
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
@@ -327,7 +635,6 @@ _PUBLIC_ bool mapitest_oxcfold_GetHierarchyTable(struct mapitest *mt)
  */
 _PUBLIC_ bool mapitest_oxcfold_GetContentsTable(struct mapitest *mt)
 {
-	enum MAPISTATUS		retval;
 	mapi_object_t		obj_store;
 	mapi_object_t		obj_folder;
 	mapi_object_t		obj_ctable;
@@ -336,7 +643,7 @@ _PUBLIC_ bool mapitest_oxcfold_GetContentsTable(struct mapitest *mt)
 
 	/* Step 1. Logon */
 	mapi_object_init(&obj_store);
-	retval = OpenMsgStore(mt->session, &obj_store);
+	OpenMsgStore(mt->session, &obj_store);
 	mapitest_print_retval(mt, "OpenMsgStore");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
@@ -344,10 +651,10 @@ _PUBLIC_ bool mapitest_oxcfold_GetContentsTable(struct mapitest *mt)
 
 	/* Step 2. Open Top Information Store folder */
 	mapi_object_init(&obj_folder);
-	retval = GetDefaultFolder(&obj_store, &id_folder, olFolderTopInformationStore);
+	GetDefaultFolder(&obj_store, &id_folder, olFolderTopInformationStore);
 	mapitest_print_retval(mt, "GetDefaultFolder");
 
-	retval = OpenFolder(&obj_store, id_folder, &obj_folder);
+	OpenFolder(&obj_store, id_folder, &obj_folder);
 	mapitest_print_retval(mt, "OpenFolder");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
@@ -355,7 +662,7 @@ _PUBLIC_ bool mapitest_oxcfold_GetContentsTable(struct mapitest *mt)
 
 	/* Step 3. Get the Contents Table */
 	mapi_object_init(&obj_ctable);
-	retval = GetContentsTable(&obj_folder, &obj_ctable, 0, &RowCount);
+	GetContentsTable(&obj_folder, &obj_ctable, 0, &RowCount);
 	mapitest_print_retval_fmt(mt, "GetContentsTable", "(%d rows)", RowCount);
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
@@ -389,7 +696,6 @@ _PUBLIC_ bool mapitest_oxcfold_GetContentsTable(struct mapitest *mt)
  */
 _PUBLIC_ bool mapitest_oxcfold_SetSearchCriteria(struct mapitest *mt)
 {
-	enum MAPISTATUS			retval;
 	bool				ret = true;
 	mapi_object_t			obj_store;
 	mapi_object_t			obj_search;
@@ -402,28 +708,28 @@ _PUBLIC_ bool mapitest_oxcfold_SetSearchCriteria(struct mapitest *mt)
 
 	/* Step 1. Logon */
 	mapi_object_init(&obj_store);
-	retval = OpenMsgStore(mt->session, &obj_store);
+	OpenMsgStore(mt->session, &obj_store);
 	mapitest_print_retval(mt, "OpenMsgStore");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
 	}
 
 	/* Open Inbox folder */
-	retval = GetDefaultFolder(&obj_store, &id_inbox, olFolderInbox);
+	GetDefaultFolder(&obj_store, &id_inbox, olFolderInbox);
 	mapitest_print_retval(mt, "GetDefaultFolder");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
 	}
 
 	/* Step 3. Open Search folder */
-	retval = GetDefaultFolder(&obj_store, &id_search, olFolderFinder);
+	GetDefaultFolder(&obj_store, &id_search, olFolderFinder);
 	mapitest_print_retval(mt, "GetDefaultFolder");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
 	}
 
 	mapi_object_init(&obj_search);
-	retval = OpenFolder(&obj_store, id_search, &obj_search);
+	OpenFolder(&obj_store, id_search, &obj_search);
 	mapitest_print_retval(mt, "OpenFolder");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
@@ -431,7 +737,7 @@ _PUBLIC_ bool mapitest_oxcfold_SetSearchCriteria(struct mapitest *mt)
 
 	/* Step 4. Create a search folder */
 	mapi_object_init(&obj_searchdir);
-	retval = CreateFolder(&obj_search, FOLDER_SEARCH, "mapitest", 
+	CreateFolder(&obj_search, FOLDER_SEARCH, "mapitest", 
 			      "mapitest search folder", OPEN_IF_EXISTS,
 			      &obj_searchdir);
 	mapitest_print_retval(mt, "CreateFolder");
@@ -442,7 +748,7 @@ _PUBLIC_ bool mapitest_oxcfold_SetSearchCriteria(struct mapitest *mt)
 	/* Step 5. Set properties on this search folder */
 	lpProps[0].ulPropTag = PR_CONTAINER_CLASS;
 	lpProps[0].value.lpszA = IPF_NOTE;
-	retval = SetProps(&obj_searchdir, lpProps, 1);
+	SetProps(&obj_searchdir, 0, lpProps, 1);
 	mapitest_print_retval(mt, "SetProps");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		ret = false;
@@ -450,16 +756,16 @@ _PUBLIC_ bool mapitest_oxcfold_SetSearchCriteria(struct mapitest *mt)
 	}
 
 	/* Step 6. Search criteria on this folder */
-	mapi_id_array_init(&id);
+	mapi_id_array_init(mt->mapi_ctx->mem_ctx, &id);
 	mapi_id_array_add_id(&id, id_inbox);
 
 	res.rt = RES_CONTENT;
 	res.res.resContent.fuzzy = FL_SUBSTRING;
 	res.res.resContent.ulPropTag = PR_SUBJECT;
 	res.res.resContent.lpProp.ulPropTag = PR_SUBJECT;
-	res.res.resContent.lpProp.value.lpszA = "[MT]";
+	res.res.resContent.lpProp.value.lpszA = "MT";
 
-	retval = SetSearchCriteria(&obj_searchdir, &res,
+	SetSearchCriteria(&obj_searchdir, &res,
 				   BACKGROUND_SEARCH|RECURSIVE_SEARCH, &id);
 	mapitest_print_retval(mt, "SetSearchCriteria");
 	mapi_id_array_release(&id);
@@ -468,7 +774,7 @@ _PUBLIC_ bool mapitest_oxcfold_SetSearchCriteria(struct mapitest *mt)
 	}
 
 error:
-	retval = DeleteFolder(&obj_search, mapi_object_get_id(&obj_searchdir),
+	DeleteFolder(&obj_search, mapi_object_get_id(&obj_searchdir),
 			      DEL_MESSAGES|DEL_FOLDERS|DELETE_HARD_DELETE, NULL);
 	mapitest_print_retval(mt, "DeleteFolder");
 	mapi_object_release(&obj_searchdir);
@@ -498,7 +804,6 @@ error:
  */
 _PUBLIC_ bool mapitest_oxcfold_GetSearchCriteria(struct mapitest *mt)
 {
-	enum MAPISTATUS			retval;
 	bool				ret = true;
 	mapi_object_t			obj_store;
 	mapi_object_t			obj_search;
@@ -514,28 +819,28 @@ _PUBLIC_ bool mapitest_oxcfold_GetSearchCriteria(struct mapitest *mt)
 
 	/* Step 1. Logon */
 	mapi_object_init(&obj_store);
-	retval = OpenMsgStore(mt->session, &obj_store);
+	OpenMsgStore(mt->session, &obj_store);
 	mapitest_print_retval(mt, "OpenMsgStore");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
 	}
 
 	/* Open Inbox folder */
-	retval = GetDefaultFolder(&obj_store, &id_inbox, olFolderInbox);
+	GetDefaultFolder(&obj_store, &id_inbox, olFolderInbox);
 	mapitest_print_retval(mt, "GetDefaultFolder");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
 	}
 
 	/* Step 3. Open Search folder */
-	retval = GetDefaultFolder(&obj_store, &id_search, olFolderFinder);
+	GetDefaultFolder(&obj_store, &id_search, olFolderFinder);
 	mapitest_print_retval(mt, "GetDefaultFolder");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
 	}
 
 	mapi_object_init(&obj_search);
-	retval = OpenFolder(&obj_store, id_search, &obj_search);
+	OpenFolder(&obj_store, id_search, &obj_search);
 	mapitest_print_retval(mt, "OpenFolder");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		return false;
@@ -543,7 +848,7 @@ _PUBLIC_ bool mapitest_oxcfold_GetSearchCriteria(struct mapitest *mt)
 
 	/* Step 4. Create a search folder */
 	mapi_object_init(&obj_searchdir);
-	retval = CreateFolder(&obj_search, FOLDER_SEARCH, "mapitest", 
+	CreateFolder(&obj_search, FOLDER_SEARCH, "mapitest", 
 			      "mapitest search folder", OPEN_IF_EXISTS,
 			      &obj_searchdir);
 	mapitest_print_retval(mt, "CreateFolder");
@@ -554,7 +859,7 @@ _PUBLIC_ bool mapitest_oxcfold_GetSearchCriteria(struct mapitest *mt)
 	/* Step 5. Set properties on this search folder */
 	lpProps[0].ulPropTag = PR_CONTAINER_CLASS;
 	lpProps[0].value.lpszA = IPF_NOTE;
-	retval = SetProps(&obj_searchdir, lpProps, 1);
+	SetProps(&obj_searchdir, 0, lpProps, 1);
 	mapitest_print_retval(mt, "SetProps");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		ret = false;
@@ -562,16 +867,16 @@ _PUBLIC_ bool mapitest_oxcfold_GetSearchCriteria(struct mapitest *mt)
 	}
 
 	/* Step 6. Search criteria on this folder */
-	mapi_id_array_init(&id);
+	mapi_id_array_init(mt->mapi_ctx->mem_ctx, &id);
 	mapi_id_array_add_id(&id, id_inbox);
 
 	res.rt = RES_CONTENT;
 	res.res.resContent.fuzzy = FL_SUBSTRING;
 	res.res.resContent.ulPropTag = PR_SUBJECT;
 	res.res.resContent.lpProp.ulPropTag = PR_SUBJECT;
-	res.res.resContent.lpProp.value.lpszA = "[MT]";
+	res.res.resContent.lpProp.value.lpszA = "MT";
 
-	retval = SetSearchCriteria(&obj_searchdir, &res,
+	SetSearchCriteria(&obj_searchdir, &res,
 				   BACKGROUND_SEARCH|RECURSIVE_SEARCH, &id);
 	mapitest_print_retval(mt, "SetSearchCriteria");
 	mapi_id_array_release(&id);
@@ -581,7 +886,7 @@ _PUBLIC_ bool mapitest_oxcfold_GetSearchCriteria(struct mapitest *mt)
 	}
 
 	/* Step 7. Call GetSearchCriteria */
-	retval = GetSearchCriteria(&obj_searchdir, &res, &ulSearchFlags, &count, &fid);
+	GetSearchCriteria(&obj_searchdir, &res, &ulSearchFlags, &count, &fid);
 	mapitest_print_retval(mt, "GetSearchCriteria");
 	if (GetLastError() != MAPI_E_SUCCESS) {
 		ret = false;
@@ -590,8 +895,8 @@ _PUBLIC_ bool mapitest_oxcfold_GetSearchCriteria(struct mapitest *mt)
 
 
 error:
-	retval = DeleteFolder(&obj_search, mapi_object_get_id(&obj_searchdir),
-			      DEL_MESSAGES|DEL_FOLDERS|DELETE_HARD_DELETE, NULL);
+	DeleteFolder(&obj_search, mapi_object_get_id(&obj_searchdir),
+		     DEL_MESSAGES|DEL_FOLDERS|DELETE_HARD_DELETE, NULL);
 	mapitest_print_retval(mt, "DeleteFolder");
 	mapi_object_release(&obj_searchdir);
 	mapi_object_release(&obj_search);
@@ -617,6 +922,7 @@ error:
 _PUBLIC_ bool mapitest_oxcfold_MoveCopyMessages(struct mapitest *mt)
 {
 	enum MAPISTATUS		retval;
+	bool			common_result;
 	bool			ret = true;
 	mapi_object_t		obj_store;
 	mapi_object_t		obj_folder_src;
@@ -636,7 +942,7 @@ _PUBLIC_ bool mapitest_oxcfold_MoveCopyMessages(struct mapitest *mt)
 	mapi_object_init(&obj_store);
 	retval = OpenMsgStore(mt->session, &obj_store);
 	mapitest_print_retval(mt, "OpenMsgStore");
-	if (GetLastError() != MAPI_E_SUCCESS) {
+	if (retval != MAPI_E_SUCCESS) {
 		return false;
 	}
 
@@ -647,7 +953,7 @@ _PUBLIC_ bool mapitest_oxcfold_MoveCopyMessages(struct mapitest *mt)
 
 	retval = OpenFolder(&obj_store, id_folder, &obj_folder_src);
 	mapitest_print_retval(mt, "OpenFolder");
-	if (GetLastError() != MAPI_E_SUCCESS) {
+	if (retval != MAPI_E_SUCCESS) {
 		return false;
 	}
 		
@@ -658,30 +964,33 @@ _PUBLIC_ bool mapitest_oxcfold_MoveCopyMessages(struct mapitest *mt)
 
 	retval = OpenFolder(&obj_store, id_folder, &obj_folder_dst);
 	mapitest_print_retval(mt, "OpenFolder");
-	if (GetLastError() != MAPI_E_SUCCESS) {
+	if (retval != MAPI_E_SUCCESS) {
 		return false;
 	}
 	mapi_object_init(&(dst_contents));
 	retval = GetContentsTable(&(obj_folder_dst), &(dst_contents), 0, &dst_count);
 	mapitest_print_retval(mt, "GetContentsTable");
-	if (GetLastError() != MAPI_E_SUCCESS) {
+	if (retval != MAPI_E_SUCCESS) {
 		ret = false;
+		goto release;
 	}
 
 	/* Step 4. Create sample messages */
-	mapi_id_array_init(&msg_id_array);
+	mapi_id_array_init(mt->mapi_ctx->mem_ctx, &msg_id_array);
 	for (i = 0; i < 3; i++) {
 		mapi_object_init(&obj_message);
-		retval = mapitest_common_message_create(mt, &obj_folder_src, &obj_message, MT_MAIL_SUBJECT);
-		mapitest_print_retval(mt, "mapitest_common_message_create");
-		if (GetLastError() != MAPI_E_SUCCESS) {
+		common_result = mapitest_common_message_create(mt, &obj_folder_src, &obj_message, MT_MAIL_SUBJECT);
+		if (!common_result) {
+			mapitest_print(mt, "* mapitest_common_message_create() failed\n");
 			ret = false;
+			goto release;
 		}
 		
 		retval = SaveChangesMessage(&obj_folder_src, &obj_message, KeepOpenReadOnly);
 		mapitest_print_retval(mt, "SaveChangesMessage");
 		if (retval != MAPI_E_SUCCESS) {
 			ret = false;
+			goto release;
 		}
 		mapi_id_array_add_obj(&msg_id_array, &obj_message);
 		mapi_object_release(&obj_message);
@@ -692,6 +1001,7 @@ _PUBLIC_ bool mapitest_oxcfold_MoveCopyMessages(struct mapitest *mt)
 	mapitest_print_retval(mt, "MoveCopyMessages");
 	if (retval != MAPI_E_SUCCESS) {
 		ret = false;
+		goto release;
 	}
 	mapi_id_array_release(&msg_id_array);
 
@@ -706,6 +1016,7 @@ _PUBLIC_ bool mapitest_oxcfold_MoveCopyMessages(struct mapitest *mt)
 	mapitest_print_retval(mt, "Restrict");
 	if (retval != MAPI_E_SUCCESS) {
 		ret = false;
+		goto release;
 	}
 
 	/* Step 7. Get the filtered row */
@@ -715,9 +1026,10 @@ _PUBLIC_ bool mapitest_oxcfold_MoveCopyMessages(struct mapitest *mt)
 	MAPIFreeBuffer(SPropTagArray);
 	if (retval != MAPI_E_SUCCESS) {
 		ret = false;
+		goto release;
 	}
 
-	QueryRows(&(dst_contents), 20, TBL_NOADVANCE, &SRowSet);
+	retval = QueryRows(&(dst_contents), 20, TBL_NOADVANCE, &SRowSet);
 	mapitest_print_retval(mt, "QueryRows");
 	if ( (retval == MAPI_E_SUCCESS) && (SRowSet.cRows > 0) ) {
 		for (i = 0; i < SRowSet.cRows; ++i) {
@@ -729,6 +1041,7 @@ _PUBLIC_ bool mapitest_oxcfold_MoveCopyMessages(struct mapitest *mt)
 	retval = DeleteMessage(&obj_folder_dst, msgid, i); 
 	mapitest_print_retval(mt, "DeleteMessage");
 
+release:
 	/* Release */
 	mapi_object_release(&dst_contents);
 	mapi_object_release(&obj_folder_src);
@@ -989,6 +1302,7 @@ _PUBLIC_ bool mapitest_oxcfold_HardDeleteMessages(struct mapitest *mt)
 	/* Step 1. Logon */
 	mapi_object_init(&obj_store);
 	mapi_object_init(&obj_folder);
+	mapi_object_init(&contents);
 
 	retval = OpenMsgStore(mt->session, &obj_store);
 	mapitest_print_retval(mt, "OpenMsgStore");
@@ -1012,7 +1326,6 @@ _PUBLIC_ bool mapitest_oxcfold_HardDeleteMessages(struct mapitest *mt)
 		goto cleanup;
 	}
 
-	mapi_object_init(&(contents));
 	retval = GetContentsTable(&(obj_folder), &(contents), 0, &count);
 	mapitest_print_retval(mt, "GetContentsTable");
 	if (retval != MAPI_E_SUCCESS) {
@@ -1021,7 +1334,7 @@ _PUBLIC_ bool mapitest_oxcfold_HardDeleteMessages(struct mapitest *mt)
 	}
 
 	/* Step 3. Create sample messages */
-	mapi_id_array_init(&msg_id_array);
+	mapi_id_array_init(mt->mapi_ctx->mem_ctx, &msg_id_array);
 	for (i = 0; i < 3; i++) {
 		mapi_object_init(&obj_message);
 		ret = mapitest_common_message_create(mt, &obj_folder, &obj_message, MT_MAIL_SUBJECT);
@@ -1191,4 +1504,142 @@ _PUBLIC_ bool mapitest_oxcfold_HardDeleteMessagesAndSubfolders(struct mapitest *
         mapitest_common_cleanup(mt);
 
         return ret;
+}
+
+/**
+   \details Test the DeleteMessages (0x1e) operation
+
+   This function:
+   -# Log on the user private mailbox
+   -# Open the top of information store
+   -# Create a test folder
+   -# Create and save three messages
+   -# Save the messages
+   -# Delete the messages
+   -# Delete the test folder
+
+   \param mt pointer on the top-level mapitest structure
+
+   \return true on success, otherwise false
+ */
+_PUBLIC_ bool mapitest_oxcfold_DeleteMessages(struct mapitest *mt)
+{
+	enum MAPISTATUS		retval;
+	mapi_object_t		obj_store;
+	mapi_id_t		id_folder;
+	mapi_object_t		obj_folder;
+	mapi_object_t		obj_top;
+	mapi_object_t		obj_message1;
+	mapi_object_t		obj_message2;
+	mapi_object_t		obj_message3;
+	mapi_id_t		id_msgs[3];
+	bool			ret = true; /* success */
+
+	mapi_object_init(&obj_store);
+	mapi_object_init(&obj_folder);
+	mapi_object_init(&obj_top);
+	mapi_object_init(&obj_message1);
+	mapi_object_init(&obj_message2);
+	mapi_object_init(&obj_message3);
+
+	/* Step 1. Logon */ 
+	retval = OpenMsgStore(mt->session, &obj_store);
+	mapitest_print_retval_clean(mt, "OpenMsgStore", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 2. Open Top Information Store folder */
+	retval = GetDefaultFolder(&obj_store, &id_folder, olFolderTopInformationStore);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+	retval = OpenFolder(&obj_store, id_folder, &obj_folder);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 3. Create the top test folder */
+	mapitest_print(mt, "* Create GENERIC \"%s\" folder\n", MT_DIRNAME_TOP);
+	retval = CreateFolder(&obj_folder, FOLDER_GENERIC, MT_DIRNAME_TOP, NULL,
+			      OPEN_IF_EXISTS, &obj_top);
+	mapitest_print_retval_clean(mt, "CreateFolder", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 4. Create the messages */
+	retval = CreateMessage(&obj_top, &obj_message1);
+	mapitest_print_retval_clean(mt, "CreateMessage - 1", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+	retval = CreateMessage(&obj_top, &obj_message2);
+	mapitest_print_retval_clean(mt, "CreateMessage - 2", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+	retval = CreateMessage(&obj_top, &obj_message3);
+	mapitest_print_retval_clean(mt, "CreateMessage - 3", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 5. Save the messages */
+	retval = SaveChangesMessage(&obj_top, &obj_message1, KeepOpenReadOnly);
+	mapitest_print_retval_clean(mt, "SaveChangesMessage - 1", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+	retval = SaveChangesMessage(&obj_top, &obj_message2, KeepOpenReadOnly);
+	mapitest_print_retval_clean(mt, "SaveChangesMessage - 2", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+	retval = SaveChangesMessage(&obj_top, &obj_message3, KeepOpenReadOnly);
+	mapitest_print_retval_clean(mt, "SaveChangesMessage - 3", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 6. Delete the saved messages */
+	id_msgs[0] = mapi_object_get_id(&obj_message1);
+	id_msgs[1] = mapi_object_get_id(&obj_message2);
+	id_msgs[2] = mapi_object_get_id(&obj_message3);
+	retval = DeleteMessage(&obj_top, id_msgs, 3);
+	mapitest_print_retval_clean(mt, "DeleteMessage", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Step 7. DeleteFolder on the top folder */
+	retval = DeleteFolder(&obj_folder, mapi_object_get_id(&obj_top),
+			      DEL_MESSAGES|DEL_FOLDERS|DELETE_HARD_DELETE, NULL);
+	mapitest_print_retval_clean(mt, "DeleteFolder - top", retval);
+	if (retval != MAPI_E_SUCCESS) {
+		ret = false;
+		goto cleanup;
+	}
+
+	/* Release */
+cleanup:
+	mapi_object_release(&obj_message3);
+	mapi_object_release(&obj_message2);
+	mapi_object_release(&obj_message1);
+	mapi_object_release(&obj_top);
+	mapi_object_release(&obj_folder);
+	mapi_object_release(&obj_store);
+
+	return ret;
 }

@@ -52,7 +52,7 @@
 #define YYSKELETON_NAME "yacc.c"
 
 /* Pure parsers.  */
-#define YYPURE 0
+#define YYPURE 1
 
 /* Push parsers.  */
 #define YYPUSH 0
@@ -79,24 +79,17 @@
 #line 20 "libocpf/ocpf.y"
 
 
-#include "libocpf/ocpf_private.h"
-#include <libocpf/ocpf.h>
-#include <libocpf/ocpf_api.h>
-#include <libocpf/lex.h>
+#include "libocpf/ocpf.h"
+#include "libocpf/ocpf_api.h"
+#include "libocpf/lex.h"
 
-void yyerror(char *);
-
-union SPropValue_CTR	lpProp;
-struct ocpf_nprop      	nprop;
-int		       	typeset;
-uint16_t       	       	type;
-int			folderset;
-uint8_t			recip_type;
+int ocpf_yylex(void *, void *);
+void yyerror(struct ocpf_context *, void *, char *);
 
 
 
 /* Line 189 of yacc.c  */
-#line 100 "libocpf/ocpf.tab.c"
+#line 93 "libocpf/ocpf.tab.c"
 
 /* Enabling traces.  */
 #ifndef YYDEBUG
@@ -127,11 +120,11 @@ uint8_t			recip_type;
      BOOLEAN = 259,
      SHORT = 260,
      INTEGER = 261,
-     DOUBLE = 262,
-     IDENTIFIER = 263,
-     STRING = 264,
-     UNICODE = 265,
-     MVSTRING = 266,
+     I8 = 262,
+     DOUBLE = 263,
+     IDENTIFIER = 264,
+     STRING = 265,
+     UNICODE = 266,
      SYSTIME = 267,
      VAR = 268,
      kw_TYPE = 269,
@@ -152,17 +145,22 @@ uint8_t			recip_type;
      kw_PT_UNICODE = 284,
      kw_PT_SHORT = 285,
      kw_PT_LONG = 286,
-     kw_PT_SYSTIME = 287,
-     kw_PT_MV_STRING8 = 288,
-     kw_PT_BINARY = 289,
-     OBRACE = 290,
-     EBRACE = 291,
-     COMMA = 292,
-     SEMICOLON = 293,
-     COLON = 294,
-     LOWER = 295,
-     GREATER = 296,
-     EQUAL = 297
+     kw_PT_I8 = 287,
+     kw_PT_DOUBLE = 288,
+     kw_PT_SYSTIME = 289,
+     kw_PT_MV_LONG = 290,
+     kw_PT_MV_BINARY = 291,
+     kw_PT_MV_STRING8 = 292,
+     kw_PT_MV_UNICODE = 293,
+     kw_PT_BINARY = 294,
+     OBRACE = 295,
+     EBRACE = 296,
+     COMMA = 297,
+     SEMICOLON = 298,
+     COLON = 299,
+     LOWER = 300,
+     GREATER = 301,
+     EQUAL = 302
    };
 #endif
 
@@ -173,23 +171,27 @@ typedef union YYSTYPE
 {
 
 /* Line 214 of yacc.c  */
-#line 38 "libocpf/ocpf.y"
+#line 37 "libocpf/ocpf.y"
 
 	uint8_t				i;
 	uint8_t				b;
 	uint16_t			s;
 	uint32_t			l;
 	uint64_t			d;
+	double				dbl;
 	char				*name;
 	char				*nameW;
 	char				*date;
 	char				*var;
+	struct LongArray_r		MVl;
 	struct StringArray_r		MVszA;
+	struct StringArrayW_r		MVszW;
+	struct BinaryArray_r		MVbin;
 
 
 
 /* Line 214 of yacc.c  */
-#line 193 "libocpf/ocpf.tab.c"
+#line 195 "libocpf/ocpf.tab.c"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
@@ -201,7 +203,7 @@ typedef union YYSTYPE
 
 
 /* Line 264 of yacc.c  */
-#line 205 "libocpf/ocpf.tab.c"
+#line 207 "libocpf/ocpf.tab.c"
 
 #ifdef short
 # undef short
@@ -416,20 +418,20 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  2
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   131
+#define YYLAST   203
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  43
+#define YYNTOKENS  48
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  25
+#define YYNNTS  32
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  66
+#define YYNRULES  89
 /* YYNRULES -- Number of states.  */
-#define YYNSTATES  110
+#define YYNSTATES  154
 
 /* YYTRANSLATE(YYLEX) -- Bison symbol number corresponding to YYLEX.  */
 #define YYUNDEFTOK  2
-#define YYMAXUTOK   297
+#define YYMAXUTOK   302
 
 #define YYTRANSLATE(YYX)						\
   ((unsigned int) (YYX) <= YYMAXUTOK ? yytranslate[YYX] : YYUNDEFTOK)
@@ -466,59 +468,72 @@ static const yytype_uint8 yytranslate[] =
        5,     6,     7,     8,     9,    10,    11,    12,    13,    14,
       15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
-      35,    36,    37,    38,    39,    40,    41,    42
+      35,    36,    37,    38,    39,    40,    41,    42,    43,    44,
+      45,    46,    47
 };
 
 #if YYDEBUG
 /* YYPRHS[YYN] -- Index of the first RHS symbol of rule number YYN in
    YYRHS.  */
-static const yytype_uint8 yyprhs[] =
+static const yytype_uint16 yyprhs[] =
 {
        0,     0,     3,     4,     7,     9,    11,    13,    15,    17,
       19,    21,    24,    27,    30,    33,    37,    42,    48,    49,
-      52,    56,    60,    64,    68,    70,    72,    74,    76,    78,
-      80,    82,    87,    91,    95,    96,    99,   102,   103,   106,
-     108,   114,   115,   118,   122,   126,   130,   134,   140,   148,
-     156,   158,   160,   162,   164,   166,   168,   170,   172,   178,
-     184,   189,   191,   193,   195,   196,   199
+      52,    58,    64,    70,    71,    74,    78,    82,    86,    90,
+      96,    97,   100,   104,   108,   112,   116,   118,   120,   122,
+     124,   126,   128,   130,   132,   137,   142,   147,   151,   158,
+     162,   163,   166,   169,   170,   173,   176,   177,   180,   183,
+     184,   187,   189,   190,   193,   198,   204,   205,   208,   212,
+     216,   220,   224,   230,   238,   246,   248,   250,   252,   254,
+     256,   258,   260,   262,   264,   266,   268,   270,   272,   278
 };
 
 /* YYRHS -- A `-1'-separated list of the rules' RHS.  */
 static const yytype_int8 yyrhs[] =
 {
-      44,     0,    -1,    -1,    44,    45,    -1,    46,    -1,    47,
-      -1,    48,    -1,    49,    -1,    50,    -1,    58,    -1,    64,
-      -1,    14,     9,    -1,    15,     9,    -1,    15,     7,    -1,
-      15,    13,    -1,    16,     8,     9,    -1,    17,    13,    42,
-      53,    -1,    18,    35,    51,    36,    38,    -1,    -1,    51,
-      52,    -1,     8,    42,    53,    -1,     6,    42,    53,    -1,
-       8,    42,    13,    -1,     6,    42,    13,    -1,     9,    -1,
-      10,    -1,     5,    -1,     6,    -1,     4,    -1,     7,    -1,
-      12,    -1,    35,    54,     9,    36,    -1,    35,    56,    36,
-      -1,    40,     9,    41,    -1,    -1,    54,    55,    -1,     9,
-      37,    -1,    -1,    56,    57,    -1,     6,    -1,    19,    35,
-      59,    36,    38,    -1,    -1,    59,    60,    -1,    61,    42,
-      53,    -1,    63,    42,    53,    -1,    61,    42,    13,    -1,
-      63,    42,    13,    -1,    24,    39,     8,    39,     8,    -1,
-      25,    39,     6,    39,    62,    39,     8,    -1,    26,    39,
-       9,    39,    62,    39,     8,    -1,    28,    -1,    29,    -1,
-      30,    -1,    31,    -1,    27,    -1,    32,    -1,    33,    -1,
-      34,    -1,    25,    39,     6,    39,     8,    -1,    26,    39,
-       9,    39,     8,    -1,    20,    65,    66,     9,    -1,    21,
-      -1,    22,    -1,    23,    -1,    -1,    66,    67,    -1,     9,
-      38,    -1
+      49,     0,    -1,    -1,    49,    50,    -1,    51,    -1,    52,
+      -1,    53,    -1,    54,    -1,    60,    -1,    74,    -1,    55,
+      -1,    14,    10,    -1,    15,    10,    -1,    15,     7,    -1,
+      15,    13,    -1,    16,     9,    10,    -1,    17,    13,    47,
+      63,    -1,    20,    40,    56,    41,    43,    -1,    -1,    56,
+      57,    -1,    21,    40,    58,    41,    43,    -1,    22,    40,
+      58,    41,    43,    -1,    23,    40,    58,    41,    43,    -1,
+      -1,    58,    59,    -1,     9,    47,    63,    -1,     6,    47,
+      63,    -1,     9,    47,    13,    -1,     6,    47,    13,    -1,
+      18,    40,    61,    41,    43,    -1,    -1,    61,    62,    -1,
+       9,    47,    63,    -1,     6,    47,    63,    -1,     9,    47,
+      13,    -1,     6,    47,    13,    -1,    10,    -1,    11,    -1,
+       5,    -1,     6,    -1,     4,    -1,     7,    -1,     8,    -1,
+      12,    -1,    40,    64,     6,    41,    -1,    40,    66,    10,
+      41,    -1,    40,    68,    11,    41,    -1,    40,    70,    41,
+      -1,    40,    72,    40,    70,    41,    41,    -1,    45,    10,
+      46,    -1,    -1,    64,    65,    -1,     6,    42,    -1,    -1,
+      66,    67,    -1,    10,    42,    -1,    -1,    68,    69,    -1,
+      11,    42,    -1,    -1,    70,    71,    -1,     3,    -1,    -1,
+      72,    73,    -1,    40,    70,    41,    42,    -1,    19,    40,
+      75,    41,    43,    -1,    -1,    75,    76,    -1,    77,    47,
+      63,    -1,    79,    47,    63,    -1,    77,    47,    13,    -1,
+      79,    47,    13,    -1,    24,    44,     9,    44,     9,    -1,
+      25,    44,     6,    44,    78,    44,     9,    -1,    26,    44,
+      10,    44,    78,    44,     9,    -1,    28,    -1,    29,    -1,
+      30,    -1,    31,    -1,    33,    -1,    32,    -1,    27,    -1,
+      34,    -1,    35,    -1,    37,    -1,    38,    -1,    39,    -1,
+      36,    -1,    25,    44,     6,    44,     9,    -1,    26,    44,
+      10,    44,     9,    -1
 };
 
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,    99,    99,    99,   105,   106,   107,   108,   109,   110,
-     111,   115,   128,   137,   146,   158,   171,   179,   183,   183,
-     190,   195,   200,   204,   210,   215,   220,   221,   222,   223,
-     224,   229,   246,   250,   259,   259,   262,   279,   279,   281,
-     303,   307,   307,   313,   317,   321,   325,   331,   337,   343,
-     351,   356,   361,   366,   371,   376,   381,   386,   393,   400,
-     410,   422,   426,   430,   436,   436,   438
+       0,   107,   107,   107,   113,   114,   115,   116,   117,   118,
+     119,   123,   136,   145,   154,   166,   179,   187,   191,   191,
+     194,   199,   204,   211,   211,   217,   222,   227,   231,   237,
+     241,   241,   248,   253,   258,   262,   268,   273,   278,   279,
+     280,   281,   282,   283,   288,   303,   321,   339,   349,   372,
+     381,   381,   383,   398,   398,   401,   419,   419,   421,   439,
+     439,   441,   459,   459,   461,   485,   489,   489,   495,   499,
+     503,   507,   513,   519,   525,   533,   538,   543,   548,   553,
+     558,   563,   568,   573,   578,   583,   588,   593,   600,   607
 };
 #endif
 
@@ -528,18 +543,20 @@ static const yytype_uint16 yyrline[] =
 static const char *const yytname[] =
 {
   "$end", "error", "$undefined", "UINT8", "BOOLEAN", "SHORT", "INTEGER",
-  "DOUBLE", "IDENTIFIER", "STRING", "UNICODE", "MVSTRING", "SYSTIME",
-  "VAR", "kw_TYPE", "kw_FOLDER", "kw_OLEGUID", "kw_SET", "kw_PROPERTY",
+  "I8", "DOUBLE", "IDENTIFIER", "STRING", "UNICODE", "SYSTIME", "VAR",
+  "kw_TYPE", "kw_FOLDER", "kw_OLEGUID", "kw_SET", "kw_PROPERTY",
   "kw_NPROPERTY", "kw_RECIPIENT", "kw_TO", "kw_CC", "kw_BCC", "kw_OOM",
   "kw_MNID_ID", "kw_MNID_STRING", "kw_PT_BOOLEAN", "kw_PT_STRING8",
-  "kw_PT_UNICODE", "kw_PT_SHORT", "kw_PT_LONG", "kw_PT_SYSTIME",
-  "kw_PT_MV_STRING8", "kw_PT_BINARY", "OBRACE", "EBRACE", "COMMA",
+  "kw_PT_UNICODE", "kw_PT_SHORT", "kw_PT_LONG", "kw_PT_I8", "kw_PT_DOUBLE",
+  "kw_PT_SYSTIME", "kw_PT_MV_LONG", "kw_PT_MV_BINARY", "kw_PT_MV_STRING8",
+  "kw_PT_MV_UNICODE", "kw_PT_BINARY", "OBRACE", "EBRACE", "COMMA",
   "SEMICOLON", "COLON", "LOWER", "GREATER", "EQUAL", "$accept", "keywords",
-  "kvalues", "Type", "Folder", "OLEGUID", "Set", "Property", "pcontent",
-  "content", "propvalue", "mvstring_contents", "mvstring_content",
-  "binary_contents", "binary_content", "NProperty", "npcontent",
-  "ncontent", "kind", "proptype", "known_kind", "Recipient", "recipClass",
-  "recipients", "recipient", 0
+  "kvalues", "Type", "Folder", "OLEGUID", "Set", "Recipient", "recipients",
+  "recipient", "rpcontent", "rcontent", "Property", "pcontent", "content",
+  "propvalue", "mvlong_contents", "mvlong_content", "mvstring_contents",
+  "mvstring_content", "mvunicode_contents", "mvunicode_content",
+  "binary_contents", "binary_content", "mvbin_contents", "mvbin_content",
+  "NProperty", "npcontent", "ncontent", "kind", "proptype", "known_kind", 0
 };
 #endif
 
@@ -552,20 +569,22 @@ static const yytype_uint16 yytoknum[] =
      265,   266,   267,   268,   269,   270,   271,   272,   273,   274,
      275,   276,   277,   278,   279,   280,   281,   282,   283,   284,
      285,   286,   287,   288,   289,   290,   291,   292,   293,   294,
-     295,   296,   297
+     295,   296,   297,   298,   299,   300,   301,   302
 };
 # endif
 
 /* YYR1[YYN] -- Symbol number of symbol that rule YYN derives.  */
 static const yytype_uint8 yyr1[] =
 {
-       0,    43,    44,    44,    45,    45,    45,    45,    45,    45,
-      45,    46,    47,    47,    47,    48,    49,    50,    51,    51,
-      52,    52,    52,    52,    53,    53,    53,    53,    53,    53,
-      53,    53,    53,    53,    54,    54,    55,    56,    56,    57,
-      58,    59,    59,    60,    60,    60,    60,    61,    61,    61,
-      62,    62,    62,    62,    62,    62,    62,    62,    63,    63,
-      64,    65,    65,    65,    66,    66,    67
+       0,    48,    49,    49,    50,    50,    50,    50,    50,    50,
+      50,    51,    52,    52,    52,    53,    54,    55,    56,    56,
+      57,    57,    57,    58,    58,    59,    59,    59,    59,    60,
+      61,    61,    62,    62,    62,    62,    63,    63,    63,    63,
+      63,    63,    63,    63,    63,    63,    63,    63,    63,    63,
+      64,    64,    65,    66,    66,    67,    68,    68,    69,    70,
+      70,    71,    72,    72,    73,    74,    75,    75,    76,    76,
+      76,    76,    77,    77,    77,    78,    78,    78,    78,    78,
+      78,    78,    78,    78,    78,    78,    78,    78,    79,    79
 };
 
 /* YYR2[YYN] -- Number of symbols composing right hand side of rule YYN.  */
@@ -573,11 +592,13 @@ static const yytype_uint8 yyr2[] =
 {
        0,     2,     0,     2,     1,     1,     1,     1,     1,     1,
        1,     2,     2,     2,     2,     3,     4,     5,     0,     2,
-       3,     3,     3,     3,     1,     1,     1,     1,     1,     1,
-       1,     4,     3,     3,     0,     2,     2,     0,     2,     1,
-       5,     0,     2,     3,     3,     3,     3,     5,     7,     7,
-       1,     1,     1,     1,     1,     1,     1,     1,     5,     5,
-       4,     1,     1,     1,     0,     2,     2
+       5,     5,     5,     0,     2,     3,     3,     3,     3,     5,
+       0,     2,     3,     3,     3,     3,     1,     1,     1,     1,
+       1,     1,     1,     1,     4,     4,     4,     3,     6,     3,
+       0,     2,     2,     0,     2,     2,     0,     2,     2,     0,
+       2,     1,     0,     2,     4,     5,     0,     2,     3,     3,
+       3,     3,     5,     7,     7,     1,     1,     1,     1,     1,
+       1,     1,     1,     1,     1,     1,     1,     1,     5,     5
 };
 
 /* YYDEFACT[STATE-NAME] -- Default rule to reduce with in state
@@ -586,108 +607,139 @@ static const yytype_uint8 yyr2[] =
 static const yytype_uint8 yydefact[] =
 {
        2,     0,     1,     0,     0,     0,     0,     0,     0,     0,
-       3,     4,     5,     6,     7,     8,     9,    10,    11,    13,
-      12,    14,     0,     0,    18,    41,    61,    62,    63,    64,
-      15,     0,     0,     0,     0,    28,    26,    27,    29,    24,
-      25,    30,    37,     0,    16,     0,     0,     0,    19,     0,
-       0,     0,     0,    42,     0,     0,    60,    65,     0,     0,
-       0,     0,     0,    17,     0,     0,     0,    40,     0,     0,
-      66,     0,    35,    39,    32,    38,    33,    23,    21,    22,
-      20,     0,     0,     0,    45,    43,    46,    44,    31,    36,
-       0,     0,     0,    47,    58,    54,    50,    51,    52,    53,
-      55,    56,    57,     0,    59,     0,     0,     0,    48,    49
+       3,     4,     5,     6,     7,    10,     8,     9,    11,    13,
+      12,    14,     0,     0,    30,    66,    18,    15,     0,     0,
+       0,     0,    40,    38,    39,    41,    42,    36,    37,    43,
+      59,     0,    16,     0,     0,     0,    31,     0,     0,     0,
+       0,    67,     0,     0,     0,     0,     0,     0,    19,     0,
+       0,     0,     0,     0,     0,     0,     0,    29,     0,     0,
+       0,    65,     0,     0,    23,    23,    23,    17,     0,    51,
+       0,    54,     0,    57,    61,    47,    60,    59,    63,    49,
+      35,    33,    34,    32,     0,     0,     0,    70,    68,    71,
+      69,     0,     0,     0,    44,    52,    45,    55,    46,    58,
+       0,     0,     0,     0,     0,     0,     0,    24,     0,     0,
+       0,    72,    88,    81,    75,    76,    77,    78,    80,    79,
+      82,    83,    87,    84,    85,    86,     0,    89,     0,     0,
+       0,    20,    21,    22,    48,    64,     0,     0,    28,    26,
+      27,    25,    73,    74
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
-static const yytype_int8 yydefgoto[] =
+static const yytype_int16 yydefgoto[] =
 {
-      -1,     1,    10,    11,    12,    13,    14,    15,    32,    48,
-      44,    58,    72,    59,    75,    16,    33,    53,    54,   103,
-      55,    17,    29,    34,    57
+      -1,     1,    10,    11,    12,    13,    14,    15,    31,    58,
+     101,   117,    16,    29,    46,    42,    59,    79,    60,    81,
+      61,    83,    62,    86,    63,    88,    17,    30,    51,    52,
+     136,    53
 };
 
 /* YYPACT[STATE-NUM] -- Index in YYTABLE of the portion describing
    STATE-NUM.  */
-#define YYPACT_NINF -12
-static const yytype_int8 yypact[] =
+#define YYPACT_NINF -66
+static const yytype_int16 yypact[] =
 {
-     -12,   105,   -12,    -5,    99,    -1,     1,   -11,    -8,    27,
-     -12,   -12,   -12,   -12,   -12,   -12,   -12,   -12,   -12,   -12,
-     -12,   -12,    21,    -3,   -12,   -12,   -12,   -12,   -12,   -12,
-     -12,    28,    36,    40,    34,   -12,   -12,   -12,   -12,   -12,
-     -12,   -12,    50,    53,   -12,     3,    25,    31,   -12,    32,
-      38,    43,    37,   -12,    42,    45,    41,   -12,    98,    11,
-      68,    -4,     6,   -12,   102,   107,   106,   -12,    16,    48,
-     -12,    49,   -12,   -12,   -12,   -12,   -12,   -12,   -12,   -12,
-     -12,    72,    75,    77,   -12,   -12,   -12,   -12,   -12,   -12,
-     109,    62,    70,   -12,   -12,   -12,   -12,   -12,   -12,   -12,
-     -12,   -12,   -12,    79,   -12,    87,   119,   120,   -12,   -12
+     -66,   166,   -66,    -4,    54,    42,    26,    -6,    14,    16,
+     -66,   -66,   -66,   -66,   -66,   -66,   -66,   -66,   -66,   -66,
+     -66,   -66,    49,    19,   -66,   -66,   -66,   -66,    98,    71,
+     106,   103,   -66,   -66,   -66,   -66,   -66,   -66,   -66,   -66,
+      47,    53,   -66,    50,    60,    72,   -66,    29,    75,    77,
+      79,   -66,    80,    82,    94,    96,    97,    99,   -66,   133,
+     130,   134,    11,   101,   104,     5,    15,   -66,   142,   181,
+     178,   -66,    25,    36,   -66,   -66,   -66,   -66,   -39,   -66,
+     -37,   -66,    27,   -66,   -66,   -66,   -66,   -66,   -66,   -66,
+     -66,   -66,   -66,   -66,   145,   146,   147,   -66,   -66,   -66,
+     -66,   105,   107,   111,   -66,   -66,   -66,   -66,   -66,   -66,
+      21,   183,   126,   140,   148,   149,   150,   -66,   151,   154,
+      30,   -66,   -66,   -66,   -66,   -66,   -66,   -66,   -66,   -66,
+     -66,   -66,   -66,   -66,   -66,   -66,   155,   -66,   156,    78,
+      88,   -66,   -66,   -66,   -66,   -66,   189,   192,   -66,   -66,
+     -66,   -66,   -66,   -66
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-     -12,   -12,   -12,   -12,   -12,   -12,   -12,   -12,   -12,   -12,
-      12,   -12,   -12,   -12,   -12,   -12,   -12,   -12,   -12,    39,
-     -12,   -12,   -12,   -12,   -12
+     -66,   -66,   -66,   -66,   -66,   -66,   -66,   -66,   -66,   -66,
+       3,   -66,   -66,   -66,   -66,   -65,   -66,   -66,   -66,   -66,
+     -66,   -66,   115,   -66,   -66,   -66,   -66,   -66,   -66,   -66,
+      90,   -66
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]].  What to do in state STATE-NUM.  If
    positive, shift that token.  If negative, reduce the rule which
    number is the opposite.  If zero, do what YYDEFACT says.
    If YYTABLE_NINF, syntax error.  */
-#define YYTABLE_NINF -35
-static const yytype_int8 yytable[] =
+#define YYTABLE_NINF -63
+static const yytype_int16 yytable[] =
 {
-      35,    36,    37,    38,    18,    39,    40,    22,    41,    77,
-      35,    36,    37,    38,    23,    39,    40,    73,    41,    79,
-      35,    36,    37,    38,    24,    39,    40,    25,    41,    84,
-      30,    42,    35,    36,    37,    38,    43,    39,    40,    31,
-      41,    42,    45,    56,    46,    61,    43,    74,    26,    27,
-      28,    42,    35,    36,    37,    38,    43,    39,    40,   -34,
-      41,    86,    60,    42,    49,    50,    51,    62,    43,    63,
-      94,    64,    47,    78,    80,    67,    52,    65,   104,    70,
-      85,    87,    66,    42,    68,    88,    89,    69,    43,    95,
-      96,    97,    98,    99,   100,   101,   102,    95,    96,    97,
-      98,    99,   100,   101,   102,     2,    19,    71,    20,    76,
-      81,    90,    21,    82,    91,    83,    92,    93,   106,     3,
-       4,     5,     6,     7,     8,     9,   107,   108,   109,     0,
-       0,   105
+      91,    93,   104,   105,   106,   107,    18,    98,   100,    32,
+      33,    34,    35,    36,    84,    37,    38,    39,    90,    32,
+      33,    34,    35,    36,    84,    37,    38,    39,    92,    32,
+      33,    34,    35,    36,    24,    37,    38,    39,    97,    23,
+      32,    33,    34,    35,    36,    40,    37,    38,    39,    99,
+      41,    22,    85,   -50,    25,    40,    26,   -53,   -56,    27,
+      41,    19,   120,    64,    20,    40,    28,    21,   108,   109,
+      41,   144,   145,    68,   149,   151,    40,    43,   102,   103,
+      44,    41,    32,    33,    34,    35,    36,   -62,    37,    38,
+      39,   148,    32,    33,    34,    35,    36,    65,    37,    38,
+      39,   150,    32,    33,    34,    35,    36,    66,    37,    38,
+      39,   114,    45,   114,   115,    67,   115,   114,    40,    69,
+     115,    70,    71,    41,    54,    55,    56,    72,    40,    73,
+      47,    48,    49,    41,    74,   122,    75,    76,    40,    78,
+      80,    87,    77,    41,    57,    82,   116,    50,   118,   137,
+      89,    94,   119,   123,   124,   125,   126,   127,   128,   129,
+     130,   131,   132,   133,   134,   135,     2,   123,   124,   125,
+     126,   127,   128,   129,   130,   131,   132,   133,   134,   135,
+       3,     4,     5,     6,     7,     8,     9,    95,    96,   111,
+     112,   113,   121,   141,   142,   139,   140,   143,   152,   146,
+     147,   153,   110,   138
 };
 
-static const yytype_int8 yycheck[] =
+static const yytype_uint8 yycheck[] =
 {
-       4,     5,     6,     7,     9,     9,    10,     8,    12,    13,
-       4,     5,     6,     7,    13,     9,    10,     6,    12,    13,
-       4,     5,     6,     7,    35,     9,    10,    35,    12,    13,
-       9,    35,     4,     5,     6,     7,    40,     9,    10,    42,
-      12,    35,     6,     9,     8,    42,    40,    36,    21,    22,
-      23,    35,     4,     5,     6,     7,    40,     9,    10,     9,
-      12,    13,     9,    35,    24,    25,    26,    42,    40,    38,
-       8,    39,    36,    61,    62,    38,    36,    39,     8,    38,
-      68,    69,    39,    35,    42,    36,    37,    42,    40,    27,
-      28,    29,    30,    31,    32,    33,    34,    27,    28,    29,
-      30,    31,    32,    33,    34,     0,     7,     9,     9,    41,
-       8,    39,    13,     6,    39,     9,    39,     8,    39,    14,
-      15,    16,    17,    18,    19,    20,    39,     8,     8,    -1,
-      -1,    92
+      65,    66,    41,    42,    41,    42,    10,    72,    73,     4,
+       5,     6,     7,     8,     3,    10,    11,    12,    13,     4,
+       5,     6,     7,     8,     3,    10,    11,    12,    13,     4,
+       5,     6,     7,     8,    40,    10,    11,    12,    13,    13,
+       4,     5,     6,     7,     8,    40,    10,    11,    12,    13,
+      45,     9,    41,     6,    40,    40,    40,    10,    11,    10,
+      45,     7,    41,    10,    10,    40,    47,    13,    41,    42,
+      45,    41,    42,    44,   139,   140,    40,     6,    75,    76,
+       9,    45,     4,     5,     6,     7,     8,    40,    10,    11,
+      12,    13,     4,     5,     6,     7,     8,    47,    10,    11,
+      12,    13,     4,     5,     6,     7,     8,    47,    10,    11,
+      12,     6,    41,     6,     9,    43,     9,     6,    40,    44,
+       9,    44,    43,    45,    21,    22,    23,    47,    40,    47,
+      24,    25,    26,    45,    40,     9,    40,    40,    40,     6,
+      10,    40,    43,    45,    41,    11,    41,    41,    41,     9,
+      46,     9,    41,    27,    28,    29,    30,    31,    32,    33,
+      34,    35,    36,    37,    38,    39,     0,    27,    28,    29,
+      30,    31,    32,    33,    34,    35,    36,    37,    38,    39,
+      14,    15,    16,    17,    18,    19,    20,     6,    10,    44,
+      44,    44,     9,    43,    43,    47,    47,    43,     9,    44,
+      44,     9,    87,   113
 };
 
 /* YYSTOS[STATE-NUM] -- The (internal number of the) accessing
    symbol of state STATE-NUM.  */
 static const yytype_uint8 yystos[] =
 {
-       0,    44,     0,    14,    15,    16,    17,    18,    19,    20,
-      45,    46,    47,    48,    49,    50,    58,    64,     9,     7,
-       9,    13,     8,    13,    35,    35,    21,    22,    23,    65,
-       9,    42,    51,    59,    66,     4,     5,     6,     7,     9,
-      10,    12,    35,    40,    53,     6,     8,    36,    52,    24,
-      25,    26,    36,    60,    61,    63,     9,    67,    54,    56,
-       9,    42,    42,    38,    39,    39,    39,    38,    42,    42,
-      38,     9,    55,     6,    36,    57,    41,    13,    53,    13,
-      53,     8,     6,     9,    13,    53,    13,    53,    36,    37,
-      39,    39,    39,     8,     8,    27,    28,    29,    30,    31,
-      32,    33,    34,    62,     8,    62,    39,    39,     8,     8
+       0,    49,     0,    14,    15,    16,    17,    18,    19,    20,
+      50,    51,    52,    53,    54,    55,    60,    74,    10,     7,
+      10,    13,     9,    13,    40,    40,    40,    10,    47,    61,
+      75,    56,     4,     5,     6,     7,     8,    10,    11,    12,
+      40,    45,    63,     6,     9,    41,    62,    24,    25,    26,
+      41,    76,    77,    79,    21,    22,    23,    41,    57,    64,
+      66,    68,    70,    72,    10,    47,    47,    43,    44,    44,
+      44,    43,    47,    47,    40,    40,    40,    43,     6,    65,
+      10,    67,    11,    69,     3,    41,    71,    40,    73,    46,
+      13,    63,    13,    63,     9,     6,    10,    13,    63,    13,
+      63,    58,    58,    58,    41,    42,    41,    42,    41,    42,
+      70,    44,    44,    44,     6,     9,    41,    59,    41,    41,
+      41,     9,     9,    27,    28,    29,    30,    31,    32,    33,
+      34,    35,    36,    37,    38,    39,    78,     9,    78,    47,
+      47,    43,    43,    43,    41,    42,    44,    44,    13,    63,
+      13,    63,     9,     9
 };
 
 #define yyerrok		(yyerrstatus = 0)
@@ -720,7 +772,7 @@ do								\
     }								\
   else								\
     {								\
-      yyerror (YY_("syntax error: cannot back up")); \
+      yyerror (ctx, scanner, YY_("syntax error: cannot back up")); \
       YYERROR;							\
     }								\
 while (YYID (0))
@@ -775,9 +827,9 @@ while (YYID (0))
 /* YYLEX -- calling `yylex' with the right arguments.  */
 
 #ifdef YYLEX_PARAM
-# define YYLEX yylex (YYLEX_PARAM)
+# define YYLEX yylex (&yylval, YYLEX_PARAM)
 #else
-# define YYLEX yylex ()
+# define YYLEX yylex (&yylval, scanner)
 #endif
 
 /* Enable debugging if requested.  */
@@ -800,7 +852,7 @@ do {									  \
     {									  \
       YYFPRINTF (stderr, "%s ", Title);					  \
       yy_symbol_print (stderr,						  \
-		  Type, Value); \
+		  Type, Value, ctx, scanner); \
       YYFPRINTF (stderr, "\n");						  \
     }									  \
 } while (YYID (0))
@@ -814,17 +866,21 @@ do {									  \
 #if (defined __STDC__ || defined __C99__FUNC__ \
      || defined __cplusplus || defined _MSC_VER)
 static void
-yy_symbol_value_print (FILE *yyoutput, int yytype, YYSTYPE const * const yyvaluep)
+yy_symbol_value_print (FILE *yyoutput, int yytype, YYSTYPE const * const yyvaluep, struct ocpf_context *ctx, void *scanner)
 #else
 static void
-yy_symbol_value_print (yyoutput, yytype, yyvaluep)
+yy_symbol_value_print (yyoutput, yytype, yyvaluep, ctx, scanner)
     FILE *yyoutput;
     int yytype;
     YYSTYPE const * const yyvaluep;
+    struct ocpf_context *ctx;
+    void *scanner;
 #endif
 {
   if (!yyvaluep)
     return;
+  YYUSE (ctx);
+  YYUSE (scanner);
 # ifdef YYPRINT
   if (yytype < YYNTOKENS)
     YYPRINT (yyoutput, yytoknum[yytype], *yyvaluep);
@@ -846,13 +902,15 @@ yy_symbol_value_print (yyoutput, yytype, yyvaluep)
 #if (defined __STDC__ || defined __C99__FUNC__ \
      || defined __cplusplus || defined _MSC_VER)
 static void
-yy_symbol_print (FILE *yyoutput, int yytype, YYSTYPE const * const yyvaluep)
+yy_symbol_print (FILE *yyoutput, int yytype, YYSTYPE const * const yyvaluep, struct ocpf_context *ctx, void *scanner)
 #else
 static void
-yy_symbol_print (yyoutput, yytype, yyvaluep)
+yy_symbol_print (yyoutput, yytype, yyvaluep, ctx, scanner)
     FILE *yyoutput;
     int yytype;
     YYSTYPE const * const yyvaluep;
+    struct ocpf_context *ctx;
+    void *scanner;
 #endif
 {
   if (yytype < YYNTOKENS)
@@ -860,7 +918,7 @@ yy_symbol_print (yyoutput, yytype, yyvaluep)
   else
     YYFPRINTF (yyoutput, "nterm %s (", yytname[yytype]);
 
-  yy_symbol_value_print (yyoutput, yytype, yyvaluep);
+  yy_symbol_value_print (yyoutput, yytype, yyvaluep, ctx, scanner);
   YYFPRINTF (yyoutput, ")");
 }
 
@@ -903,12 +961,14 @@ do {								\
 #if (defined __STDC__ || defined __C99__FUNC__ \
      || defined __cplusplus || defined _MSC_VER)
 static void
-yy_reduce_print (YYSTYPE *yyvsp, int yyrule)
+yy_reduce_print (YYSTYPE *yyvsp, int yyrule, struct ocpf_context *ctx, void *scanner)
 #else
 static void
-yy_reduce_print (yyvsp, yyrule)
+yy_reduce_print (yyvsp, yyrule, ctx, scanner)
     YYSTYPE *yyvsp;
     int yyrule;
+    struct ocpf_context *ctx;
+    void *scanner;
 #endif
 {
   int yynrhs = yyr2[yyrule];
@@ -922,7 +982,7 @@ yy_reduce_print (yyvsp, yyrule)
       YYFPRINTF (stderr, "   $%d = ", yyi + 1);
       yy_symbol_print (stderr, yyrhs[yyprhs[yyrule] + yyi],
 		       &(yyvsp[(yyi + 1) - (yynrhs)])
-		       		       );
+		       		       , ctx, scanner);
       YYFPRINTF (stderr, "\n");
     }
 }
@@ -930,7 +990,7 @@ yy_reduce_print (yyvsp, yyrule)
 # define YY_REDUCE_PRINT(Rule)		\
 do {					\
   if (yydebug)				\
-    yy_reduce_print (yyvsp, Rule); \
+    yy_reduce_print (yyvsp, Rule, ctx, scanner); \
 } while (YYID (0))
 
 /* Nonzero means print parse trace.  It is left uninitialized so that
@@ -1181,16 +1241,20 @@ yysyntax_error (char *yyresult, int yystate, int yychar)
 #if (defined __STDC__ || defined __C99__FUNC__ \
      || defined __cplusplus || defined _MSC_VER)
 static void
-yydestruct (const char *yymsg, int yytype, YYSTYPE *yyvaluep)
+yydestruct (const char *yymsg, int yytype, YYSTYPE *yyvaluep, struct ocpf_context *ctx, void *scanner)
 #else
 static void
-yydestruct (yymsg, yytype, yyvaluep)
+yydestruct (yymsg, yytype, yyvaluep, ctx, scanner)
     const char *yymsg;
     int yytype;
     YYSTYPE *yyvaluep;
+    struct ocpf_context *ctx;
+    void *scanner;
 #endif
 {
   YYUSE (yyvaluep);
+  YYUSE (ctx);
+  YYUSE (scanner);
 
   if (!yymsg)
     yymsg = "Deleting";
@@ -1213,21 +1277,13 @@ int yyparse ();
 #endif
 #else /* ! YYPARSE_PARAM */
 #if defined __STDC__ || defined __cplusplus
-int yyparse (void);
+int yyparse (struct ocpf_context *ctx, void *scanner);
 #else
 int yyparse ();
 #endif
 #endif /* ! YYPARSE_PARAM */
 
 
-/* The lookahead symbol.  */
-int yychar;
-
-/* The semantic value of the lookahead symbol.  */
-YYSTYPE yylval;
-
-/* Number of syntax errors so far.  */
-int yynerrs;
 
 
 
@@ -1249,15 +1305,23 @@ yyparse (YYPARSE_PARAM)
 #if (defined __STDC__ || defined __C99__FUNC__ \
      || defined __cplusplus || defined _MSC_VER)
 int
-yyparse (void)
+yyparse (struct ocpf_context *ctx, void *scanner)
 #else
 int
-yyparse ()
-
+yyparse (ctx, scanner)
+    struct ocpf_context *ctx;
+    void *scanner;
 #endif
 #endif
 {
+/* The lookahead symbol.  */
+int yychar;
 
+/* The semantic value of the lookahead symbol.  */
+YYSTYPE yylval;
+
+    /* Number of syntax errors so far.  */
+    int yynerrs;
 
     int yystate;
     /* Number of tokens to shift before error messages enabled.  */
@@ -1501,22 +1565,22 @@ yyreduce:
         case 3:
 
 /* Line 1455 of yacc.c  */
-#line 100 "libocpf/ocpf.y"
+#line 108 "libocpf/ocpf.y"
     {
-			memset(&lpProp, 0, sizeof (union SPropValue_CTR));
+			memset(&ctx->lpProp, 0, sizeof (union SPropValue_CTR));
 		;}
     break;
 
   case 11:
 
 /* Line 1455 of yacc.c  */
-#line 116 "libocpf/ocpf.y"
+#line 124 "libocpf/ocpf.y"
     {
-			if (!typeset) {
-				ocpf_type_add((yyvsp[(2) - (2)].name));
-				typeset++;
+			if (!ctx->typeset) {
+			  ocpf_type_add(ctx,(yyvsp[(2) - (2)].name));
+				ctx->typeset++;
 			} else {
-				error_message("%s", "duplicated TYPE\n");
+				ocpf_error_message(ctx, "%s", "duplicated TYPE\n");
 				return -1;
 			}
 		;}
@@ -1525,13 +1589,13 @@ yyreduce:
   case 12:
 
 /* Line 1455 of yacc.c  */
-#line 129 "libocpf/ocpf.y"
+#line 137 "libocpf/ocpf.y"
     {
-			if (folderset == false) {
-				ocpf_folder_add((yyvsp[(2) - (2)].name), 0, NULL);
-				folderset = true;
+			if (ctx->folderset == false) {
+				ocpf_folder_add(ctx, (yyvsp[(2) - (2)].name), 0, NULL);
+				ctx->folderset = true;
 			} else {
-				error_message("%s", "duplicated FOLDER\n");
+				ocpf_error_message(ctx, "%s", "duplicated FOLDER\n");
 			}
 		;}
     break;
@@ -1539,13 +1603,13 @@ yyreduce:
   case 13:
 
 /* Line 1455 of yacc.c  */
-#line 138 "libocpf/ocpf.y"
+#line 146 "libocpf/ocpf.y"
     {
-			if (folderset == false) {
-				ocpf_folder_add(NULL, (yyvsp[(2) - (2)].d), NULL);
-				folderset = true;
+			if (ctx->folderset == false) {
+				ocpf_folder_add(ctx, NULL, (yyvsp[(2) - (2)].d), NULL);
+				ctx->folderset = true;
 			} else {
-				error_message("%s", "duplicated FOLDER\n");
+				ocpf_error_message(ctx,"%s", "duplicated FOLDER\n");
 			}
 		;}
     break;
@@ -1553,13 +1617,13 @@ yyreduce:
   case 14:
 
 /* Line 1455 of yacc.c  */
-#line 147 "libocpf/ocpf.y"
+#line 155 "libocpf/ocpf.y"
     {
-			if (folderset == false) {
-				ocpf_folder_add(NULL, 0, (yyvsp[(2) - (2)].var));
-				folderset = true;
+			if (ctx->folderset == false) {
+				ocpf_folder_add(ctx, NULL, 0, (yyvsp[(2) - (2)].var));
+				ctx->folderset = true;
 			} else {
-				error_message("%s", "duplicated FOLDER\n");
+				ocpf_error_message(ctx,"%s", "duplicated FOLDER\n");
 			}
 		;}
     break;
@@ -1567,477 +1631,704 @@ yyreduce:
   case 15:
 
 /* Line 1455 of yacc.c  */
-#line 159 "libocpf/ocpf.y"
+#line 167 "libocpf/ocpf.y"
     { 
 			char *name;
 			char *guid;
 			
-			name = talloc_strdup(ocpf->mem_ctx, (yyvsp[(2) - (3)].name));
-			guid = talloc_strdup(ocpf->mem_ctx, (yyvsp[(3) - (3)].name));
+			name = talloc_strdup(ctx, (yyvsp[(2) - (3)].name));
+			guid = talloc_strdup(ctx, (yyvsp[(3) - (3)].name));
 
-			ocpf_oleguid_add(name, guid);
+			ocpf_oleguid_add(ctx, name, guid);
 		;}
     break;
 
   case 16:
 
 /* Line 1455 of yacc.c  */
-#line 172 "libocpf/ocpf.y"
+#line 180 "libocpf/ocpf.y"
     {
-			ocpf_variable_add((yyvsp[(2) - (4)].var), lpProp, type, true);
-			memset(&lpProp, 0, sizeof (union SPropValue_CTR));
+			ocpf_variable_add(ctx, (yyvsp[(2) - (4)].var), ctx->lpProp, ctx->ltype, true);
+			memset(&ctx->lpProp, 0, sizeof (union SPropValue_CTR));
 		;}
     break;
 
   case 17:
 
 /* Line 1455 of yacc.c  */
-#line 180 "libocpf/ocpf.y"
+#line 188 "libocpf/ocpf.y"
     {
-		;}
-    break;
-
-  case 19:
-
-/* Line 1455 of yacc.c  */
-#line 184 "libocpf/ocpf.y"
-    {
-			memset(&lpProp, 0, sizeof (union SPropValue_CTR));
 		;}
     break;
 
   case 20:
 
 /* Line 1455 of yacc.c  */
-#line 191 "libocpf/ocpf.y"
+#line 195 "libocpf/ocpf.y"
     {
-		  ocpf_propvalue_s((yyvsp[(1) - (3)].name), lpProp, type, true);
-			ocpf_propvalue_free(lpProp, type);
+			ocpf_recipient_set_class(ctx, MAPI_TO);
+			ocpf_new_recipient(ctx);
 		;}
     break;
 
   case 21:
 
 /* Line 1455 of yacc.c  */
-#line 196 "libocpf/ocpf.y"
+#line 200 "libocpf/ocpf.y"
     {
-			ocpf_propvalue((yyvsp[(1) - (3)].l), lpProp, type, true);
-			ocpf_propvalue_free(lpProp, type);
+			ocpf_recipient_set_class(ctx, MAPI_CC);
+			ocpf_new_recipient(ctx);
 		;}
     break;
 
   case 22:
 
 /* Line 1455 of yacc.c  */
-#line 201 "libocpf/ocpf.y"
-    {
-			ocpf_propvalue_var((yyvsp[(1) - (3)].name), 0x0, (yyvsp[(3) - (3)].var), true);
-		;}
-    break;
-
-  case 23:
-
-/* Line 1455 of yacc.c  */
 #line 205 "libocpf/ocpf.y"
     {
-			ocpf_propvalue_var(NULL, (yyvsp[(1) - (3)].l), (yyvsp[(3) - (3)].var), true);
+			ocpf_recipient_set_class(ctx, MAPI_BCC);
+			ocpf_new_recipient(ctx);
 		;}
     break;
 
   case 24:
 
 /* Line 1455 of yacc.c  */
-#line 211 "libocpf/ocpf.y"
-    { 
-			lpProp.lpszA = talloc_strdup(ocpf->mem_ctx, (yyvsp[(1) - (1)].name)); 
-			type = PT_STRING8; 
+#line 212 "libocpf/ocpf.y"
+    {
+			memset(&ctx->lpProp, 0, sizeof (union SPropValue_CTR));
 		;}
     break;
 
   case 25:
 
 /* Line 1455 of yacc.c  */
-#line 216 "libocpf/ocpf.y"
+#line 218 "libocpf/ocpf.y"
     {
-			lpProp.lpszW = talloc_strdup(ocpf->mem_ctx, (yyvsp[(1) - (1)].nameW));
-			type = PT_UNICODE;
+			ocpf_propvalue_s(ctx, (yyvsp[(1) - (3)].name), ctx->lpProp, ctx->ltype, true, kw_RECIPIENT);
+			ocpf_propvalue_free(ctx->lpProp, ctx->ltype);
 		;}
     break;
 
   case 26:
 
 /* Line 1455 of yacc.c  */
-#line 220 "libocpf/ocpf.y"
-    { lpProp.i = (yyvsp[(1) - (1)].s); type = PT_SHORT; ;}
+#line 223 "libocpf/ocpf.y"
+    {
+			ocpf_propvalue(ctx, (yyvsp[(1) - (3)].l), ctx->lpProp, ctx->ltype, true, kw_RECIPIENT);
+			ocpf_propvalue_free(ctx->lpProp, ctx->ltype);
+		;}
     break;
 
   case 27:
 
 /* Line 1455 of yacc.c  */
-#line 221 "libocpf/ocpf.y"
-    { lpProp.l = (yyvsp[(1) - (1)].l); type = PT_LONG; ;}
+#line 228 "libocpf/ocpf.y"
+    {
+			ocpf_propvalue_var(ctx, (yyvsp[(1) - (3)].name), 0x0, (yyvsp[(3) - (3)].var), true, kw_RECIPIENT);
+		;}
     break;
 
   case 28:
 
 /* Line 1455 of yacc.c  */
-#line 222 "libocpf/ocpf.y"
-    { lpProp.b = (yyvsp[(1) - (1)].b); type = PT_BOOLEAN; ;}
+#line 232 "libocpf/ocpf.y"
+    {
+			ocpf_propvalue_var(ctx, NULL, (yyvsp[(1) - (3)].l), (yyvsp[(3) - (3)].var), true, kw_RECIPIENT);
+		;}
     break;
 
   case 29:
 
 /* Line 1455 of yacc.c  */
-#line 223 "libocpf/ocpf.y"
-    { lpProp.d = (yyvsp[(1) - (1)].d); type = PT_DOUBLE; ;}
-    break;
-
-  case 30:
-
-/* Line 1455 of yacc.c  */
-#line 225 "libocpf/ocpf.y"
+#line 238 "libocpf/ocpf.y"
     {
-			ocpf_add_filetime((yyvsp[(1) - (1)].date), &lpProp.ft);
-			type = PT_SYSTIME;
 		;}
     break;
 
   case 31:
 
 /* Line 1455 of yacc.c  */
-#line 230 "libocpf/ocpf.y"
+#line 242 "libocpf/ocpf.y"
     {
-			TALLOC_CTX *mem_ctx;
-
-			if (!lpProp.MVszA.cValues) {
-				lpProp.MVszA.cValues = 0;
-				lpProp.MVszA.lppszA = talloc_array(ocpf->mem_ctx, const char *, 2);
-			} else {
-				lpProp.MVszA.lppszA = talloc_realloc(NULL, lpProp.MVszA.lppszA, const char *,
-								     lpProp.MVszA.cValues + 2);
-			}
-			mem_ctx = (TALLOC_CTX *) lpProp.MVszA.lppszA;
-			lpProp.MVszA.lppszA[lpProp.MVszA.cValues] = talloc_strdup(mem_ctx, (yyvsp[(3) - (4)].name));
-			lpProp.MVszA.cValues += 1;
-
-			type = PT_MV_STRING8;
+			memset(&ctx->lpProp, 0, sizeof (union SPropValue_CTR));
 		;}
     break;
 
   case 32:
 
 /* Line 1455 of yacc.c  */
-#line 247 "libocpf/ocpf.y"
+#line 249 "libocpf/ocpf.y"
     {
-			type = PT_BINARY;
+			ocpf_propvalue_s(ctx, (yyvsp[(1) - (3)].name), ctx->lpProp, ctx->ltype, true, kw_PROPERTY);
+			ocpf_propvalue_free(ctx->lpProp, ctx->ltype);
 		;}
     break;
 
   case 33:
 
 /* Line 1455 of yacc.c  */
-#line 251 "libocpf/ocpf.y"
+#line 254 "libocpf/ocpf.y"
     {
-			int	ret;
+			ocpf_propvalue(ctx, (yyvsp[(1) - (3)].l), ctx->lpProp, ctx->ltype, true, kw_PROPERTY);
+			ocpf_propvalue_free(ctx->lpProp, ctx->ltype);
+		;}
+    break;
 
-			ret = ocpf_binary_add((yyvsp[(2) - (3)].name), &lpProp.bin);
-			type = (ret == OCPF_SUCCESS) ? PT_BINARY : PT_ERROR;
+  case 34:
+
+/* Line 1455 of yacc.c  */
+#line 259 "libocpf/ocpf.y"
+    {
+			ocpf_propvalue_var(ctx, (yyvsp[(1) - (3)].name), 0x0, (yyvsp[(3) - (3)].var), true, kw_PROPERTY);
+		;}
+    break;
+
+  case 35:
+
+/* Line 1455 of yacc.c  */
+#line 263 "libocpf/ocpf.y"
+    {
+			ocpf_propvalue_var(ctx, NULL, (yyvsp[(1) - (3)].l), (yyvsp[(3) - (3)].var), true, kw_PROPERTY);
 		;}
     break;
 
   case 36:
 
 /* Line 1455 of yacc.c  */
-#line 263 "libocpf/ocpf.y"
-    {
-			TALLOC_CTX *mem_ctx;
+#line 269 "libocpf/ocpf.y"
+    { 
+			ctx->lpProp.lpszA = talloc_strdup(ctx, (yyvsp[(1) - (1)].name)); 
+			ctx->ltype = PT_STRING8; 
+		;}
+    break;
 
-			if (!lpProp.MVszA.cValues) {
-				lpProp.MVszA.cValues = 0;
-				lpProp.MVszA.lppszA = talloc_array(ocpf->mem_ctx, const char *, 2);
-			} else {
-				lpProp.MVszA.lppszA = talloc_realloc(NULL, lpProp.MVszA.lppszA, const char *,
-								     lpProp.MVszA.cValues + 2);
-			}
-			mem_ctx = (TALLOC_CTX *) lpProp.MVszA.lppszA;
-			lpProp.MVszA.lppszA[lpProp.MVszA.cValues] = talloc_strdup(mem_ctx, (yyvsp[(1) - (2)].name));
-			lpProp.MVszA.cValues += 1;
-		  ;}
+  case 37:
+
+/* Line 1455 of yacc.c  */
+#line 274 "libocpf/ocpf.y"
+    {
+			ctx->lpProp.lpszW = talloc_strdup(ctx, (yyvsp[(1) - (1)].nameW));
+			ctx->ltype = PT_UNICODE;
+		;}
+    break;
+
+  case 38:
+
+/* Line 1455 of yacc.c  */
+#line 278 "libocpf/ocpf.y"
+    { ctx->lpProp.i = (yyvsp[(1) - (1)].s); ctx->ltype = PT_SHORT; ;}
     break;
 
   case 39:
 
 /* Line 1455 of yacc.c  */
-#line 282 "libocpf/ocpf.y"
-    {
-			TALLOC_CTX *mem_ctx;
-
-			if ((yyvsp[(1) - (1)].l) > 0xFF) {
-				error_message("Invalid Binary constant: 0x%x > 0xFF\n", (yyvsp[(1) - (1)].l));
-			}
-
-			if (!lpProp.bin.cb) {
-				lpProp.bin.cb = 0;
-				lpProp.bin.lpb = talloc_array(ocpf->mem_ctx, uint8_t, 2);
-			} else {
-				lpProp.bin.lpb = talloc_realloc(NULL, lpProp.bin.lpb, uint8_t,
-								lpProp.bin.cb + 2);
-			}
-			mem_ctx = (TALLOC_CTX *) lpProp.bin.lpb;
-			lpProp.bin.lpb[lpProp.bin.cb] = (yyvsp[(1) - (1)].l);
-			lpProp.bin.cb += 1;
-		;}
+#line 279 "libocpf/ocpf.y"
+    { ctx->lpProp.l = (yyvsp[(1) - (1)].l); ctx->ltype = PT_LONG; ;}
     break;
 
   case 40:
 
 /* Line 1455 of yacc.c  */
-#line 304 "libocpf/ocpf.y"
-    {
-		;}
+#line 280 "libocpf/ocpf.y"
+    { ctx->lpProp.b = (yyvsp[(1) - (1)].b); ctx->ltype = PT_BOOLEAN; ;}
+    break;
+
+  case 41:
+
+/* Line 1455 of yacc.c  */
+#line 281 "libocpf/ocpf.y"
+    { ctx->lpProp.d = (yyvsp[(1) - (1)].d); ctx->ltype = PT_I8; ;}
     break;
 
   case 42:
 
 /* Line 1455 of yacc.c  */
-#line 308 "libocpf/ocpf.y"
-    {
-			memset(&lpProp, 0, sizeof (union SPropValue_CTR));
-		;}
+#line 282 "libocpf/ocpf.y"
+    { ctx->lpProp.dbl = (yyvsp[(1) - (1)].dbl), ctx->ltype = PT_DOUBLE; ;}
     break;
 
   case 43:
 
 /* Line 1455 of yacc.c  */
-#line 314 "libocpf/ocpf.y"
+#line 284 "libocpf/ocpf.y"
     {
-			ocpf_nproperty_add(&nprop, lpProp, NULL, type, true);
+			ocpf_add_filetime((yyvsp[(1) - (1)].date), &ctx->lpProp.ft);
+			ctx->ltype = PT_SYSTIME;
 		;}
     break;
 
   case 44:
 
 /* Line 1455 of yacc.c  */
-#line 318 "libocpf/ocpf.y"
+#line 289 "libocpf/ocpf.y"
     {
-			ocpf_nproperty_add(&nprop, lpProp, NULL, type, true);
+			if (!ctx->lpProp.MVl.cValues) {
+				ctx->lpProp.MVl.cValues = 0;
+				ctx->lpProp.MVl.lpl = talloc_array(ctx, uint32_t, 2);
+			} else {
+				ctx->lpProp.MVl.lpl = talloc_realloc(NULL, ctx->lpProp.MVl.lpl,
+								     uint32_t,
+								     ctx->lpProp.MVl.cValues + 2);
+			}
+			ctx->lpProp.MVl.lpl[ctx->lpProp.MVl.cValues] = (yyvsp[(3) - (4)].l);
+			ctx->lpProp.MVl.cValues += 1;
+
+			ctx->ltype = PT_MV_LONG;
 		;}
     break;
 
   case 45:
 
 /* Line 1455 of yacc.c  */
-#line 322 "libocpf/ocpf.y"
+#line 304 "libocpf/ocpf.y"
     {
-			ocpf_nproperty_add(&nprop, lpProp, (yyvsp[(3) - (3)].var), type, true);
+			TALLOC_CTX	*mem_ctx;
+
+			if (!ctx->lpProp.MVszA.cValues) {
+				ctx->lpProp.MVszA.cValues = 0;
+				ctx->lpProp.MVszA.lppszA = talloc_array(ctx, const char *, 2);
+			} else {
+				ctx->lpProp.MVszA.lppszA = talloc_realloc(NULL, ctx->lpProp.MVszA.lppszA, 
+									  const char *,
+									  ctx->lpProp.MVszA.cValues + 2);
+			}
+			mem_ctx = (TALLOC_CTX *) ctx->lpProp.MVszA.lppszA;
+			ctx->lpProp.MVszA.lppszA[ctx->lpProp.MVszA.cValues] = talloc_strdup(mem_ctx, (yyvsp[(3) - (4)].name));
+			ctx->lpProp.MVszA.cValues += 1;
+
+			ctx->ltype = PT_MV_STRING8;
 		;}
     break;
 
   case 46:
 
 /* Line 1455 of yacc.c  */
-#line 326 "libocpf/ocpf.y"
+#line 322 "libocpf/ocpf.y"
     {
-			ocpf_nproperty_add(&nprop, lpProp, (yyvsp[(3) - (3)].var), type, true);
+			TALLOC_CTX	*mem_ctx;
+			
+			if (!ctx->lpProp.MVszW.cValues) {
+				ctx->lpProp.MVszW.cValues = 0;
+				ctx->lpProp.MVszW.lppszW = talloc_array(ctx, const char *, 2);
+			} else {
+				ctx->lpProp.MVszW.lppszW = talloc_realloc(NULL, ctx->lpProp.MVszW.lppszW,
+									  const char *,
+									  ctx->lpProp.MVszW.cValues + 2);
+			}
+			mem_ctx = (TALLOC_CTX *) ctx->lpProp.MVszW.lppszW;
+			ctx->lpProp.MVszW.lppszW[ctx->lpProp.MVszW.cValues] = talloc_strdup(mem_ctx, (yyvsp[(3) - (4)].nameW));
+			ctx->lpProp.MVszW.cValues += 1;
+
+			ctx->ltype = PT_MV_UNICODE;
 		;}
     break;
 
   case 47:
 
 /* Line 1455 of yacc.c  */
-#line 332 "libocpf/ocpf.y"
+#line 340 "libocpf/ocpf.y"
     {
-			memset(&nprop, 0, sizeof (struct ocpf_nprop));
-			nprop.OOM = talloc_strdup(ocpf->mem_ctx, (yyvsp[(3) - (5)].name));
-			nprop.guid = (yyvsp[(5) - (5)].name);
+			ctx->lpProp.bin.cb = ctx->bin.cb;
+			ctx->lpProp.bin.lpb = talloc_memdup(ctx, ctx->bin.lpb, ctx->bin.cb);
+
+			talloc_free(ctx->bin.lpb);
+			ctx->bin.cb = 0;
+
+			ctx->ltype = PT_BINARY;
 		;}
     break;
 
   case 48:
 
 /* Line 1455 of yacc.c  */
-#line 338 "libocpf/ocpf.y"
+#line 350 "libocpf/ocpf.y"
     {
-			nprop.registered = false;
-			nprop.mnid_id = (yyvsp[(3) - (7)].l);
-			nprop.guid = (yyvsp[(7) - (7)].name);
+			TALLOC_CTX	*mem_ctx;
+
+			if (!ctx->lpProp.MVbin.cValues) {
+				ctx->lpProp.MVbin.cValues = 0;
+				ctx->lpProp.MVbin.lpbin = talloc_array(ctx, struct Binary_r, 2);
+			} else {
+				ctx->lpProp.MVbin.lpbin = talloc_realloc(NULL, ctx->lpProp.MVbin.lpbin,
+									 struct Binary_r,
+									 ctx->lpProp.MVbin.cValues + 2);
+			}
+			mem_ctx = (TALLOC_CTX *) ctx->lpProp.MVbin.lpbin;
+			ctx->lpProp.MVbin.lpbin[ctx->lpProp.MVbin.cValues].cb = ctx->bin.cb;
+			ctx->lpProp.MVbin.lpbin[ctx->lpProp.MVbin.cValues].lpb = talloc_memdup(mem_ctx,
+											       ctx->bin.lpb, 
+											       ctx->bin.cb);
+			ctx->lpProp.MVbin.cValues += 1;
+			talloc_free(ctx->bin.lpb);
+			ctx->bin.cb = 0;
+
+			ctx->ltype = PT_MV_BINARY;
 		;}
     break;
 
   case 49:
 
 /* Line 1455 of yacc.c  */
-#line 344 "libocpf/ocpf.y"
+#line 373 "libocpf/ocpf.y"
     {
-			nprop.registered = false;
-			nprop.mnid_string = talloc_strdup(ocpf->mem_ctx, (yyvsp[(3) - (7)].name));
-			nprop.guid = (yyvsp[(7) - (7)].name);
-		;}
-    break;
+			int	ret;
 
-  case 50:
-
-/* Line 1455 of yacc.c  */
-#line 352 "libocpf/ocpf.y"
-    {
- 			memset(&nprop, 0, sizeof (struct ocpf_nprop));
-			nprop.propType = PT_STRING8; 
-		;}
-    break;
-
-  case 51:
-
-/* Line 1455 of yacc.c  */
-#line 357 "libocpf/ocpf.y"
-    {
-			memset(&nprop, 0, sizeof (struct ocpf_nprop));
-			nprop.propType = PT_UNICODE; 
+			ret = ocpf_binary_add(ctx, (yyvsp[(2) - (3)].name), &ctx->lpProp.bin);
+			ctx->ltype = (ret == OCPF_SUCCESS) ? PT_BINARY : PT_ERROR;
 		;}
     break;
 
   case 52:
 
 /* Line 1455 of yacc.c  */
-#line 362 "libocpf/ocpf.y"
+#line 384 "libocpf/ocpf.y"
     {
-			memset(&nprop, 0, sizeof (struct ocpf_nprop));
-			nprop.propType = PT_SHORT;
-		;}
-    break;
-
-  case 53:
-
-/* Line 1455 of yacc.c  */
-#line 367 "libocpf/ocpf.y"
-    {
-			memset(&nprop, 0, sizeof (struct ocpf_nprop));
-			nprop.propType = PT_LONG; 
-		;}
-    break;
-
-  case 54:
-
-/* Line 1455 of yacc.c  */
-#line 372 "libocpf/ocpf.y"
-    {
-			memset(&nprop, 0, sizeof (struct ocpf_nprop));
-			nprop.propType = PT_BOOLEAN;
+			if (!ctx->lpProp.MVl.cValues) {
+				ctx->lpProp.MVl.cValues = 0;
+				ctx->lpProp.MVl.lpl = talloc_array(ctx, uint32_t, 2);
+			} else {
+				ctx->lpProp.MVl.lpl = talloc_realloc(NULL, ctx->lpProp.MVl.lpl, uint32_t,
+								     ctx->lpProp.MVl.cValues + 2);
+			}
+			ctx->lpProp.MVl.lpl[ctx->lpProp.MVl.cValues] = (yyvsp[(1) - (2)].l);
+			ctx->lpProp.MVl.cValues += 1;
 		;}
     break;
 
   case 55:
 
 /* Line 1455 of yacc.c  */
-#line 377 "libocpf/ocpf.y"
+#line 402 "libocpf/ocpf.y"
     {
-			memset(&nprop, 0, sizeof (struct ocpf_nprop));
-			nprop.propType = PT_SYSTIME; 
-		;}
-    break;
+			TALLOC_CTX	*mem_ctx;
 
-  case 56:
-
-/* Line 1455 of yacc.c  */
-#line 382 "libocpf/ocpf.y"
-    {
-			memset(&nprop, 0, sizeof (struct ocpf_nprop));
-			nprop.propType = PT_MV_STRING8;
-		;}
-    break;
-
-  case 57:
-
-/* Line 1455 of yacc.c  */
-#line 387 "libocpf/ocpf.y"
-    {
-			memset(&nprop, 0, sizeof (struct ocpf_nprop));
-			nprop.propType = PT_BINARY;
-		;}
+			if (!ctx->lpProp.MVszA.cValues) {
+				ctx->lpProp.MVszA.cValues = 0;
+				ctx->lpProp.MVszA.lppszA = talloc_array(ctx, const char *, 2);
+			} else {
+				ctx->lpProp.MVszA.lppszA = talloc_realloc(NULL, ctx->lpProp.MVszA.lppszA, 
+									  const char *,
+									  ctx->lpProp.MVszA.cValues + 2);
+			}
+			mem_ctx = (TALLOC_CTX *) ctx->lpProp.MVszA.lppszA;
+			ctx->lpProp.MVszA.lppszA[ctx->lpProp.MVszA.cValues] = talloc_strdup(mem_ctx, (yyvsp[(1) - (2)].name));
+			ctx->lpProp.MVszA.cValues += 1;
+		  ;}
     break;
 
   case 58:
 
 /* Line 1455 of yacc.c  */
-#line 394 "libocpf/ocpf.y"
+#line 422 "libocpf/ocpf.y"
     {
-			memset(&nprop, 0, sizeof (struct ocpf_nprop));
-			nprop.registered = true;
-			nprop.mnid_id = (yyvsp[(3) - (5)].l);
-			nprop.guid = (yyvsp[(5) - (5)].name);
-		;}
-    break;
+			TALLOC_CTX *mem_ctx;
 
-  case 59:
-
-/* Line 1455 of yacc.c  */
-#line 401 "libocpf/ocpf.y"
-    {
-			memset(&nprop, 0, sizeof (struct ocpf_nprop));
-			nprop.registered = true;
-			nprop.mnid_string = talloc_strdup(ocpf->mem_ctx, (yyvsp[(3) - (5)].name));
-			nprop.guid = (yyvsp[(5) - (5)].name);
-		;}
-    break;
-
-  case 60:
-
-/* Line 1455 of yacc.c  */
-#line 411 "libocpf/ocpf.y"
-    {
-			char	*recipient = NULL;
-
-			recipient = talloc_strdup(ocpf->mem_ctx, (yyvsp[(4) - (4)].name));
-			ocpf_recipient_add(recip_type, recipient);
-			talloc_free(recipient);
-
-			recip_type = 0;
+			if (!ctx->lpProp.MVszW.cValues) {
+				ctx->lpProp.MVszW.cValues = 0;
+				ctx->lpProp.MVszW.lppszW = talloc_array(ctx, const char *, 2);
+			} else {
+				ctx->lpProp.MVszW.lppszW = talloc_realloc(NULL, ctx->lpProp.MVszW.lppszW,
+									  const char *,
+									  ctx->lpProp.MVszW.cValues + 2);
+			}
+			mem_ctx = (TALLOC_CTX *) ctx->lpProp.MVszW.lppszW;
+			ctx->lpProp.MVszW.lppszW[ctx->lpProp.MVszW.cValues] = talloc_strdup(mem_ctx, (yyvsp[(1) - (2)].nameW));
+			ctx->lpProp.MVszW.cValues += 1;
 		;}
     break;
 
   case 61:
 
 /* Line 1455 of yacc.c  */
-#line 423 "libocpf/ocpf.y"
+#line 442 "libocpf/ocpf.y"
     {
-			recip_type = MAPI_TO;
+			if ((yyvsp[(1) - (1)].i) > 0xFF) {
+				ocpf_error_message(ctx,"Invalid Binary constant: 0x%x > 0xFF\n", (yyvsp[(1) - (1)].i));
+			}
+
+			if (!ctx->bin.cb) {
+				ctx->bin.cb = 0;
+				ctx->bin.lpb = talloc_array(ctx, uint8_t, 2);
+			} else {
+				ctx->bin.lpb = talloc_realloc(NULL, ctx->bin.lpb, uint8_t,
+								     ctx->bin.cb + 2);
+			}
+			ctx->bin.lpb[ctx->bin.cb] = (yyvsp[(1) - (1)].i);
+			ctx->bin.cb += 1;
 		;}
     break;
 
-  case 62:
+  case 64:
 
 /* Line 1455 of yacc.c  */
-#line 427 "libocpf/ocpf.y"
+#line 462 "libocpf/ocpf.y"
     {
-			recip_type = MAPI_CC;
+			TALLOC_CTX	*mem_ctx;
+
+			if (!ctx->lpProp.MVbin.cValues) {
+				ctx->lpProp.MVbin.cValues = 0;
+				ctx->lpProp.MVbin.lpbin = talloc_array(ctx, struct Binary_r, 2);
+			} else {
+				ctx->lpProp.MVbin.lpbin = talloc_realloc(NULL, ctx->lpProp.MVbin.lpbin,
+									 struct Binary_r,
+									 ctx->lpProp.MVbin.cValues + 2);
+			}
+			mem_ctx = (TALLOC_CTX *) ctx->lpProp.MVbin.lpbin;
+			ctx->lpProp.MVbin.lpbin[ctx->lpProp.MVbin.cValues].cb = ctx->bin.cb;
+			ctx->lpProp.MVbin.lpbin[ctx->lpProp.MVbin.cValues].lpb = talloc_memdup(mem_ctx,
+											       ctx->bin.lpb,
+											       ctx->bin.cb);
+			ctx->lpProp.MVbin.cValues += 1;
+
+			ctx->bin.cb = 0;
 		;}
     break;
 
-  case 63:
+  case 65:
 
 /* Line 1455 of yacc.c  */
-#line 431 "libocpf/ocpf.y"
+#line 486 "libocpf/ocpf.y"
     {
-			recip_type = MAPI_BCC;
 		;}
     break;
 
-  case 66:
+  case 67:
 
 /* Line 1455 of yacc.c  */
-#line 439 "libocpf/ocpf.y"
+#line 490 "libocpf/ocpf.y"
     {
-			char	*recipient = NULL;
+			memset(&ctx->lpProp, 0, sizeof (union SPropValue_CTR));
+		;}
+    break;
 
-			recipient = talloc_strdup(ocpf->mem_ctx, (yyvsp[(1) - (2)].name));
-			ocpf_recipient_add(recip_type, recipient);
-			talloc_free(recipient);
+  case 68:
+
+/* Line 1455 of yacc.c  */
+#line 496 "libocpf/ocpf.y"
+    {
+			ocpf_nproperty_add(ctx, &ctx->nprop, ctx->lpProp, NULL, ctx->ltype, true);
+		;}
+    break;
+
+  case 69:
+
+/* Line 1455 of yacc.c  */
+#line 500 "libocpf/ocpf.y"
+    {
+			ocpf_nproperty_add(ctx, &ctx->nprop, ctx->lpProp, NULL, ctx->ltype, true);
+		;}
+    break;
+
+  case 70:
+
+/* Line 1455 of yacc.c  */
+#line 504 "libocpf/ocpf.y"
+    {
+			ocpf_nproperty_add(ctx, &ctx->nprop, ctx->lpProp, (yyvsp[(3) - (3)].var), ctx->ltype, true);
+		;}
+    break;
+
+  case 71:
+
+/* Line 1455 of yacc.c  */
+#line 508 "libocpf/ocpf.y"
+    {
+			ocpf_nproperty_add(ctx, &ctx->nprop, ctx->lpProp, (yyvsp[(3) - (3)].var), ctx->ltype, true);
+		;}
+    break;
+
+  case 72:
+
+/* Line 1455 of yacc.c  */
+#line 514 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.OOM = talloc_strdup(ctx, (yyvsp[(3) - (5)].name));
+			ctx->nprop.guid = (yyvsp[(5) - (5)].name);
+		;}
+    break;
+
+  case 73:
+
+/* Line 1455 of yacc.c  */
+#line 520 "libocpf/ocpf.y"
+    {
+			ctx->nprop.registered = false;
+			ctx->nprop.mnid_id = (yyvsp[(3) - (7)].l);
+			ctx->nprop.guid = (yyvsp[(7) - (7)].name);
+		;}
+    break;
+
+  case 74:
+
+/* Line 1455 of yacc.c  */
+#line 526 "libocpf/ocpf.y"
+    {
+			ctx->nprop.registered = false;
+			ctx->nprop.mnid_string = talloc_strdup(ctx, (yyvsp[(3) - (7)].name));
+			ctx->nprop.guid = (yyvsp[(7) - (7)].name);
+		;}
+    break;
+
+  case 75:
+
+/* Line 1455 of yacc.c  */
+#line 534 "libocpf/ocpf.y"
+    {
+ 			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_STRING8; 
+		;}
+    break;
+
+  case 76:
+
+/* Line 1455 of yacc.c  */
+#line 539 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_UNICODE; 
+		;}
+    break;
+
+  case 77:
+
+/* Line 1455 of yacc.c  */
+#line 544 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_SHORT;
+		;}
+    break;
+
+  case 78:
+
+/* Line 1455 of yacc.c  */
+#line 549 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_LONG; 
+		;}
+    break;
+
+  case 79:
+
+/* Line 1455 of yacc.c  */
+#line 554 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_DOUBLE;
+		;}
+    break;
+
+  case 80:
+
+/* Line 1455 of yacc.c  */
+#line 559 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_I8;
+		;}
+    break;
+
+  case 81:
+
+/* Line 1455 of yacc.c  */
+#line 564 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_BOOLEAN;
+		;}
+    break;
+
+  case 82:
+
+/* Line 1455 of yacc.c  */
+#line 569 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_SYSTIME; 
+		;}
+    break;
+
+  case 83:
+
+/* Line 1455 of yacc.c  */
+#line 574 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_MV_LONG;
+		;}
+    break;
+
+  case 84:
+
+/* Line 1455 of yacc.c  */
+#line 579 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_MV_STRING8;
+		;}
+    break;
+
+  case 85:
+
+/* Line 1455 of yacc.c  */
+#line 584 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_MV_UNICODE;
+		;}
+    break;
+
+  case 86:
+
+/* Line 1455 of yacc.c  */
+#line 589 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_BINARY;
+		;}
+    break;
+
+  case 87:
+
+/* Line 1455 of yacc.c  */
+#line 594 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.propType = PT_MV_BINARY;
+		;}
+    break;
+
+  case 88:
+
+/* Line 1455 of yacc.c  */
+#line 601 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.registered = true;
+			ctx->nprop.mnid_id = (yyvsp[(3) - (5)].l);
+			ctx->nprop.guid = (yyvsp[(5) - (5)].name);
+		;}
+    break;
+
+  case 89:
+
+/* Line 1455 of yacc.c  */
+#line 608 "libocpf/ocpf.y"
+    {
+			memset(&ctx->nprop, 0, sizeof (struct ocpf_nprop));
+			ctx->nprop.registered = true;
+			ctx->nprop.mnid_string = talloc_strdup(ctx, (yyvsp[(3) - (5)].name));
+			ctx->nprop.guid = (yyvsp[(5) - (5)].name);
 		;}
     break;
 
 
 
 /* Line 1455 of yacc.c  */
-#line 2041 "libocpf/ocpf.tab.c"
+#line 2332 "libocpf/ocpf.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -2072,7 +2363,7 @@ yyerrlab:
     {
       ++yynerrs;
 #if ! YYERROR_VERBOSE
-      yyerror (YY_("syntax error"));
+      yyerror (ctx, scanner, YY_("syntax error"));
 #else
       {
 	YYSIZE_T yysize = yysyntax_error (0, yystate, yychar);
@@ -2096,11 +2387,11 @@ yyerrlab:
 	if (0 < yysize && yysize <= yymsg_alloc)
 	  {
 	    (void) yysyntax_error (yymsg, yystate, yychar);
-	    yyerror (yymsg);
+	    yyerror (ctx, scanner, yymsg);
 	  }
 	else
 	  {
-	    yyerror (YY_("syntax error"));
+	    yyerror (ctx, scanner, YY_("syntax error"));
 	    if (yysize != 0)
 	      goto yyexhaustedlab;
 	  }
@@ -2124,7 +2415,7 @@ yyerrlab:
       else
 	{
 	  yydestruct ("Error: discarding",
-		      yytoken, &yylval);
+		      yytoken, &yylval, ctx, scanner);
 	  yychar = YYEMPTY;
 	}
     }
@@ -2180,7 +2471,7 @@ yyerrlab1:
 
 
       yydestruct ("Error: popping",
-		  yystos[yystate], yyvsp);
+		  yystos[yystate], yyvsp, ctx, scanner);
       YYPOPSTACK (1);
       yystate = *yyssp;
       YY_STACK_PRINT (yyss, yyssp);
@@ -2215,7 +2506,7 @@ yyabortlab:
 | yyexhaustedlab -- memory exhaustion comes here.  |
 `-------------------------------------------------*/
 yyexhaustedlab:
-  yyerror (YY_("memory exhausted"));
+  yyerror (ctx, scanner, YY_("memory exhausted"));
   yyresult = 2;
   /* Fall through.  */
 #endif
@@ -2223,7 +2514,7 @@ yyexhaustedlab:
 yyreturn:
   if (yychar != YYEMPTY)
      yydestruct ("Cleanup: discarding lookahead",
-		 yytoken, &yylval);
+		 yytoken, &yylval, ctx, scanner);
   /* Do not reclaim the symbols of the rule which action triggered
      this YYABORT or YYACCEPT.  */
   YYPOPSTACK (yylen);
@@ -2231,7 +2522,7 @@ yyreturn:
   while (yyssp != yyss)
     {
       yydestruct ("Cleanup: popping",
-		  yystos[*yyssp], yyvsp);
+		  yystos[*yyssp], yyvsp, ctx, scanner);
       YYPOPSTACK (1);
     }
 #ifndef yyoverflow
@@ -2249,11 +2540,12 @@ yyreturn:
 
 
 /* Line 1675 of yacc.c  */
-#line 447 "libocpf/ocpf.y"
+#line 616 "libocpf/ocpf.y"
 
 
-void yyerror(char *s)
+void yyerror(struct ocpf_context *ctx, void *scanner, char *s)
 {
-	printf("%s: %d", s, lineno);
+	printf("%s: %d\n", s, ctx->lineno);
+	fflush(0);
 }
 

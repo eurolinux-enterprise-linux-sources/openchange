@@ -5,6 +5,7 @@
 int main(int argc, char *argv[])
 {
         enum MAPISTATUS                 retval;
+	struct mapi_context		*mapi_ctx;
 	TALLOC_CTX			*mem_ctx;
         struct mapi_session             *session = NULL;
         mapi_object_t                   obj_store;
@@ -26,15 +27,15 @@ int main(int argc, char *argv[])
 
         /* Initialize MAPI */
 	profdb = talloc_asprintf(mem_ctx, DEFAULT_PROFDB, getenv("HOME"));
-        retval = MAPIInitialize(profdb);
+        retval = MAPIInitialize(&mapi_ctx, profdb);
         MAPI_RETVAL_IF(retval, retval, mem_ctx);
 
         /* Find Default Profile */
-        retval = GetDefaultProfile(&profname);
+        retval = GetDefaultProfile(mapi_ctx, &profname);
         MAPI_RETVAL_IF(retval, retval, mem_ctx);
 
         /* Log on EMSMDB and NSPI */
-        retval = MapiLogonEx(&session, profname, NULL);
+        retval = MapiLogonEx(mapi_ctx, &session, profname, NULL);
         MAPI_RETVAL_IF(retval, retval, mem_ctx);
 
         /* Open Message Store */
@@ -76,8 +77,8 @@ int main(int argc, char *argv[])
 			mapi_object_init(&obj_message);
                         retval = OpenMessage(&obj_store, *fid, *mid, &obj_message, 0x0);
                         if (retval != MAPI_E_NOT_FOUND) {
-                                retval = GetPropsAll(&obj_message, &props_all);
-                                mapidump_message(&props_all, NULL);
+                                retval = GetPropsAll(&obj_message, MAPI_UNICODE, &props_all);
+                                mapidump_message(&props_all, NULL, &obj_message);
                                 mapi_object_release(&obj_message);
                         }
                 }
@@ -91,6 +92,6 @@ int main(int argc, char *argv[])
 	Logoff(&obj_store);
 
         /* Uninitialize MAPI */
-        MAPIUninitialize();
+        MAPIUninitialize(mapi_ctx);
         return (0);
 }

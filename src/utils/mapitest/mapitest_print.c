@@ -19,9 +19,13 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
 #include <samba/version.h>
-#include <utils/mapitest/mapitest.h>
+#include "utils/mapitest/mapitest.h"
+
+#include "config.h"
+#ifdef HAVE_SUBUNIT
+#include <subunit/child.h>
+#endif
 
 #include <time.h>
 
@@ -76,10 +80,13 @@ _PUBLIC_ void mapitest_print(struct mapitest *mt, const char *format, ...)
 {
 	va_list		ap;
 	char		*s = NULL;
-	int		ret;
+
+	if (mt->subunit_output) {
+		return;
+	}
 
 	va_start(ap, format);
-	ret = vasprintf(&s, format, ap);
+	vasprintf(&s, format, ap);
 	va_end(ap);
 
 	mapitest_print_tab(mt);
@@ -97,6 +104,10 @@ _PUBLIC_ void mapitest_print_newline(struct mapitest *mt, int count)
 {
 	int	i;
 
+	if (mt->subunit_output) {
+		return;
+	}
+
 	for (i = 0; i < count; i++) {
 		fprintf(mt->stream, "\n");
 	}
@@ -112,6 +123,10 @@ _PUBLIC_ void mapitest_print_newline(struct mapitest *mt, int count)
 _PUBLIC_ void mapitest_print_line(struct mapitest *mt, int len, char delim)
 {
 	int	i;
+
+	if (mt->subunit_output) {
+		return;
+	}
 
 	for (i = 0; i < len; i++) {
 		fprintf(mt->stream, "%c", delim);
@@ -151,6 +166,11 @@ _PUBLIC_ void mapitest_underline(struct mapitest *mt, const char *str, char deli
  */
 _PUBLIC_ void mapitest_print_title(struct mapitest *mt, const char *str, char delim)
 {
+	/* we handle this outside mapitest if we're using subunit */
+	if (mt->subunit_output) {
+		return;
+	}
+
 	mapitest_underline(mt, str, delim);
 	mapitest_indent();
 }
@@ -192,7 +212,7 @@ _PUBLIC_ void mapitest_print_module_title_end(struct mapitest *mt)
 
 
 /**
-   \details print the test tile
+   \details print the test title
    
    \param mt pointer to the top-level mapitest structure
    \param str the test title
@@ -203,6 +223,12 @@ _PUBLIC_ void mapitest_print_test_title_start(struct mapitest *mt, const char *s
 
 	if (!str) return;
 
+#ifdef HAVE_SUBUNIT
+	if (mt->subunit_output) {
+		subunit_test_start(str);
+		return;
+	}
+#endif
 	title = talloc_asprintf(mt->mem_ctx, MODULE_TEST_TITLE, str);
 	mapitest_print(mt, "%s", title);
 	mapitest_print_tab(mt);
@@ -342,6 +368,10 @@ _PUBLIC_ void mapitest_print_headers_server_info(struct mapitest *mt)
  */
 _PUBLIC_ void mapitest_print_headers(struct mapitest *mt)
 {
+	if (mt->subunit_output) {
+		return;
+	}
+
 	mapitest_print_headers_start(mt);
 	mapitest_indent();
 	mapitest_print_headers_info(mt);
@@ -363,11 +393,22 @@ _PUBLIC_ void mapitest_print_headers(struct mapitest *mt)
  */
 _PUBLIC_ void mapitest_print_test_result(struct mapitest *mt, char *name, bool ret)
 {
+#ifdef HAVE_SUBUNIT
+	if (mt->subunit_output) {
+		if (ret == true) {
+			subunit_test_pass(name);
+		} else {
+			subunit_test_fail(name, "failed");
+		}
+	} else
+#endif
+	{
 	mapitest_print(mt, MODULE_TEST_RESULT, name, (ret == true) ? 
 		       MODULE_TEST_SUCCESS : MODULE_TEST_FAILURE);
 	mapitest_print_tab(mt);
 	mapitest_print_line(mt, MODULE_TEST_LINELEN, MODULE_TEST_DELIM2);
 	mapitest_print_newline(mt, MODULE_TEST_NEWLINE);
+	}
 }
 
 
@@ -378,10 +419,15 @@ _PUBLIC_ void mapitest_print_test_result(struct mapitest *mt, char *name, bool r
    \param name the test name
 
    \sa mapitest_print_retval_fmt for a version providing an additional format string
+   \sa mapitest_print_retval_clean for a version that doesn't rely on GetLastError()
  */
 _PUBLIC_ void mapitest_print_retval(struct mapitest *mt, char *name)
 {
 	const char	*retstr = NULL;
+
+	if (mt->subunit_output) {
+		return;
+	}
 
 	retstr = mapi_get_errstr(GetLastError());
 
@@ -400,6 +446,41 @@ _PUBLIC_ void mapitest_print_retval(struct mapitest *mt, char *name)
 	}
 }
 
+/**
+   \details Print %mapitest return value
+   
+   This version takes an explicit return status value
+
+   \param mt pointer to the top-level mapitest structure
+   \param name the test name
+   \param retval the return value to output
+
+   \sa mapitest_print_retval_fmt_clean for a version providing an additional format string
+ */
+_PUBLIC_ void mapitest_print_retval_clean(struct mapitest *mt, char *name, enum MAPISTATUS retval)
+{
+	const char	*retstr = NULL;
+
+	if (mt->subunit_output) {
+		return;
+	}
+
+	retstr = mapi_get_errstr(retval);
+
+	if (mt->color == true) {
+		if (retstr) {
+			mapitest_print(mt, "* %-35s: %s %s %s \n", name, (retval ? MT_RED : MT_GREEN), retstr, MT_WHITE);
+		} else {
+			mapitest_print(mt, "* %-35s: %s Unknown Error (0x%.8x) %s\n", name, MT_RED, retval, MT_WHITE);
+		}
+	} else {
+		if (retstr) {
+			mapitest_print(mt, "* %-35s: %s\n", name, retstr);
+		} else {
+			mapitest_print(mt, "* %-35s: Unknown Error (0x%.8x)\n", name, retval);
+		}
+	}
+}
 
 /**
    \details Print %mapitest return value with additional format string
@@ -414,10 +495,9 @@ _PUBLIC_ void mapitest_print_retval_fmt(struct mapitest *mt, char *name, const c
 	const char	*retstr = NULL;
 	va_list		ap;
 	char		*s = NULL;
-	int		ret;
 
 	va_start(ap, format);
-	ret = vasprintf(&s, format, ap);
+	vasprintf(&s, format, ap);
 	va_end(ap);
 
 	retstr = mapi_get_errstr(GetLastError());
@@ -438,33 +518,70 @@ _PUBLIC_ void mapitest_print_retval_fmt(struct mapitest *mt, char *name, const c
 	free(s);
 }
 
+/**
+   \details Print %mapitest return value with additional format string
+
+   \param mt pointer to the top-level mapitest structure
+   \param name the test name
+   \param retval the return value to output
+   \param format the format string
+   \param ... the format string parameters
+ */
+_PUBLIC_ void mapitest_print_retval_fmt_clean(struct mapitest *mt, char *name, enum MAPISTATUS retval, const char *format, ...)
+{
+	const char	*retstr = NULL;
+	va_list		ap;
+	char		*s = NULL;
+
+	va_start(ap, format);
+	vasprintf(&s, format, ap);
+	va_end(ap);
+
+	retstr = mapi_get_errstr(retval);
+
+	if (mt->color == true) {
+		if (retstr) {
+			mapitest_print(mt, "* %-35s: %s %s %s %s\n", name, (retval ? MT_RED: MT_GREEN), retstr, MT_WHITE, s);
+		} else {
+			mapitest_print(mt, "* %-35s: %s Unknown Error (0x%.8x) %s %s\n", name, MT_RED, retval, MT_WHITE, s);
+		}
+	} else {
+		if (retstr) {
+			mapitest_print(mt, "* %-35s: %s %s\n", name, retstr, s);
+		} else {
+			mapitest_print(mt, "* %-35s: Unknown Error (0x%.8x) %s\n", name, retval, s);
+		}
+	}
+	free(s);
+}
 
 /**
    \details Print %mapitest return value for a given step
 
-   \param mt pointer tp the top-level mapitest structure
+   \param mt pointer to the top-level mapitest structure
    \param step the test step
    \param name the test name
+   \param retval the return value
 
    \sa mapitest_print_retval_step_fmt for a version providing an additional format string
  */
-_PUBLIC_ void mapitest_print_retval_step(struct mapitest *mt, char *step, char *name)
+_PUBLIC_ void mapitest_print_retval_step(struct mapitest *mt, char *step, char *name, enum MAPISTATUS retval)
 {
 	const char	*retstr = NULL;
 
-	retstr = mapi_get_errstr(GetLastError());
+	retstr = mapi_get_errstr(retval);
 
 	if (mt->color == true) {
 		if (retstr) {
-			mapitest_print(mt, "* Step %-5s %-35s: %s %s %s\n", step, name, (GetLastError() ? MT_RED : MT_GREEN), retstr, MT_WHITE);
+			mapitest_print(mt, "* Step %-5s %-35s: %s %s %s\n", step, name, (retval ? MT_RED : MT_GREEN), retstr, MT_WHITE);
 		} else {
-			mapitest_print(mt, "* Step %-5s %-35s: %s Unknown Error (0x%.8x) %s\n", step, name, MT_RED, GetLastError(), MT_WHITE);
+			mapitest_print(mt, "* Step %-5s %-35s: %s Unknown Error (0x%.8x) %s\n", step, name, MT_RED, retval, MT_WHITE);
 		}
 	} else {
 		if (retstr) {
 			mapitest_print(mt, "* Step %-5s %-35s: %s\n", step, name, retstr);
 		} else {
-			mapitest_print(mt, "* Step %-5s %-35s: Unknown Error (0x%.8x)\n", step, name, GetLastError());
+			mapitest_print(mt, "* Step %-5s %-35s: Unknown Error (0x%.8x)\n", step, name, retval);
 		}
 	}
 }
@@ -484,10 +601,9 @@ _PUBLIC_ void mapitest_print_retval_step_fmt(struct mapitest *mt, char *step, ch
 	const char	*retstr = NULL;
 	va_list		ap;
 	char		*s = NULL;
-	int		ret;
 
 	va_start(ap, format);
-	ret = vasprintf(&s, format, ap);
+	vasprintf(&s, format, ap);
 	va_end(ap);
 
 	retstr = mapi_get_errstr(GetLastError());
@@ -506,4 +622,63 @@ _PUBLIC_ void mapitest_print_retval_step_fmt(struct mapitest *mt, char *step, ch
 		}
 	}
 	free(s);
+}
+
+/**
+  Output a set of rows from a table
+  
+  \param mt pointer to the top-level mapitest structure
+  \param rowset the rows to output
+  \param sep a separator / spacer to insert in front of the label
+  
+  \note this is a simple wrapper for mapidump_SRowSet(), only for use in mapitest.
+*/
+_PUBLIC_ void mapitest_print_SRowSet(struct mapitest *mt, struct SRowSet *rowset, const char *sep)
+{
+	if (mt->subunit_output) {
+		return;
+	}
+
+	mapidump_SRowSet(rowset, sep);
+}
+
+/**
+  Output a row of the public address book
+
+  \param mt pointer to the top-level mapitest structure
+  \param lpProp the property to print
+  \param sep a separator / spacer to insert in front of the label
+  
+  \note this is a simple wrapper for mapidump_SPropValue(), only for use in mapitest.
+*/
+_PUBLIC_ void mapitest_print_SPropValue(struct mapitest *mt, struct SPropValue lpProp, const char *sep)
+{
+	if (mt->subunit_output) {
+		return;
+	}
+
+	mapidump_SPropValue(lpProp, sep);
+}
+
+/**
+  Output a row of the public address book
+
+  \param mt pointer to the top-level mapitest structure
+  \param aRow one row of the public address book (Global Address List)
+  
+  This function is usually used with GetGALTable, which can obtain several
+  rows at once - you'll need to iterate over the rows.
+  
+  The SRow is assumed to contain entries for PR_ADDRTYPE_UNICODE, PR_DISPLAY_NAME_UNICODE,
+  PR_EMAIL_ADDRESS_UNICODE and PR_ACCOUNT_UNICODE.
+  
+  \note this is a simple wrapper for mapidump_PAB_entry(), only for use in mapitest.
+*/
+_PUBLIC_ void mapitest_print_PAB_entry(struct mapitest *mt, struct SRow *aRow)
+{
+	if (mt->subunit_output) {
+		return;
+	}
+
+	mapidump_PAB_entry(aRow);
 }

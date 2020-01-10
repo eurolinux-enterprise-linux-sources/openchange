@@ -44,6 +44,9 @@ __BEGIN_DECLS
 /* The following definitions come from utils/mapitest/modules/module_oxcfold.c  */
 
 
+/* The following definitions come from utils/mapitest/modules/module_oxcfxics.c  */
+
+
 /* The following definitions come from utils/mapitest/modules/module_oxomsg.c  */
 
 
@@ -63,7 +66,7 @@ __BEGIN_DECLS
 
 int cb(uint16_t, void* , void* );
 
-/* The following definitions come from utils/mapitest/modules/module_oxcfxics.c  */
+/* The following definitions come from utils/mapitest/modules/module_oxcperm.c  */
 
 
 /* The following definitions come from utils/mapitest/modules/module_nspi.c  */
@@ -79,6 +82,9 @@ int cb(uint16_t, void* , void* );
 
 
 /* The following definitions come from utils/mapitest/modules/module_mapidump.c  */
+
+
+/* The following definitions come from utils/mapitest/modules/module_lzxpress.c  */
 
 
 __END_DECLS

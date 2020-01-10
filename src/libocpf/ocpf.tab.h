@@ -43,11 +43,11 @@
      BOOLEAN = 259,
      SHORT = 260,
      INTEGER = 261,
-     DOUBLE = 262,
-     IDENTIFIER = 263,
-     STRING = 264,
-     UNICODE = 265,
-     MVSTRING = 266,
+     I8 = 262,
+     DOUBLE = 263,
+     IDENTIFIER = 264,
+     STRING = 265,
+     UNICODE = 266,
      SYSTIME = 267,
      VAR = 268,
      kw_TYPE = 269,
@@ -68,17 +68,22 @@
      kw_PT_UNICODE = 284,
      kw_PT_SHORT = 285,
      kw_PT_LONG = 286,
-     kw_PT_SYSTIME = 287,
-     kw_PT_MV_STRING8 = 288,
-     kw_PT_BINARY = 289,
-     OBRACE = 290,
-     EBRACE = 291,
-     COMMA = 292,
-     SEMICOLON = 293,
-     COLON = 294,
-     LOWER = 295,
-     GREATER = 296,
-     EQUAL = 297
+     kw_PT_I8 = 287,
+     kw_PT_DOUBLE = 288,
+     kw_PT_SYSTIME = 289,
+     kw_PT_MV_LONG = 290,
+     kw_PT_MV_BINARY = 291,
+     kw_PT_MV_STRING8 = 292,
+     kw_PT_MV_UNICODE = 293,
+     kw_PT_BINARY = 294,
+     OBRACE = 295,
+     EBRACE = 296,
+     COMMA = 297,
+     SEMICOLON = 298,
+     COLON = 299,
+     LOWER = 300,
+     GREATER = 301,
+     EQUAL = 302
    };
 #endif
 
@@ -89,29 +94,33 @@ typedef union YYSTYPE
 {
 
 /* Line 1676 of yacc.c  */
-#line 38 "libocpf/ocpf.y"
+#line 37 "libocpf/ocpf.y"
 
 	uint8_t				i;
 	uint8_t				b;
 	uint16_t			s;
 	uint32_t			l;
 	uint64_t			d;
+	double				dbl;
 	char				*name;
 	char				*nameW;
 	char				*date;
 	char				*var;
+	struct LongArray_r		MVl;
 	struct StringArray_r		MVszA;
+	struct StringArrayW_r		MVszW;
+	struct BinaryArray_r		MVbin;
 
 
 
 /* Line 1676 of yacc.c  */
-#line 109 "libocpf/ocpf.tab.h"
+#line 118 "libocpf/ocpf.tab.h"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 #endif
 
-extern YYSTYPE ocpf_yylval;
+
 
 

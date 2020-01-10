@@ -3,7 +3,7 @@
 
    OpenChange Project
 
-   Copyright (C) Julien Kerihuel 2007-2008
+   Copyright (C) Julien Kerihuel 2007-2010
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,9 +19,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/defs_private.h>
-#include <libocpf/ocpf.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
+#include "libmapi/mapi_nameid.h"
+#include "libocpf/ocpf.h"
 #include <samba/popt.h>
 #include <param.h>
 
@@ -41,6 +42,8 @@
 
 static void init_oclient(struct oclient *oclient)
 {
+	oclient->mapi_ctx = NULL;
+
 	/* update and delete parameter */
 	oclient->update = NULL;
 	oclient->delete = NULL;
@@ -65,6 +68,7 @@ static void init_oclient(struct oclient *oclient)
 	oclient->private = false;
 	oclient->freebusy = NULL;
 	oclient->force = false;
+	oclient->summary = false;
 
 	/* contact related parameters */
 	oclient->email = NULL;
@@ -93,14 +97,6 @@ static void init_oclient(struct oclient *oclient)
 	oclient->ocpf_dump = NULL;
 }
 
-static char *utf8tolinux(TALLOC_CTX *mem_ctx, const char *wstring)
-{
-	char		*newstr;
-
-	newstr = windows_to_utf8(mem_ctx, wstring);
-	return newstr;
-}
-
 static enum MAPISTATUS openchangeclient_getdir(TALLOC_CTX *mem_ctx,
 					       mapi_object_t *obj_container,
 					       mapi_object_t *obj_child,
@@ -111,7 +107,6 @@ static enum MAPISTATUS openchangeclient_getdir(TALLOC_CTX *mem_ctx,
 	struct SRowSet		SRowSet;
 	mapi_object_t		obj_htable;
 	mapi_object_t		obj_folder;
-	char			*newname;
 	char     		**folder  = NULL;
 	const char		*name;
 	const uint64_t		*fid;
@@ -131,7 +126,7 @@ static enum MAPISTATUS openchangeclient_getdir(TALLOC_CTX *mem_ctx,
 		MAPI_RETVAL_IF(retval, GetLastError(), folder);
 
 		SPropTagArray = set_SPropTagArray(mem_ctx, 0x2,
-						  PR_DISPLAY_NAME,
+						  PR_DISPLAY_NAME_UNICODE,
 						  PR_FID);
 		retval = SetColumns(&obj_htable, SPropTagArray);
 		MAPIFreeBuffer(SPropTagArray);
@@ -140,17 +135,14 @@ static enum MAPISTATUS openchangeclient_getdir(TALLOC_CTX *mem_ctx,
 		while (((retval = QueryRows(&obj_htable, 0x32, TBL_ADVANCE, &SRowSet)) != MAPI_E_NOT_FOUND) && SRowSet.cRows) {
 			for (index = 0; (index < SRowSet.cRows) && (found == false); index++) {
 				fid = (const uint64_t *)find_SPropValue_data(&SRowSet.aRow[index], PR_FID);
-				name = (const char *)find_SPropValue_data(&SRowSet.aRow[index], PR_DISPLAY_NAME);
-
-				newname = utf8tolinux(mem_ctx, name);
-				if (newname && fid && !strcmp(newname, folder[i])) {
+				name = (const char *)find_SPropValue_data(&SRowSet.aRow[index], PR_DISPLAY_NAME_UNICODE);
+				if (name && fid && !strcmp(name, folder[i])) {
 					retval = OpenFolder(&obj_folder, *fid, obj_child);
 					MAPI_RETVAL_IF(retval, retval, folder);
 
 					found = true;
 					mapi_object_copy(&obj_folder, obj_child);
 				}
-				MAPIFreeBuffer(newname);
 			}
 		}
 
@@ -201,7 +193,10 @@ static bool oclient_read_file(TALLOC_CTX *mem_ctx, const char *filename,
 		return false;
 	}
 	/* stat the file */
-	if (fstat(fd, &sb) != 0) return false;
+	if (fstat(fd, &sb) != 0) {
+		close(fd);
+		return false;
+	}
 
 	switch (mapitag) {
 	case PR_HTML:
@@ -275,7 +270,7 @@ static const char *get_filename(const char *filename)
 	if (!filename) return NULL;
 
 	substr = rindex(filename, '/');
-	if (substr) return substr;
+	if (substr) return substr + 1;
 
 	return filename;
 }
@@ -287,7 +282,6 @@ static const char *get_filename(const char *filename)
 static char *build_uniqueID(TALLOC_CTX *mem_ctx, mapi_object_t *obj_folder,
 			    mapi_object_t *obj_message)
 {
-	enum MAPISTATUS		retval;
 	char			*id;
 	struct SPropTagArray	*SPropTagArray;
 	struct SPropValue	*lpProps;
@@ -297,14 +291,14 @@ static char *build_uniqueID(TALLOC_CTX *mem_ctx, mapi_object_t *obj_folder,
 
 	/* retrieve the folder ID */
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0x1, PR_FID);
-	retval = GetProps(obj_folder, SPropTagArray, &lpProps, &count);
+	GetProps(obj_folder, 0, SPropTagArray, &lpProps, &count);
 	MAPIFreeBuffer(SPropTagArray);
 	if (GetLastError() != MAPI_E_SUCCESS) return NULL;
 	fid = (const uint64_t *)get_SPropValue_data(lpProps);
 
 	/* retrieve the message ID */
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0x1, PR_MID);
-	retval = GetProps(obj_message, SPropTagArray, &lpProps, &count);
+	GetProps(obj_message, 0, SPropTagArray, &lpProps, &count);
 	MAPIFreeBuffer(SPropTagArray);
 	if (GetLastError() != MAPI_E_SUCCESS) return NULL;
 	mid = (const uint64_t *)get_SPropValue_data(lpProps);
@@ -326,7 +320,6 @@ static bool store_attachment(mapi_object_t obj_attach, const char *filename, uin
 {
 	TALLOC_CTX	*mem_ctx;
 	enum MAPISTATUS	retval;
-	ssize_t		len;
 	char		*path;
 	mapi_object_t	obj_stream;
 	uint16_t	read_size;
@@ -336,8 +329,9 @@ static bool store_attachment(mapi_object_t obj_attach, const char *filename, uin
 
 	if (!filename || !size) return false;
 
-	mem_ctx = talloc_named(NULL, 0, "store_attachment");
 	mapi_object_init(&obj_stream);
+
+	mem_ctx = talloc_named(NULL, 0, "store_attachment");
 
 	if (!(dir = opendir(oclient->store_folder))) {
 		if (mkdir(oclient->store_folder, 0700) == -1) return false;
@@ -346,7 +340,9 @@ static bool store_attachment(mapi_object_t obj_attach, const char *filename, uin
 	}
 
 	path = talloc_asprintf(mem_ctx, "%s/%s", oclient->store_folder, filename);
-	if ((fd = open(path, O_CREAT|O_WRONLY, S_IWUSR|S_IRUSR)) == -1) return false;
+	if ((fd = open(path, O_CREAT|O_WRONLY, S_IWUSR|S_IRUSR)) == -1) {
+		goto error;
+	}
 	talloc_free(path);
 
 	retval = OpenStream(&obj_attach, PR_ATTACH_DATA_BIN, 0, &obj_stream);
@@ -356,7 +352,7 @@ static bool store_attachment(mapi_object_t obj_attach, const char *filename, uin
 	do {
 		retval = ReadStream(&obj_stream, buf, MAX_READ_SIZE, &read_size);
 		if (retval != MAPI_E_SUCCESS) goto error;
-		len = write(fd, buf, read_size);
+		write(fd, buf, read_size);
 	} while (read_size);
 	
 	close(fd);
@@ -426,13 +422,14 @@ static enum MAPISTATUS openchangeclient_fetchmail(mapi_object_t *obj_store,
 	MAPI_RETVAL_IF(retval, retval, mem_ctx);
 
 	printf("MAILBOX (%u messages)\n", count);
+	if (!count) goto end;
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0x5,
 					  PR_FID,
 					  PR_MID,
 					  PR_INST_ID,
 					  PR_INSTANCE_NUM,
-					  PR_SUBJECT);
+					  PR_SUBJECT_UNICODE);
 	retval = SetColumns(&obj_table, SPropTagArray);
 	MAPIFreeBuffer(SPropTagArray);
 	MAPI_RETVAL_IF(retval, retval, mem_ctx);
@@ -446,83 +443,88 @@ static enum MAPISTATUS openchangeclient_fetchmail(mapi_object_t *obj_store,
 					     rowset.aRow[i].lpProps[1].value.d,
 					     &obj_message, 0);
 			if (GetLastError() == MAPI_E_SUCCESS) {
-				struct SPropValue	*lpProps;
-				struct SRow		aRow;
-
-				SPropTagArray = set_SPropTagArray(mem_ctx, 0x1, PR_HASATTACH);
-				lpProps = talloc_zero(mem_ctx, struct SPropValue);
-				retval = GetProps(&obj_message, SPropTagArray, &lpProps, &count);
-				MAPIFreeBuffer(SPropTagArray);
-				if (retval != MAPI_E_SUCCESS) return retval;
-
-				aRow.ulAdrEntryPad = 0;
-				aRow.cValues = count;
-				aRow.lpProps = lpProps;
-
-				retval = octool_message(mem_ctx, &obj_message);
-
-				has_attach = (const uint8_t *) get_SPropValue_SRow_data(&aRow, PR_HASATTACH);
-
- 				/* If we have attachments, retrieve them */
-				if (has_attach && *has_attach) {
-					mapi_object_init(&obj_tb_attach);
-					retval = GetAttachmentTable(&obj_message, &obj_tb_attach);
-					if (retval == MAPI_E_SUCCESS) {
-						SPropTagArray = set_SPropTagArray(mem_ctx, 0x1, PR_ATTACH_NUM);
-						retval = SetColumns(&obj_tb_attach, SPropTagArray);
-						if (retval != MAPI_E_SUCCESS) return retval;
-						MAPIFreeBuffer(SPropTagArray);
-						
-						retval = QueryRows(&obj_tb_attach, 0xa, TBL_ADVANCE, &rowset_attach);
-						if (retval != MAPI_E_SUCCESS) return retval;
-
-						for (j = 0; j < rowset_attach.cRows; j++) {
-							attach_num = (const uint32_t *)find_SPropValue_data(&(rowset_attach.aRow[j]), PR_ATTACH_NUM);
-							retval = OpenAttach(&obj_message, *attach_num, &obj_attach);
-							if (retval == MAPI_E_SUCCESS) {
-								struct SPropValue	*lpProps2;
-								uint32_t		count2;
-
-								SPropTagArray = set_SPropTagArray(mem_ctx, 0x3, 
-												  PR_ATTACH_FILENAME,
-												  PR_ATTACH_LONG_FILENAME,
-												  PR_ATTACH_SIZE);
-								lpProps2 = talloc_zero(mem_ctx, struct SPropValue);
-								retval = GetProps(&obj_attach, SPropTagArray, &lpProps2, &count2);
-								MAPIFreeBuffer(SPropTagArray);
-								if (retval != MAPI_E_SUCCESS) return retval;
-								
-								aRow.ulAdrEntryPad = 0;
-								aRow.cValues = count2;
-								aRow.lpProps = lpProps2;
-
-								attach_filename = get_filename(octool_get_propval(&aRow, PR_ATTACH_LONG_FILENAME));
-								if (!attach_filename || (attach_filename && !strcmp(attach_filename, ""))) {
-									attach_filename = get_filename(octool_get_propval(&aRow, PR_ATTACH_FILENAME));
-								}
-								attach_size = (const uint32_t *) octool_get_propval(&aRow, PR_ATTACH_SIZE);
-								printf("[%u] %s (%u Bytes)\n", j, attach_filename, attach_size ? *attach_size : 0);
-								fflush(0);
-								if (oclient->store_folder) {
-								  status = store_attachment(obj_attach, attach_filename, attach_size ? *attach_size : 0, oclient);
-									if (status == false) {
-										printf("A Problem was encountered while storing attachments on the filesystem\n");
-										MAPI_RETVAL_IF(status == false, MAPI_E_UNABLE_TO_COMPLETE, mem_ctx);
-
+				if (oclient->summary) {
+					mapidump_message_summary(&obj_message);
+				} else {
+					struct SPropValue	*lpProps;
+					struct SRow		aRow;
+					
+					SPropTagArray = set_SPropTagArray(mem_ctx, 0x1, PR_HASATTACH);
+					lpProps = NULL;
+					retval = GetProps(&obj_message, 0, SPropTagArray, &lpProps, &count);
+					MAPIFreeBuffer(SPropTagArray);
+					if (retval != MAPI_E_SUCCESS) return retval;
+					
+					aRow.ulAdrEntryPad = 0;
+					aRow.cValues = count;
+					aRow.lpProps = lpProps;
+					
+					retval = octool_message(mem_ctx, &obj_message);
+					
+					has_attach = (const uint8_t *) get_SPropValue_SRow_data(&aRow, PR_HASATTACH);
+					
+					/* If we have attachments, retrieve them */
+					if (has_attach && *has_attach) {
+						mapi_object_init(&obj_tb_attach);
+						retval = GetAttachmentTable(&obj_message, &obj_tb_attach);
+						if (retval == MAPI_E_SUCCESS) {
+							SPropTagArray = set_SPropTagArray(mem_ctx, 0x1, PR_ATTACH_NUM);
+							retval = SetColumns(&obj_tb_attach, SPropTagArray);
+							if (retval != MAPI_E_SUCCESS) return retval;
+							MAPIFreeBuffer(SPropTagArray);
+							
+							retval = QueryRows(&obj_tb_attach, 0xa, TBL_ADVANCE, &rowset_attach);
+							if (retval != MAPI_E_SUCCESS) return retval;
+							
+							for (j = 0; j < rowset_attach.cRows; j++) {
+								attach_num = (const uint32_t *)find_SPropValue_data(&(rowset_attach.aRow[j]), PR_ATTACH_NUM);
+								retval = OpenAttach(&obj_message, *attach_num, &obj_attach);
+								if (retval == MAPI_E_SUCCESS) {
+									struct SPropValue	*lpProps2;
+									uint32_t		count2;
+									
+									SPropTagArray = set_SPropTagArray(mem_ctx, 0x4, 
+													  PR_ATTACH_FILENAME,
+													  PR_ATTACH_LONG_FILENAME,
+													  PR_ATTACH_SIZE,
+													  PR_ATTACH_CONTENT_ID);
+									lpProps2 = NULL;
+									retval = GetProps(&obj_attach, MAPI_UNICODE, SPropTagArray, &lpProps2, &count2);
+									MAPIFreeBuffer(SPropTagArray);
+									if (retval != MAPI_E_SUCCESS) return retval;
+									
+									aRow.ulAdrEntryPad = 0;
+									aRow.cValues = count2;
+									aRow.lpProps = lpProps2;
+									
+									attach_filename = get_filename(octool_get_propval(&aRow, PR_ATTACH_LONG_FILENAME));
+									if (!attach_filename || (attach_filename && !strcmp(attach_filename, ""))) {
+										attach_filename = get_filename(octool_get_propval(&aRow, PR_ATTACH_FILENAME));
 									}
+									attach_size = (const uint32_t *) octool_get_propval(&aRow, PR_ATTACH_SIZE);
+									printf("[%u] %s (%u Bytes)\n", j, attach_filename, attach_size ? *attach_size : 0);
+									fflush(0);
+									if (oclient->store_folder) {
+										status = store_attachment(obj_attach, attach_filename, attach_size ? *attach_size : 0, oclient);
+										if (status == false) {
+											printf("A Problem was encountered while storing attachments on the filesystem\n");
+											MAPI_RETVAL_IF(status == false, MAPI_E_UNABLE_TO_COMPLETE, mem_ctx);
+											
+										}
+									}
+									MAPIFreeBuffer(lpProps2);
 								}
-								MAPIFreeBuffer(lpProps2);
 							}
+							errno = 0;
 						}
-						errno = 0;
+						MAPIFreeBuffer(lpProps);
 					}
-					MAPIFreeBuffer(lpProps);
 				}
 			}
 			mapi_object_release(&obj_message);
 		}
 	}
-
+ end:
 	mapi_object_release(&obj_table);
 	mapi_object_release(&obj_inbox);
 	mapi_object_release(&obj_tis);
@@ -573,7 +575,7 @@ static bool set_external_recipients(TALLOC_CTX *mem_ctx, struct SRowSet *SRowSet
 	uint32_t		last;
 	struct SPropValue	SPropValue;
 
-	SRowSet->aRow = talloc_realloc(mem_ctx, SRowSet->aRow, struct SRow, SRowSet->cRows + 2);
+	SRowSet->aRow = talloc_realloc(mem_ctx, SRowSet->aRow, struct SRow, SRowSet->cRows + 1);
 	last = SRowSet->cRows;
 	SRowSet->aRow[last].cValues = 0;
 	SRowSet->aRow[last].lpProps = talloc_zero(mem_ctx, struct SPropValue);
@@ -589,27 +591,27 @@ static bool set_external_recipients(TALLOC_CTX *mem_ctx, struct SRowSet *SRowSet
 	SRow_addprop(&(SRowSet->aRow[last]), SPropValue);
 
 	/* PR_GIVEN_NAME */
-	SPropValue.ulPropTag = PR_GIVEN_NAME;
+	SPropValue.ulPropTag = PR_GIVEN_NAME_UNICODE;
 	SPropValue.value.lpszA = username;
 	SRow_addprop(&(SRowSet->aRow[last]), SPropValue);
 
 	/* PR_DISPLAY_NAME */
-	SPropValue.ulPropTag = PR_DISPLAY_NAME;
+	SPropValue.ulPropTag = PR_DISPLAY_NAME_UNICODE;
 	SPropValue.value.lpszA = username;
 	SRow_addprop(&(SRowSet->aRow[last]), SPropValue);
 
 	/* PR_7BIT_DISPLAY_NAME */
-	SPropValue.ulPropTag = PR_7BIT_DISPLAY_NAME;
+	SPropValue.ulPropTag = PR_7BIT_DISPLAY_NAME_UNICODE;
 	SPropValue.value.lpszA = username;
 	SRow_addprop(&(SRowSet->aRow[last]), SPropValue);
 
 	/* PR_SMTP_ADDRESS */
-	SPropValue.ulPropTag = PR_SMTP_ADDRESS;
+	SPropValue.ulPropTag = PR_SMTP_ADDRESS_UNICODE;
 	SPropValue.value.lpszA = username;
 	SRow_addprop(&(SRowSet->aRow[last]), SPropValue);
 
 	/* PR_ADDRTYPE */
-	SPropValue.ulPropTag = PR_ADDRTYPE;
+	SPropValue.ulPropTag = PR_ADDRTYPE_UNICODE;
 	SPropValue.value.lpszA = "SMTP";
 	SRow_addprop(&(SRowSet->aRow[last]), SPropValue);
 
@@ -620,7 +622,7 @@ static bool set_external_recipients(TALLOC_CTX *mem_ctx, struct SRowSet *SRowSet
 }
 
 static bool set_usernames_RecipientType(TALLOC_CTX *mem_ctx, uint32_t *index, struct SRowSet *rowset, 
-					char **usernames, struct SPropTagArray *flaglist,
+					char **usernames, struct PropertyTagArray_r *flaglist,
 					enum ulRecipClass RecipClass)
 {
 	uint32_t	i;
@@ -697,6 +699,9 @@ static bool openchangeclient_stream(TALLOC_CTX *mem_ctx, mapi_object_t obj_paren
 
 	/* Open a stream on the parent for the given property */
 	retval = OpenStream(&obj_parent, mapitag, access_flags, &obj_stream);
+	fprintf (stderr, "openstream: retval = %s (0x%.8x)\n",
+		 mapi_get_errstr (retval), retval);
+
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	/* WriteStream operation */
@@ -715,7 +720,10 @@ static bool openchangeclient_stream(TALLOC_CTX *mem_ctx, mapi_object_t obj_paren
 		fflush(0);
 
 		/* Exit when there is nothing left to write */
-		if (!read_size) return true;
+		if (!read_size) {
+			mapi_object_release(&obj_stream);
+			return true;
+		}
 		
 		offset += read_size;
 
@@ -723,6 +731,8 @@ static bool openchangeclient_stream(TALLOC_CTX *mem_ctx, mapi_object_t obj_paren
 			size = bin.cb - offset;
 		}
 	}
+
+	mapi_object_release(&obj_stream);
 
 	return true;
 }
@@ -738,20 +748,20 @@ static enum MAPISTATUS openchangeclient_sendmail(TALLOC_CTX *mem_ctx,
 						 mapi_object_t *obj_store, 
 						 struct oclient *oclient)
 {
-	enum MAPISTATUS		retval;
-	struct SPropTagArray	*SPropTagArray;
-	struct SPropValue	SPropValue;
-	struct SRowSet		*SRowSet = NULL;
-	struct SPropTagArray   	*flaglist = NULL;
-	mapi_id_t		id_outbox;
-	mapi_object_t		obj_outbox;
-	mapi_object_t		obj_message;
-	mapi_object_t		obj_stream;
-	uint32_t		index = 0;
-	uint32_t		msgflag;
-	struct SPropValue	props[SETPROPS_COUNT];
-	uint32_t		prop_count = 0;
-	uint32_t		editor = 0;
+	enum MAPISTATUS			retval;
+	struct SPropTagArray		*SPropTagArray;
+	struct SPropValue		SPropValue;
+	struct SRowSet			*SRowSet = NULL;
+	struct PropertyTagArray_r	*flaglist = NULL;
+	mapi_id_t			id_outbox;
+	mapi_object_t			obj_outbox;
+	mapi_object_t			obj_message;
+	mapi_object_t			obj_stream;
+	uint32_t			index = 0;
+	uint32_t			msgflag;
+	struct SPropValue		props[SETPROPS_COUNT];
+	uint32_t			prop_count = 0;
+	uint32_t			editor = 0;
 
 	mapi_object_init(&obj_outbox);
 	mapi_object_init(&obj_message);
@@ -761,7 +771,7 @@ static enum MAPISTATUS openchangeclient_sendmail(TALLOC_CTX *mem_ctx,
 		if (retval != MAPI_E_SUCCESS) return retval;
 	} else {
 		/* Get Sent Items folder but should be using olFolderOutbox */
-		retval = GetDefaultFolder(obj_store, &id_outbox, olFolderSentMail);
+		retval = GetDefaultFolder(obj_store, &id_outbox, olFolderOutbox);
 		if (retval != MAPI_E_SUCCESS) return retval;
 
 		/* Open outbox folder */
@@ -815,7 +825,7 @@ static enum MAPISTATUS openchangeclient_sendmail(TALLOC_CTX *mem_ctx,
 	/* set message properties */
 	msgflag = MSGFLAG_UNSENT;
 	oclient->subject = (!oclient->subject) ? "" : oclient->subject;
-	set_SPropValue_proptag(&props[0], PR_SUBJECT, 
+	set_SPropValue_proptag(&props[0], PR_SUBJECT_UNICODE, 
 			       (const void *)oclient->subject);
 	set_SPropValue_proptag(&props[1], PR_MESSAGE_FLAGS, 
 			       (const void *)&msgflag);
@@ -833,7 +843,7 @@ static enum MAPISTATUS openchangeclient_sendmail(TALLOC_CTX *mem_ctx,
 			bin.cb = strlen(oclient->pr_body);
 			openchangeclient_stream(mem_ctx, obj_message, obj_stream, PR_BODY, 2, bin);
 		} else {
-			set_SPropValue_proptag(&props[2], PR_BODY, 
+			set_SPropValue_proptag(&props[2], PR_BODY_UNICODE, 
 								   (const void *)oclient->pr_body);
 			prop_count++;
 		}
@@ -846,6 +856,7 @@ static enum MAPISTATUS openchangeclient_sendmail(TALLOC_CTX *mem_ctx,
 			
 			bin.lpb = (uint8_t *)oclient->pr_html_inline;
 			bin.cb = strlen(oclient->pr_html_inline);
+
 			openchangeclient_stream(mem_ctx, obj_message, obj_stream, PR_HTML, 2, bin);
 		} else {
 			struct SBinary_short bin;
@@ -871,11 +882,10 @@ static enum MAPISTATUS openchangeclient_sendmail(TALLOC_CTX *mem_ctx,
 		} else {
 			mapi_object_init(&obj_stream);
 			openchangeclient_stream(mem_ctx, obj_message, obj_stream, PR_HTML, 2, oclient->pr_html);
-			mapi_object_release(&obj_stream);
 		}
 	}
 
-	retval = SetProps(&obj_message, props, prop_count);
+	retval = SetProps(&obj_message, 0, props, prop_count);
 	if (retval != MAPI_E_SUCCESS) return retval;
 
 	/* attachment related code */
@@ -885,7 +895,7 @@ static enum MAPISTATUS openchangeclient_sendmail(TALLOC_CTX *mem_ctx,
 		for (i = 0; oclient->attach[i].filename; i++) {
 			mapi_object_t		obj_attach;
 			mapi_object_t		obj_stream;
-			struct SPropValue	props_attach[3];
+			struct SPropValue	props_attach[4];
 			uint32_t		count_props_attach;
 
 			mapi_object_init(&obj_attach);
@@ -900,13 +910,16 @@ static enum MAPISTATUS openchangeclient_sendmail(TALLOC_CTX *mem_ctx,
 			props_attach[2].ulPropTag = PR_ATTACH_FILENAME;
 			printf("Sending %s:\n", oclient->attach[i].filename);
 			props_attach[2].value.lpszA = get_filename(oclient->attach[i].filename);
-			count_props_attach = 3;
+			props_attach[3].ulPropTag = PR_ATTACH_CONTENT_ID;
+			props_attach[3].value.lpszA = get_filename(oclient->attach[i].filename);
+			count_props_attach = 4;
 
 			/* SetProps */
-			retval = SetProps(&obj_attach, props_attach, count_props_attach);
+			retval = SetProps(&obj_attach, 0, props_attach, count_props_attach);
 			if (retval != MAPI_E_SUCCESS) return retval;
 
 			/* Stream operations */
+			mapi_object_init(&obj_stream);
 			openchangeclient_stream(mem_ctx, obj_attach, obj_stream, PR_ATTACH_DATA_BIN, 2, oclient->attach[i].bin);
 
 			/* Save changes on attachment */
@@ -979,7 +992,7 @@ static bool openchangeclient_deletemail(TALLOC_CTX *mem_ctx,
 					  PR_MID,
 					  PR_INST_ID,
 					  PR_INSTANCE_NUM,
-					  PR_SUBJECT);
+					  PR_SUBJECT_UNICODE);
 	retval = SetColumns(&obj_table, SPropTagArray);
 	if (retval != MAPI_E_SUCCESS) return false;
 	
@@ -1010,7 +1023,8 @@ static bool openchangeclient_deletemail(TALLOC_CTX *mem_ctx,
 }
 
 
-static enum MAPISTATUS check_conflict_date(mapi_object_t *obj,
+static enum MAPISTATUS check_conflict_date(struct oclient *oclient,
+					   mapi_object_t *obj,
 					   struct FILETIME *ft)
 {
 	enum MAPISTATUS		retval;
@@ -1020,7 +1034,7 @@ static enum MAPISTATUS check_conflict_date(mapi_object_t *obj,
 	bool			conflict;
 			
 	session = mapi_object_get_session(obj);
-	retval = MapiLogonEx(&session2, session->profile->profname, session->profile->password);
+	retval = MapiLogonEx(oclient->mapi_ctx, &session2, session->profile->profname, session->profile->password);
 	MAPI_RETVAL_IF(retval, retval, NULL);
 
 	mapi_object_init(&obj_store);
@@ -1061,13 +1075,13 @@ static enum MAPISTATUS appointment_SetProps(TALLOC_CTX *mem_ctx,
 	lpProps = talloc_array(mem_ctx, struct SPropValue, 2);
 
 	if (oclient->subject) {
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_CONVERSATION_TOPIC, 
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_CONVERSATION_TOPIC_UNICODE, 
 			       (const void *) oclient->subject);
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_NORMALIZED_SUBJECT,
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_NORMALIZED_SUBJECT_UNICODE,
 			       (const void *) oclient->subject);
 	}
 	if (oclient->pr_body) {
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_BODY, (const void *)oclient->pr_body);
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_BODY_UNICODE, (const void *)oclient->pr_body);
 	}
 	if (oclient->location) {
 		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PidLidLocation, (const void *)oclient->location);
@@ -1082,7 +1096,7 @@ static enum MAPISTATUS appointment_SetProps(TALLOC_CTX *mem_ctx,
 		start_date->dwLowDateTime = (nt << 32) >> 32;
 		start_date->dwHighDateTime = (nt >> 32);
 
-		retval = check_conflict_date(obj_folder, start_date);
+		retval = check_conflict_date(oclient, obj_folder, start_date);
 		if (oclient->force == false) {
 			MAPI_RETVAL_IF(retval, retval, NULL);
 		}
@@ -1101,7 +1115,7 @@ static enum MAPISTATUS appointment_SetProps(TALLOC_CTX *mem_ctx,
 		end_date->dwLowDateTime = (nt << 32) >> 32;
 		end_date->dwHighDateTime = (nt >> 32);
 
-		retval = check_conflict_date(obj_folder, end_date);
+		retval = check_conflict_date(oclient, obj_folder, end_date);
 		if (oclient->force == false) {
 			MAPI_RETVAL_IF(retval, retval, NULL);
 		}
@@ -1112,7 +1126,7 @@ static enum MAPISTATUS appointment_SetProps(TALLOC_CTX *mem_ctx,
 	}
 
 	if (!oclient->update) {
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_MESSAGE_CLASS, (const void *)"IPM.Appointment");
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_MESSAGE_CLASS_UNICODE, (const void *)"IPM.Appointment");
 
 		flag = 1;
 		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_MESSAGE_FLAGS, (const void *)&flag);
@@ -1144,7 +1158,7 @@ static enum MAPISTATUS appointment_SetProps(TALLOC_CTX *mem_ctx,
 	flag = (oclient->private == true) ? 2 : 0;
 	lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_SENSITIVITY, (const void *)&flag);
 	
-	retval = SetProps(obj_message, lpProps, cValues);
+	retval = SetProps(obj_message, 0, lpProps, cValues);
 	MAPIFreeBuffer(lpProps);
 	MAPI_RETVAL_IF(retval, retval, NULL);
 
@@ -1214,13 +1228,20 @@ static enum MAPISTATUS contact_SetProps(TALLOC_CTX *mem_ctx,
 
 	/* Build the list of named properties we want to set */
 	nameid = mapi_nameid_new(mem_ctx);
-	mapi_nameid_string_add(nameid, "urn:schemas:contacts:fileas", PS_PUBLIC_STRINGS);
+	retval = mapi_nameid_string_add(nameid, "urn:schemas:contacts:fileas", PS_PUBLIC_STRINGS);
+	if (retval != MAPI_E_SUCCESS) {
+		talloc_free(nameid);
+		return retval;
+	}
 
 	/* GetIDsFromNames and map property types */
 	SPropTagArray = talloc_zero(mem_ctx, struct SPropTagArray);
 	retval = GetIDsFromNames(obj_folder, nameid->count,
 				 nameid->nameid, 0, &SPropTagArray);
-	if (retval != MAPI_E_SUCCESS) return retval;
+	if (retval != MAPI_E_SUCCESS) {
+		talloc_free(nameid);
+		return retval;
+	}
 	mapi_nameid_SPropTagArray(nameid, SPropTagArray);
 	MAPIFreeBuffer(nameid);
 
@@ -1228,21 +1249,21 @@ static enum MAPISTATUS contact_SetProps(TALLOC_CTX *mem_ctx,
 	lpProps = talloc_array(mem_ctx, struct SPropValue, 2);
 
 	if (oclient->card_name) {
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_NORMALIZED_SUBJECT, (const void *)oclient->card_name);
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_NORMALIZED_SUBJECT_UNICODE, (const void *)oclient->card_name);
 		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PidLidFileUnder, (const void *)oclient->card_name);
 		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, SPropTagArray->aulPropTag[0], (const void *)oclient->card_name);
 	}
 	if (oclient->full_name) {
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_DISPLAY_NAME, (const void *)oclient->full_name);
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_DISPLAY_NAME_UNICODE, (const void *)oclient->full_name);
 	}
 	if (oclient->email) {
 		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PidLidEmail1OriginalDisplayName, (const void *)oclient->email);
 		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PidLidEmail1EmailAddress, (const void *)oclient->email);
 	}
 	if (!oclient->update) {
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_MESSAGE_CLASS, (const void *)"IPM.Contact");
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_MESSAGE_CLASS_UNICODE, (const void *)"IPM.Contact");
 	}
-	retval = SetProps(obj_message, lpProps, cValues);
+	retval = SetProps(obj_message, 0, lpProps, cValues);
 	MAPIFreeBuffer(SPropTagArray);
 	MAPIFreeBuffer(lpProps);
 	MAPI_RETVAL_IF(retval, retval, NULL);
@@ -1272,7 +1293,7 @@ static bool openchangeclient_sendcontact(TALLOC_CTX *mem_ctx, mapi_object_t *obj
 		if (retval != MAPI_E_SUCCESS) return false;
 	}
 
-	/* Create contact mesage */
+	/* Create contact message */
 	mapi_object_init(&obj_message);
 	retval = CreateMessage(&obj_contact, &obj_message);
 	if (retval != MAPI_E_SUCCESS) return false;
@@ -1315,8 +1336,8 @@ static enum MAPISTATUS task_SetProps(TALLOC_CTX *mem_ctx,
 	lpProps = talloc_array(mem_ctx, struct SPropValue, 2);
 
 	if (oclient->card_name) {
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_CONVERSATION_TOPIC, (const void *)oclient->card_name);
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_NORMALIZED_SUBJECT, (const void *)oclient->card_name);
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_CONVERSATION_TOPIC_UNICODE, (const void *)oclient->card_name);
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_NORMALIZED_SUBJECT_UNICODE, (const void *)oclient->card_name);
 	}
 
 	if (oclient->dtstart) {
@@ -1344,11 +1365,11 @@ static enum MAPISTATUS task_SetProps(TALLOC_CTX *mem_ctx,
 	}
 
 	if (oclient->pr_body) {
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_BODY, (const void *)oclient->pr_body);
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_BODY_UNICODE, (const void *)oclient->pr_body);
 	}
 
 	if (!oclient->update) {
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_MESSAGE_CLASS, (const void *)"IPM.Task");
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_MESSAGE_CLASS_UNICODE, (const void *)"IPM.Task");
 		oclient->importance = (oclient->importance == -1) ? 1 : oclient->importance;
 		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_IMPORTANCE, (const void *)&oclient->importance);
 		oclient->taskstatus = (oclient->taskstatus == -1) ? 0 : oclient->taskstatus;
@@ -1362,7 +1383,7 @@ static enum MAPISTATUS task_SetProps(TALLOC_CTX *mem_ctx,
 		}
 	}
 
-	retval = SetProps(obj_message, lpProps, cValues);
+	retval = SetProps(obj_message, 0, lpProps, cValues);
 	MAPIFreeBuffer(lpProps);
 	MAPI_RETVAL_IF(retval, retval, NULL);
 
@@ -1391,7 +1412,7 @@ static bool openchangeclient_sendtask(TALLOC_CTX *mem_ctx, mapi_object_t *obj_st
 		if (retval != MAPI_E_SUCCESS) return false;
 	}
 
-	/* Create contact mesage */
+	/* Create contact message */
 	mapi_object_init(&obj_message);
 	retval = CreateMessage(&obj_task, &obj_message);
 	if (retval != MAPI_E_SUCCESS) return false;
@@ -1431,14 +1452,14 @@ static enum MAPISTATUS note_SetProps(TALLOC_CTX *mem_ctx,
 	lpProps = talloc_array(mem_ctx, struct SPropValue, 2);
 
 	if (oclient->card_name) {
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_CONVERSATION_TOPIC, (const void *)oclient->card_name);
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_SUBJECT, (const void *)oclient->card_name);
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_NORMALIZED_SUBJECT, (const void *)oclient->card_name);
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_BODY, (const void *)oclient->card_name);
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_CONVERSATION_TOPIC_UNICODE, (const void *)oclient->card_name);
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_SUBJECT_UNICODE, (const void *)oclient->card_name);
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_NORMALIZED_SUBJECT_UNICODE, (const void *)oclient->card_name);
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_BODY_UNICODE, (const void *)oclient->card_name);
 	}
 
 	if (!oclient->update) {
-		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_MESSAGE_CLASS, (const void *)"IPM.StickyNote");
+		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_MESSAGE_CLASS_UNICODE, (const void *)"IPM.StickyNote");
 
 		value = 1;
 		lpProps = add_SPropValue(mem_ctx, lpProps, &cValues, PR_MESSAGE_FLAGS, (const void *)&value);
@@ -1471,7 +1492,7 @@ static enum MAPISTATUS note_SetProps(TALLOC_CTX *mem_ctx,
 	}
 
 	
-	retval = SetProps(obj_message, lpProps, cValues);
+	retval = SetProps(obj_message, 0, lpProps, cValues);
 	MAPIFreeBuffer(lpProps);
 	MAPI_RETVAL_IF(retval, retval, NULL);
 	
@@ -1500,7 +1521,7 @@ static bool openchangeclient_sendnote(TALLOC_CTX *mem_ctx, mapi_object_t *obj_st
 		if (retval != MAPI_E_SUCCESS) return false;
 	}
 
-	/* Create contact mesage */
+	/* Create contact message */
 	mapi_object_init(&obj_message);
 	retval = CreateMessage(&obj_note, &obj_message);
 	if (retval != MAPI_E_SUCCESS) return false;
@@ -1538,8 +1559,9 @@ static const char *get_container_class(TALLOC_CTX *mem_ctx, mapi_object_t *paren
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0x1, PR_CONTAINER_CLASS);
-	retval = GetProps(&obj_folder, SPropTagArray, &lpProps, &count);
+	retval = GetProps(&obj_folder, MAPI_UNICODE, SPropTagArray, &lpProps, &count);
 	MAPIFreeBuffer(SPropTagArray);
+	mapi_object_release(&obj_folder);
 	if ((lpProps[0].ulPropTag != PR_CONTAINER_CLASS) || (retval != MAPI_E_SUCCESS)) {
 		errno = 0;
 		return IPF_NOTE;
@@ -1556,7 +1578,6 @@ static bool get_child_folders(TALLOC_CTX *mem_ctx, mapi_object_t *parent, mapi_i
 	struct SPropTagArray	*SPropTagArray;
 	struct SRowSet		rowset;
 	const char	       	*name;
-	char			*newname;
 	const char		*comment;
 	const uint32_t		*total;
 	const uint32_t		*unread;
@@ -1574,9 +1595,9 @@ static bool get_child_folders(TALLOC_CTX *mem_ctx, mapi_object_t *parent, mapi_i
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0x6,
-					  PR_DISPLAY_NAME,
+					  PR_DISPLAY_NAME_UNICODE,
 					  PR_FID,
-					  PR_COMMENT,
+					  PR_COMMENT_UNICODE,
 					  PR_CONTENT_UNREAD,
 					  PR_CONTENT_COUNT,
 					  PR_FOLDER_CHILD_COUNT);
@@ -1587,8 +1608,8 @@ static bool get_child_folders(TALLOC_CTX *mem_ctx, mapi_object_t *parent, mapi_i
 	while (((retval = QueryRows(&obj_htable, 0x32, TBL_ADVANCE, &rowset)) != MAPI_E_NOT_FOUND) && rowset.cRows) {
 		for (index = 0; index < rowset.cRows; index++) {
 			fid = (const uint64_t *)find_SPropValue_data(&rowset.aRow[index], PR_FID);
-			name = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_DISPLAY_NAME);
-			comment = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_COMMENT);
+			name = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_DISPLAY_NAME_UNICODE);
+			comment = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_COMMENT_UNICODE);
 			total = (const uint32_t *)find_SPropValue_data(&rowset.aRow[index], PR_CONTENT_COUNT);
 			unread = (const uint32_t *)find_SPropValue_data(&rowset.aRow[index], PR_CONTENT_UNREAD);
 			child = (const uint32_t *)find_SPropValue_data(&rowset.aRow[index], PR_FOLDER_CHILD_COUNT);
@@ -1596,11 +1617,9 @@ static bool get_child_folders(TALLOC_CTX *mem_ctx, mapi_object_t *parent, mapi_i
 			for (i = 0; i < count; i++) {
 				printf("|   ");
 			}
-			newname = utf8tolinux(mem_ctx, name);
 			printf("|---+ %-15s : %-20s (Total: %u / Unread: %u - Container class: %s) [FID: 0x%016"PRIx64"]\n", 
-			       newname, comment?comment:"", total?*total:0, unread?*unread:0,
+			       name, comment?comment:"", total?*total:0, unread?*unread:0,
 			       get_container_class(mem_ctx, parent, *fid), *fid);
-			MAPIFreeBuffer(newname);
 			if (child && *child) {
 				ret = get_child_folders(mem_ctx, &obj_folder, *fid, count + 1);
 				if (ret == false) return ret;
@@ -1608,6 +1627,9 @@ static bool get_child_folders(TALLOC_CTX *mem_ctx, mapi_object_t *parent, mapi_i
 			
 		}
 	}
+	mapi_object_release(&obj_htable);
+	mapi_object_release(&obj_folder);
+
 	return true;
 }
 
@@ -1620,7 +1642,6 @@ static bool get_child_folders_pf(TALLOC_CTX *mem_ctx, mapi_object_t *parent, map
 	struct SPropTagArray	*SPropTagArray;
 	struct SRowSet		rowset;
 	const char	       	*name;
-	char			*newname;
 	const uint32_t		*child;
 	uint32_t		index;
 	const uint64_t		*fid;
@@ -1635,7 +1656,7 @@ static bool get_child_folders_pf(TALLOC_CTX *mem_ctx, mapi_object_t *parent, map
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0x3,
-					  PR_DISPLAY_NAME,
+					  PR_DISPLAY_NAME_UNICODE,
 					  PR_FID,
 					  PR_FOLDER_CHILD_COUNT);
 	retval = SetColumns(&obj_htable, SPropTagArray);
@@ -1645,15 +1666,13 @@ static bool get_child_folders_pf(TALLOC_CTX *mem_ctx, mapi_object_t *parent, map
 	while (((retval = QueryRows(&obj_htable, 0x32, TBL_ADVANCE, &rowset)) != MAPI_E_NOT_FOUND) && rowset.cRows) {
 		for (index = 0; index < rowset.cRows; index++) {
 			fid = (const uint64_t *)find_SPropValue_data(&rowset.aRow[index], PR_FID);
-			name = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_DISPLAY_NAME);
+			name = (const char *)find_SPropValue_data(&rowset.aRow[index], PR_DISPLAY_NAME_UNICODE);
 			child = (const uint32_t *)find_SPropValue_data(&rowset.aRow[index], PR_FOLDER_CHILD_COUNT);
 
 			for (i = 0; i < count; i++) {
 				printf("|   ");
 			}
-			newname = utf8tolinux(mem_ctx, name);
-			printf("|---+ %-15s [FID: 0x%016"PRIx64"]\n", newname, *fid);
-			MAPIFreeBuffer(newname);
+			printf("|---+ %-15s [FID: 0x%016"PRIx64"]\n", name, *fid);
 			if (*child) {
 				ret = get_child_folders_pf(mem_ctx, &obj_folder, *fid, count + 1);
 				if (ret == false) return ret;
@@ -1686,16 +1705,15 @@ static bool openchangeclient_mailbox(TALLOC_CTX *mem_ctx,
 	struct SPropValue		*lpProps;
 	uint32_t			cValues;
 	const char			*mailbox_name;
-	char				*utf8_mailbox_name;
 
 	/* Retrieve the mailbox folder name */
-	SPropTagArray = set_SPropTagArray(mem_ctx, 0x1, PR_DISPLAY_NAME);
-	retval = GetProps(obj_store, SPropTagArray, &lpProps, &cValues);
+	SPropTagArray = set_SPropTagArray(mem_ctx, 0x1, PR_DISPLAY_NAME_UNICODE);
+	retval = GetProps(obj_store, MAPI_UNICODE, SPropTagArray, &lpProps, &cValues);
 	MAPIFreeBuffer(SPropTagArray);
 	if (retval != MAPI_E_SUCCESS) return false;
 
-	if (lpProps[0].value.lpszA) {
-		mailbox_name = lpProps[0].value.lpszA;
+	if (lpProps[0].value.lpszW) {
+		mailbox_name = lpProps[0].value.lpszW;
 	} else {
 		return false;
 	}
@@ -1704,9 +1722,7 @@ static bool openchangeclient_mailbox(TALLOC_CTX *mem_ctx,
 	retval = GetDefaultFolder(obj_store, &id_mailbox, olFolderTopInformationStore);
 	if (retval != MAPI_E_SUCCESS) return false;
 
-	utf8_mailbox_name = utf8tolinux(mem_ctx, mailbox_name);
-	printf("+ %s\n", utf8_mailbox_name);
-	MAPIFreeBuffer(utf8_mailbox_name);
+	printf("+ %s\n", mailbox_name);
 	return get_child_folders(mem_ctx, obj_store, id_mailbox, 0);
 }
 
@@ -1769,14 +1785,21 @@ static bool openchangeclient_fetchitems(TALLOC_CTX *mem_ctx, mapi_object_t *obj_
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	printf("MAILBOX (%u messages)\n", count);
+	if (!count) {
+		mapi_object_release(&obj_table);
+		mapi_object_release(&obj_folder);
+		mapi_object_release(&obj_tis);
+
+		return true;
+	}
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0x8,
 					  PR_FID,
 					  PR_MID,
 					  PR_INST_ID,
 					  PR_INSTANCE_NUM,
-					  PR_SUBJECT,
-					  PR_MESSAGE_CLASS,
+					  PR_SUBJECT_UNICODE,
+					  PR_MESSAGE_CLASS_UNICODE,
 					  PR_RULE_MSG_PROVIDER,
 					  PR_RULE_MSG_NAME);
 	retval = SetColumns(&obj_table, SPropTagArray);
@@ -1792,33 +1815,37 @@ static bool openchangeclient_fetchitems(TALLOC_CTX *mem_ctx, mapi_object_t *obj_
 					     SRowSet.aRow[i].lpProps[1].value.d,
 					     &obj_message, 0);
 			if (retval != MAPI_E_NOT_FOUND) {
-				retval = GetPropsAll(&obj_message, &properties_array);
-				if (retval == MAPI_E_SUCCESS) {
-					id = talloc_asprintf(mem_ctx, ": %"PRIX64"/%"PRIX64,
-							     SRowSet.aRow[i].lpProps[0].value.d,
-							     SRowSet.aRow[i].lpProps[1].value.d);
-					mapi_SPropValue_array_named(&obj_message, 
-								    &properties_array);
-					switch (olFolder) {
-					case olFolderInbox:
-					  mapidump_message(&properties_array, id);
-						break;
-					case olFolderCalendar:
-						mapidump_appointment(&properties_array, id);
-						break;
-					case olFolderContacts:
-						mapidump_contact(&properties_array, id);
-						break;
-					case olFolderTasks:
-						mapidump_task(&properties_array, id);
-						break;
-					case olFolderNotes:
-						mapidump_note(&properties_array, id);
-						break;
+				if (oclient->summary) {
+					mapidump_message_summary(&obj_message);
+				} else {
+					retval = GetPropsAll(&obj_message, MAPI_UNICODE, &properties_array);
+					if (retval == MAPI_E_SUCCESS) {
+						id = talloc_asprintf(mem_ctx, ": %"PRIX64"/%"PRIX64,
+								     SRowSet.aRow[i].lpProps[0].value.d,
+								     SRowSet.aRow[i].lpProps[1].value.d);
+						mapi_SPropValue_array_named(&obj_message, 
+									    &properties_array);
+						switch (olFolder) {
+						case olFolderInbox:
+						  mapidump_message(&properties_array, id, NULL);
+							break;
+						case olFolderCalendar:
+							mapidump_appointment(&properties_array, id);
+							break;
+						case olFolderContacts:
+							mapidump_contact(&properties_array, id);
+							break;
+						case olFolderTasks:
+							mapidump_task(&properties_array, id);
+							break;
+						case olFolderNotes:
+							mapidump_note(&properties_array, id);
+							break;
+						}
+						talloc_free(id);
 					}
-					talloc_free(id);
-					mapi_object_release(&obj_message);
 				}
+				mapi_object_release(&obj_message);
 			}
 		}
 	}
@@ -2122,12 +2149,12 @@ static enum MAPISTATUS openchangeclient_findmail(mapi_object_t *obj_store,
 							     SRowSet.aRow[i].lpProps[1].value.d,
 							     &obj_message, 0);
 					if (GetLastError() == MAPI_E_SUCCESS) {
-						retval = GetPropsAll(&obj_message, &properties_array);
+						retval = GetPropsAll(&obj_message, MAPI_UNICODE, &properties_array);
 						if (retval != MAPI_E_SUCCESS) return retval;
 						id = talloc_asprintf(mem_ctx, ": %"PRIX64"/%"PRIX64,
 								     SRowSet.aRow[i].lpProps[0].value.d,
 								     SRowSet.aRow[i].lpProps[1].value.d);
-						mapidump_message(&properties_array, id);
+						mapidump_message(&properties_array, id, NULL);
 						mapi_object_release(&obj_message);
 						talloc_free(id);
 
@@ -2153,7 +2180,6 @@ static int callback(uint16_t NotificationType, void *NotificationData, void *pri
 	struct HierarchyTableChange    	*htable;
 	struct ContentsTableChange     	*ctable;
 	struct ContentsTableChange     	*stable;
-	enum MAPISTATUS			retval;
 
 	switch(NotificationType) {
 	case fnevNewMail:
@@ -2161,7 +2187,7 @@ static int callback(uint16_t NotificationType, void *NotificationData, void *pri
 		DEBUG(0, ("[+] New mail Received\n"));
 		newmail = (struct NewMailNotification *) NotificationData;
 		mapidump_newmail(newmail, "\t");
-		retval = openchangeclient_findmail((mapi_object_t *)private_data, newmail->MID);
+		openchangeclient_findmail((mapi_object_t *)private_data, newmail->MID);
 		mapi_errstr("openchangeclient_findmail", GetLastError());
 		break;
 	case fnevObjectCreated:
@@ -2287,14 +2313,17 @@ static int callback(uint16_t NotificationType, void *NotificationData, void *pri
 
 static bool openchangeclient_notifications(TALLOC_CTX *mem_ctx, mapi_object_t *obj_store, struct oclient *oclient)
 {
-	enum MAPISTATUS	retval;
-	mapi_object_t	obj_inbox;
-	mapi_id_t	fid;
-	uint32_t	ulConnection;
-	uint16_t	ulEventMask;
+	enum MAPISTATUS		retval;
+	mapi_object_t		obj_inbox;
+	mapi_id_t		fid;
+	uint32_t		ulConnection;
+	uint16_t		ulEventMask;
+	uint32_t		notification = 0;
+	struct mapi_session	*session;
 
 	/* Register notification */
-	retval = RegisterNotification(0);
+	session = mapi_object_get_session(obj_store);
+	retval = RegisterNotification(session);
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	if (oclient->pf == true) {
@@ -2317,12 +2346,15 @@ static bool openchangeclient_notifications(TALLOC_CTX *mem_ctx, mapi_object_t *o
 		fnevSearchComplete|fnevTableModified|fnevStatusObjectModified;
 	retval = Subscribe(obj_store, &ulConnection, ulEventMask, true, (mapi_notify_callback_t)callback,
 		(void*) obj_store);
-	retval = Subscribe(&obj_inbox, &ulConnection, ulEventMask, false, (mapi_notify_callback_t)callback,
+	retval = Subscribe(&obj_inbox, &ulConnection, ulEventMask, true, (mapi_notify_callback_t)callback,
 		(void*) obj_store);
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	/* wait for notifications: infinite loop */
-	retval = MonitorNotification(mapi_object_get_session(obj_store), (void *)obj_store, NULL);
+	retval = RegisterAsyncNotification(mapi_object_get_session(obj_store), &notification);
+	if( retval == MAPI_E_NOT_INITIALIZED ) {
+		retval = MonitorNotification(mapi_object_get_session(obj_store), (void *)obj_store, NULL);
+	}
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	retval = Unsubscribe(mapi_object_get_session(obj_store), ulConnection);
@@ -2429,11 +2461,14 @@ static bool openchangeclient_userlist(TALLOC_CTX *mem_ctx,
 {
 	struct SPropTagArray	*SPropTagArray;
 	struct SRowSet		*SRowSet;
-	enum MAPISTATUS		retval;
 	uint32_t		i;
 	uint32_t		count;
 	uint8_t			ulFlags;
 	uint32_t		rowsFetched = 0;
+	uint32_t		totalRecs = 0;
+
+	GetGALTableCount(session, &totalRecs);
+	printf("Total Number of entries in GAL: %d\n", totalRecs);
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0xc,
 					  PR_INSTANCE_KEY,
@@ -2453,7 +2488,7 @@ static bool openchangeclient_userlist(TALLOC_CTX *mem_ctx,
 	ulFlags = TABLE_START;
 	do {
 		count += 0x2;
-		retval = GetGALTable(session, SPropTagArray, &SRowSet, count, ulFlags);
+		GetGALTable(session, SPropTagArray, &SRowSet, count, ulFlags);
 		if ((!SRowSet) || (!(SRowSet->aRow))) {
 			return false;
 		}
@@ -2478,6 +2513,7 @@ static bool openchangeclient_ocpf_syntax(struct oclient *oclient)
 {
 	int			ret;
 	struct ocpf_file	*element;
+	uint32_t		context_id;
 
 	/* Sanity checks */
 	if (!oclient->ocpf_files || !oclient->ocpf_files->next) {
@@ -2494,15 +2530,24 @@ static bool openchangeclient_ocpf_syntax(struct oclient *oclient)
 
 	/* Step2. Parse OCPF files */
 	for (element = oclient->ocpf_files; element->next; element = element->next) {
-		ret = ocpf_parse(element->filename);
+	  ret = ocpf_new_context(element->filename, &context_id, OCPF_FLAGS_READ);
 		if (ret == -1) {
 			errno = MAPI_E_INVALID_PARAMETER;
 			return false;
 		}
+		ret = ocpf_parse(context_id);
+		if (ret == -1) {
+			DEBUG(0, ("ocpf_parse failed ...\n"));
+			errno = MAPI_E_INVALID_PARAMETER;
+			return false;
+		}
+
+		/* Dump OCPF contents */
+		ocpf_dump(context_id);
+
+		ret = ocpf_del_context(context_id);
 	}
 
-	/* Step3. Dump OCPF contents */
-	ocpf_dump();
 
 	/* Step4. Release OCPF context */
 	ret = ocpf_release();
@@ -2524,6 +2569,7 @@ static bool openchangeclient_ocpf_sender(TALLOC_CTX *mem_ctx, mapi_object_t *obj
 	mapi_object_t		obj_message;
 	uint32_t		cValues = 0;
 	struct SPropValue	*lpProps;
+	uint32_t		context_id;
 
 	/* Sanity Check */
 	if (!oclient->ocpf_files || !oclient->ocpf_files->next) {
@@ -2540,7 +2586,8 @@ static bool openchangeclient_ocpf_sender(TALLOC_CTX *mem_ctx, mapi_object_t *obj
 
 	/* Step2. Parse OCPF files */
 	for (element = oclient->ocpf_files; element->next; element = element->next) {
-		ret = ocpf_parse(element->filename);
+	  ret = ocpf_new_context(element->filename, &context_id, OCPF_FLAGS_READ);
+		ret = ocpf_parse(context_id);
 		if (ret == -1) {
 			errno = MAPI_E_INVALID_PARAMETER;
 			return false;
@@ -2549,7 +2596,7 @@ static bool openchangeclient_ocpf_sender(TALLOC_CTX *mem_ctx, mapi_object_t *obj
 
 	/* Step3. Open destination folder using ocpf API */
 	mapi_object_init(&obj_folder);
-	retval = ocpf_OpenFolder(obj_store, &obj_folder);
+	retval = ocpf_OpenFolder(context_id, obj_store, &obj_folder);
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	/* Step4. Create the message */
@@ -2558,18 +2605,18 @@ static bool openchangeclient_ocpf_sender(TALLOC_CTX *mem_ctx, mapi_object_t *obj
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	/* Step5, Set message recipients */
-	retval = ocpf_set_Recipients(mem_ctx, &obj_message);
+	retval = ocpf_set_Recipients(mem_ctx, context_id, &obj_message);
 	if (retval != MAPI_E_SUCCESS && GetLastError() != MAPI_E_NOT_FOUND) return false;
 	errno = MAPI_E_SUCCESS;
 
 	/* Step6. Set message properties */
-	retval = ocpf_set_SPropValue(mem_ctx, &obj_folder, &obj_message);
+	retval = ocpf_set_SPropValue(mem_ctx, context_id, &obj_folder, &obj_message);
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	/* Step7. Set message properties */
-	lpProps = ocpf_get_SPropValue(&cValues);
+	lpProps = ocpf_get_SPropValue(context_id, &cValues);
 
-	retval = SetProps(&obj_message, lpProps, cValues);
+	retval = SetProps(&obj_message, 0, lpProps, cValues);
 	MAPIFreeBuffer(lpProps);
 	if (retval != MAPI_E_SUCCESS) return false;
 
@@ -2579,6 +2626,8 @@ static bool openchangeclient_ocpf_sender(TALLOC_CTX *mem_ctx, mapi_object_t *obj
 
 	mapi_object_release(&obj_message);
 	mapi_object_release(&obj_folder);
+
+	ocpf_del_context(context_id);
 
 	return true;
 }
@@ -2597,6 +2646,7 @@ static bool openchangeclient_ocpf_dump(TALLOC_CTX *mem_ctx, mapi_object_t *obj_s
 	const char			*item = NULL;
 	char				*filename = NULL;
 	struct mapi_SPropValue_array	lpProps;
+	uint32_t			context_id;
 
 
 	/* retrieve the FID/MID for ocpf_dump parameter */
@@ -2626,7 +2676,7 @@ static bool openchangeclient_ocpf_dump(TALLOC_CTX *mem_ctx, mapi_object_t *obj_s
 	if (retval != MAPI_E_SUCCESS) return false;
 
 	/* Step 3. retrieve all message properties */
-	retval = GetPropsAll(&obj_message, &lpProps);
+	retval = GetPropsAll(&obj_message, MAPI_UNICODE, &lpProps);
 
 	/* Step 4. save the message */
 	ret = ocpf_init();
@@ -2634,13 +2684,16 @@ static bool openchangeclient_ocpf_dump(TALLOC_CTX *mem_ctx, mapi_object_t *obj_s
 	filename = talloc_asprintf(mem_ctx, "%"PRIx64".ocpf", mid);
 	DEBUG(0, ("OCPF output file: %s\n", filename));
 
-	ret = ocpf_write_init(filename, fid);
+	ret = ocpf_new_context(filename, &context_id, OCPF_FLAGS_CREATE);
 	talloc_free(filename);
+	ret = ocpf_write_init(context_id, fid);
 
-	ret = ocpf_write_auto(&obj_message, &lpProps);
+	ret = ocpf_write_auto(context_id, &obj_message, &lpProps);
 	if (ret == OCPF_SUCCESS) {
-		ret = ocpf_write_commit();
+		ret = ocpf_write_commit(context_id);
 	} 
+
+	ret = ocpf_del_context(context_id);
 
 	ret = ocpf_release();
 
@@ -2674,14 +2727,14 @@ static bool openchangeclient_freebusy(mapi_object_t *obj_store, struct oclient *
 
 	/* Step 2. Dump properties */
 	message_name = (const char *) find_SPropValue_data(&aRow, PR_NORMALIZED_SUBJECT);
-	publish_start = (const uint32_t *) find_SPropValue_data(&aRow, PR_FREEBUSY_START_RANGE);
-	publish_end = (const uint32_t *) find_SPropValue_data(&aRow, PR_FREEBUSY_END_RANGE);
-	busy_months = (const struct LongArray_r *) find_SPropValue_data(&aRow, PR_FREEBUSY_BUSY_MONTHS);
-	busy_events = (const struct BinaryArray_r *) find_SPropValue_data(&aRow, PR_FREEBUSY_BUSY_EVENTS);
-	tentative_months = (const struct LongArray_r *) find_SPropValue_data(&aRow, PR_FREEBUSY_TENTATIVE_MONTHS);
-	tentative_events = (const struct BinaryArray_r *) find_SPropValue_data(&aRow, PR_FREEBUSY_TENTATIVE_EVENTS);
-	oof_months = (const struct LongArray_r *) find_SPropValue_data(&aRow, PR_FREEBUSY_OOF_MONTHS);
-	oof_events = (const struct BinaryArray_r *) find_SPropValue_data(&aRow, PR_FREEBUSY_OOF_EVENTS);
+	publish_start = (const uint32_t *) find_SPropValue_data(&aRow, PR_FREEBUSY_PUBLISH_START);
+	publish_end = (const uint32_t *) find_SPropValue_data(&aRow, PR_FREEBUSY_PUBLISH_END);
+	busy_months = (const struct LongArray_r *) find_SPropValue_data(&aRow, PR_SCHDINFO_MONTHS_BUSY);
+	busy_events = (const struct BinaryArray_r *) find_SPropValue_data(&aRow, PR_SCHDINFO_FREEBUSY_BUSY);
+	tentative_months = (const struct LongArray_r *) find_SPropValue_data(&aRow, PR_SCHDINFO_MONTHS_TENTATIVE);
+	tentative_events = (const struct BinaryArray_r *) find_SPropValue_data(&aRow, PR_SCHDINFO_FREEBUSY_TENTATIVE);
+	oof_months = (const struct LongArray_r *) find_SPropValue_data(&aRow, PR_SCHDINFO_MONTHS_OOF);
+	oof_events = (const struct BinaryArray_r *) find_SPropValue_data(&aRow, PR_SCHDINFO_FREEBUSY_OOF);
 
 	year = GetFreeBusyYear(publish_start);
 
@@ -2777,6 +2830,7 @@ int main(int argc, const char *argv[])
 	bool			opt_ocpf_sender = false;
 	const char		*opt_profdb = NULL;
 	char			*opt_profname = NULL;
+	const char		*opt_username = NULL;
 	const char		*opt_password = NULL;
 	const char		*opt_attachments = NULL;
 	const char		*opt_fetchitems = NULL;
@@ -2797,7 +2851,8 @@ int main(int argc, const char *argv[])
 	      OPT_FOLDER, OPT_MAPI_COLOR, OPT_SENDNOTE, OPT_MKDIR, OPT_RMDIR,
 	      OPT_FOLDER_NAME, OPT_FOLDER_COMMENT, OPT_USERLIST, OPT_MAPI_PRIVATE,
 	      OPT_UPDATE, OPT_DELETEITEMS, OPT_OCPF_FILE, OPT_OCPF_SYNTAX,
-	      OPT_OCPF_SENDER, OPT_OCPF_DUMP, OPT_FREEBUSY, OPT_FORCE};
+	      OPT_OCPF_SENDER, OPT_OCPF_DUMP, OPT_FREEBUSY, OPT_FORCE, OPT_FETCHSUMMARY,
+	      OPT_USERNAME };
 
 	struct poptOption long_options[] = {
 		POPT_AUTOHELP
@@ -2805,12 +2860,14 @@ int main(int argc, const char *argv[])
 		{"pf", 0, POPT_ARG_NONE, NULL, OPT_PF, "access public folders instead of mailbox", NULL },
 		{"profile", 'p', POPT_ARG_STRING, NULL, OPT_PROFILE, "set the profile name", NULL },
 		{"password", 'P', POPT_ARG_STRING, NULL, OPT_PASSWORD, "set the profile password", NULL },
+		{"username", 0, POPT_ARG_STRING, NULL, OPT_USERNAME, "set the username of the mailbox to use", NULL },
 		{"sendmail", 'S', POPT_ARG_NONE, NULL, OPT_SENDMAIL, "send a mail", NULL },
 		{"sendappointment", 0, POPT_ARG_NONE, NULL, OPT_SENDAPPOINTMENT, "send an appointment", NULL },
 		{"sendcontact", 0, POPT_ARG_NONE, NULL, OPT_SENDCONTACT, "send a contact", NULL },
 		{"sendtask", 0, POPT_ARG_NONE, NULL, OPT_SENDTASK, "send a task", NULL },
 		{"sendnote", 0, POPT_ARG_NONE, NULL, OPT_SENDNOTE, "send a note", NULL },
 		{"fetchmail", 'F', POPT_ARG_NONE, NULL, OPT_FETCHMAIL, "fetch user INBOX mails", NULL },
+		{"fetchsummary", 0, POPT_ARG_NONE, NULL, OPT_FETCHSUMMARY, "fetch message summaries only", NULL },
 		{"storemail", 'G', POPT_ARG_STRING, NULL, OPT_STOREMAIL, "retrieve a mail on the filesystem", NULL },
 		{"fetch-items", 'i', POPT_ARG_STRING, NULL, OPT_FETCHITEMS, "fetch specified user INBOX items", NULL },
 		{"freebusy", 0, POPT_ARG_STRING, NULL, OPT_FREEBUSY, "display free / busy information for the specified user", NULL },
@@ -2903,11 +2960,17 @@ int main(int argc, const char *argv[])
 		case OPT_PASSWORD:
 			opt_password = poptGetOptArg(pc);
 			break;
+		case OPT_USERNAME:
+			opt_username = talloc_strdup(mem_ctx, poptGetOptArg(pc));
+			break;
 		case OPT_MAILBOX:
 			opt_mailbox = true;
 			break;
 		case OPT_FETCHITEMS:
 			opt_fetchitems = poptGetOptArg(pc);
+			break;
+		case OPT_FETCHSUMMARY:
+			oclient.summary = true;
 			break;
 		case OPT_DELETEITEMS:
 			oclient.delete = poptGetOptArg(pc);
@@ -3109,17 +3172,17 @@ int main(int argc, const char *argv[])
 	 * Initialize MAPI subsystem
 	 */
 
-	retval = MAPIInitialize(opt_profdb);
+	retval = MAPIInitialize(&oclient.mapi_ctx, opt_profdb);
 	if (retval != MAPI_E_SUCCESS) {
 		mapi_errstr("MAPIInitialize", GetLastError());
 		exit (1);
 	}
 
 	/* debug options */
-	SetMAPIDumpData(opt_dumpdata);
+	SetMAPIDumpData(oclient.mapi_ctx, opt_dumpdata);
 
 	if (opt_debug) {
-		SetMAPIDebugLevel(atoi(opt_debug));
+		SetMAPIDebugLevel(oclient.mapi_ctx, atoi(opt_debug));
 	}
 	
 	/* If no profile is specified try to load the default one from
@@ -3127,14 +3190,14 @@ int main(int argc, const char *argv[])
 	 */
 
 	if (!opt_profname) {
-		retval = GetDefaultProfile(&opt_profname);
+		retval = GetDefaultProfile(oclient.mapi_ctx, &opt_profname);
 		if (retval != MAPI_E_SUCCESS) {
 			mapi_errstr("GetDefaultProfile", GetLastError());
 			exit (1);
 		}
 	}
 
-	retval = MapiLogonEx(&session, opt_profname, opt_password);
+	retval = MapiLogonEx(oclient.mapi_ctx, &session, opt_profname, opt_password);
 	talloc_free(opt_profname);
 	if (retval != MAPI_E_SUCCESS) {
 		mapi_errstr("MapiLogonEx", GetLastError());
@@ -3158,6 +3221,12 @@ int main(int argc, const char *argv[])
 		retval = OpenPublicFolder(session, &obj_store);
 		if (retval != MAPI_E_SUCCESS) {
 			mapi_errstr("OpenPublicFolder", GetLastError());
+			exit (1);
+		}
+	} else if (opt_username) {
+		retval = OpenUserMailbox(session, opt_username, &obj_store);
+		if (retval != MAPI_E_SUCCESS) {
+			mapi_errstr("OpenUserMailbox", GetLastError());
 			exit (1);
 		}
 	} else {
@@ -3371,7 +3440,7 @@ end:
 
 	mapi_object_release(&obj_store);
 
-	MAPIUninitialize();
+	MAPIUninitialize(oclient.mapi_ctx);
 
 	talloc_free(mem_ctx);
 

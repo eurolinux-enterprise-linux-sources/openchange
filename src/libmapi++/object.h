@@ -26,7 +26,6 @@
 #include <stdexcept>
 
 #include <libmapi++/clibmapi.h>
-#include <libmapi++/session.h>
 
 /**
  *  The libmapi++ classes and other definitions are all enclosed in
@@ -36,7 +35,7 @@ namespace libmapipp
 {
 // #define INVALID_HANDLE_VALUE 0xffffffff
 class property_container;
-
+class session;
 /**
  * Base Object class
  *
@@ -53,7 +52,7 @@ class object {
 		 * \param mapi_session Session this object is to be associated with.
 		 * \param object_type The name of the type of object (to be set in a subclass)
 		 */
-		object(session& mapi_session, const std::string& object_type = "") throw() : m_session(mapi_session), m_object_type(object_type)
+		explicit object(session& mapi_session, const std::string& object_type = "") throw() : m_session(mapi_session), m_object_type(object_type)
 		{
 			mapi_object_init(&m_object);
 		}
@@ -102,7 +101,5 @@ class object {
 };
 
 } // namespace libmapipp
-
-#include <libmapi++/impl/object.ipp>
 
 #endif //!LIBMAPIPP__OBJECT_H__

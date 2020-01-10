@@ -27,6 +27,9 @@
 /* UNICODE flags */
 #define	MAPI_UNICODE		0x80000000
 
+/* Other GetProps/SetProps flags */
+#define	MAPI_PROPS_SKIP_NAMEDID_CHECK	0x00000001
+
 /* Property types */
 #define	PT_UNSPECIFIED		0x0
 #define	PT_NULL			0x1
@@ -127,10 +130,9 @@
 #define	MAPI_CREATE		0x2
 
 /* SaveChanges flags */
-#define KEEP_OPEN_READONLY	0x1
-#define KEEP_OPEN_READWRITE	0x2
-#define FORCE_SAVE		0x4
-/* #define MAPI_DEFERRED_ERRORS 0x8 (already defined in the IDL */
+#define KEEP_OPEN_READONLY	0x09
+#define KEEP_OPEN_READWRITE	0x0A
+#define FORCE_SAVE		0x0C
 
 /* OpenMessage flags */
 #define	MAPI_MODIFY             0x1
@@ -229,6 +231,7 @@
 /*
  * Default folders
  */
+#define	olFolderMailboxRoot		0
 #define	olFolderTopInformationStore	1
 #define	olFolderDeletedItems		3
 #define	olFolderOutbox			4
@@ -275,21 +278,27 @@
  * Common OLEGUID - see MS-OXPROPS, Section 1.3.2
  */
 
-#define	PSETID_Appointment	"00062002-0000-0000-c000-000000000046"
-#define	PSETID_Task		"00062003-0000-0000-c000-000000000046"
-#define	PSETID_Address		"00062004-0000-0000-c000-000000000046"
-#define	PSETID_Common		"00062008-0000-0000-c000-000000000046"
-#define	PSETID_Note		"0006200e-0000-0000-c000-000000000046"
-#define	PSETID_Log		"0006200a-0000-0000-c000-000000000046"
-#define	PSETID_Sharing		"00062040-0000-0000-c000-000000000046"
-#define	PSETID_PostRss		"00062041-0000-0000-c000-000000000046"
-#define	PSETID_UnifiedMessaging	"4442858e-a9e3-4e80-b900-317a210cc15b"
-#define	PSETID_Meeting		"6ed8da90-450b-101b-98da-00aa003f1305"
-#define	PSETID_AirSync		"71035549-0739-4dcb-9163-00f0580dbbdf"
-#define	PSETID_Attachment	"96357f7f-59e1-47d0-99a7-46515c183b54"
-#define	PS_PUBLIC_STRINGS	"00020329-0000-0000-c000-000000000046"
-#define	PS_INTERNET_HEADERS	"00020386-0000-0000-c000-000000000046"
-#define	PS_MAPI			"00020328-0000-0000-c000-000000000046"
+#define	PSETID_Appointment		"00062002-0000-0000-c000-000000000046"
+#define	PSETID_Task			"00062003-0000-0000-c000-000000000046"
+#define	PSETID_Address			"00062004-0000-0000-c000-000000000046"
+#define	PSETID_Common			"00062008-0000-0000-c000-000000000046"
+#define	PSETID_Note			"0006200e-0000-0000-c000-000000000046"
+#define	PSETID_Log			"0006200a-0000-0000-c000-000000000046"
+#define	PSETID_Sharing			"00062040-0000-0000-c000-000000000046"
+#define	PSETID_PostRss			"00062041-0000-0000-c000-000000000046"
+#define	PSETID_UnifiedMessaging		"4442858e-a9e3-4e80-b900-317a210cc15b"
+#define	PSETID_Meeting			"6ed8da90-450b-101b-98da-00aa003f1305"
+#define	PSETID_AirSync			"71035549-0739-4dcb-9163-00f0580dbbdf"
+#define	PSETID_Messaging		"41f28f13-83f4-4114-a584-eedb5a6b0bff"
+#define	PSETID_Attachment		"96357f7f-59e1-47d0-99a7-46515c183b54"
+#define	PSETID_CalendarAssistant	"11000e07-b51b-40d6-af21-caa85edab1d0"
+#define	PS_PUBLIC_STRINGS		"00020329-0000-0000-c000-000000000046"
+#define	PS_INTERNET_HEADERS		"00020386-0000-0000-c000-000000000046"
+#define	PS_MAPI				"00020328-0000-0000-c000-000000000046"
+#define PSETID_Report                   "00062013-0000-0000-c000-000000000046"
+#define PSETID_Remote                   "00062014-0000-0000-c000-000000000046"
+#define	PS_UNKNOWN_0006200b_0000_0000_c000_000000000046 "0006200b-0000-0000-c000-000000000046"
+#define	PSETID_Appointment2		"02200600-0000-0000-c000-000000000046"
 
 /* FreeBusy strings for Exchange 2003 and below */
 #define	FREEBUSY_FOLDER		"EX:/o=%s/ou=%s"

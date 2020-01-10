@@ -43,6 +43,7 @@ struct attach {
 };
 
 struct oclient {
+	struct mapi_context	*mapi_ctx;
 	struct oc_property	*props;
 	const char     		*update;
 	const char		*delete;
@@ -75,6 +76,7 @@ struct oclient {
 	const char		*folder_comment;
 	const char		*freebusy;
 	bool			force;
+	bool			summary;
 	/* PF related options */
 	bool			pf;
 	const char		*folder;

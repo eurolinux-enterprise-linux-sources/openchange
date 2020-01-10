@@ -83,6 +83,7 @@ typedef [public, v1_enum, flag(NDR_PAHEX)] enum {
 	SYNC_W_PROGRESS                                     = 0x00040820,
 	SYNC_W_CLIENT_CHANGE_NEWER                          = 0x00040821,
 	MAPI_E_NAMED_PROP_QUOTA_EXCEEDED                    = 0x80040900,
+	MAPI_E_NOT_IMPLEMENTED                              = 0x80040FFF,
 	MAPI_E_NO_ACCESS                                    = 0x80070005,
 	MAPI_E_NOT_ENOUGH_MEMORY                            = 0x8007000E,
 	MAPI_E_INVALID_PARAMETER                            = 0x80070057,
@@ -270,6 +271,8 @@ typedef [public, v1_enum, flag(NDR_PAHEX)] enum {
 	ecFxUnexpectedMarker                                = 0x00000A2A,
 	ecDuplicateDelivery                                 = 0x00000A2B,
 	ecConditionViolation                                = 0x00000A2C,
+	ecRpcInvalidHandle                                  = 0x00000A2E,
+	ecEventNotFound                                     = 0x00000A2F,
 	MAPI_E_RESERVED                                     = 0xFFFFFFFF
 } MAPISTATUS;
 

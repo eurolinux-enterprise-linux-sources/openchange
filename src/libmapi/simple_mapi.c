@@ -1,7 +1,7 @@
 /*
    OpenChange MAPI implementation.
 
-   Copyright (C) Julien Kerihuel 2007-2008.
+   Copyright (C) Julien Kerihuel 2007-2011.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,8 +17,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/proto_private.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
 
 
 /**
@@ -64,7 +64,6 @@ _PUBLIC_ enum MAPISTATUS GetDefaultPublicFolder(mapi_object_t *obj_store,
 						uint64_t *folder,
 						const uint32_t id)
 {
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 
 	switch (id) {
@@ -125,7 +124,7 @@ static enum MAPISTATUS CacheDefaultFolders(mapi_object_t *obj_store)
 	store = (mapi_object_store_t *)obj_store->private_data;
 	OPENCHANGE_RETVAL_IF(!store, MAPI_E_NOT_INITIALIZED, NULL);
 
-	mem_ctx = talloc_named(NULL, 0, "GetDefaultFolder");
+	mem_ctx = talloc_named(mapi_object_get_session(obj_store), 0, "CacheDefaultFolders");
 
 	mapi_object_init(&obj_inbox);
 	retval = GetReceiveFolder(obj_store, &id_inbox, NULL);
@@ -142,7 +141,7 @@ static enum MAPISTATUS CacheDefaultFolders(mapi_object_t *obj_store)
 					  PR_IPM_TASK_ENTRYID,
 					  PR_IPM_DRAFTS_ENTRYID);
 	
-	retval = GetProps(&obj_inbox, SPropTagArray, &lpProps, &count);
+	retval = GetProps(&obj_inbox, 0, SPropTagArray, &lpProps, &count);
 	MAPIFreeBuffer(SPropTagArray);
 	OPENCHANGE_RETVAL_IF(retval, retval, mem_ctx);
 	
@@ -184,8 +183,8 @@ static enum MAPISTATUS CacheDefaultFolders(mapi_object_t *obj_store)
 	OPENCHANGE_RETVAL_IF(!entryid, MAPI_E_NOT_FOUND, mem_ctx);
 	retval = GetFIDFromEntryID(entryid->cb, entryid->lpb, id_inbox, &store->fid_drafts);
 	OPENCHANGE_RETVAL_IF(retval, retval, mem_ctx);
-	
-	store->cached_mailbox_fid = true;
+
+	store->store_type = PrivateFolderWithCachedFids;
 	
 	mapi_object_release(&obj_inbox);
 	talloc_free(mem_ctx);
@@ -242,19 +241,21 @@ _PUBLIC_ enum MAPISTATUS GetDefaultFolder(mapi_object_t *obj_store,
 	mapi_object_store_t		*store;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_store, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!folder, MAPI_E_INVALID_PARAMETER, NULL);
 
 	store = (mapi_object_store_t *)obj_store->private_data;
 	OPENCHANGE_RETVAL_IF(!store, MAPI_E_NOT_INITIALIZED, NULL);
 
-	if ((id > 6) && (store->cached_mailbox_fid == false)) {
+	if ((id > 6) && (store->store_type == PrivateFolderWithoutCachedFids)) {
 		retval = CacheDefaultFolders(obj_store);
 		OPENCHANGE_RETVAL_IF(retval, retval, NULL);
 	} 
 
 	switch (id) {
+	case olFolderMailboxRoot:
+		*folder = store->fid_mailbox_root;
+		return MAPI_E_SUCCESS;
 	case olFolderTopInformationStore:
 		*folder = store->fid_top_information_store;
 		return MAPI_E_SUCCESS;
@@ -317,16 +318,26 @@ _PUBLIC_ bool IsMailboxFolder(mapi_object_t *obj_store,
 {
 	enum MAPISTATUS		retval;
 	mapi_object_store_t	*store;
-	uint32_t		olFolderNum;
+	uint32_t		olFolderNum = 0;
 	bool			ret = true;
 
-	if (!obj_store) return false;
+	if (!obj_store) {
+		return false;
+	}
 	store = (mapi_object_store_t *) obj_store->private_data;
-	if (!store) return false;
+	if (!store) {
+		return false;
+	}
 
-	if (store->cached_mailbox_fid == false) {
+	if (fid == 0x0) {
+		return false;
+	}
+
+	if (store->store_type == PrivateFolderWithoutCachedFids) {
 		retval = CacheDefaultFolders(obj_store);
-		if (retval) return false;
+		if (retval) {
+			return false;
+		}
 	}
 
 	if(fid == store->fid_top_information_store) {
@@ -355,8 +366,28 @@ _PUBLIC_ bool IsMailboxFolder(mapi_object_t *obj_store,
 		olFolderNum = olFolderDrafts;
 	} else if (fid == store->fid_search) {
 		olFolderNum = olFolderFinder;
+	} else if (fid == store->fid_pf_OfflineAB) {
+		olFolderNum = olFolderPublicOfflineAB;
+	} else if (fid == store->fid_pf_FreeBusyRoot) {
+		olFolderNum = olFolderPublicFreeBusyRoot;
+	} else if (fid == store->fid_pf_EFormsRegistryRoot) {
+		olFolderNum = olFolderPublicEFormsRoot;
+	} else if (fid == store->fid_pf_EFormsRegistry) {
+		olFolderNum = olFolderPublicEFormsRegistry;
+	} else if (fid == store->fid_pf_public_root) {
+		olFolderNum = olFolderPublicRoot;
+	} else if (fid == store->fid_pf_ipm_subtree) {
+		olFolderNum = olFolderPublicIPMSubtree;
+	} else if (fid == store->fid_pf_non_ipm_subtree) {
+		olFolderNum = olFolderPublicNonIPMSubtree;
+	} else if (fid == store->fid_pf_LocalSiteFreeBusy) {
+		olFolderNum = olFolderPublicLocalFreeBusy;
+	} else if (fid == store->fid_pf_LocalSiteOfflineAB) {
+		olFolderNum = olFolderPublicLocalOfflineAB;
+	} else if (fid == store->fid_pf_NNTPArticle) {
+		olFolderNum = olFolderPublicNNTPArticle;
 	} else {
-		olFolderNum = -1;
+		olFolderNum = 0xFFFFFFFF;
 		ret = false;
 	}
 
@@ -395,18 +426,17 @@ _PUBLIC_ enum MAPISTATUS GetFolderItemsCount(mapi_object_t *obj_folder,
 	struct SPropValue	*lpProps;
 	uint32_t		count;
 
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_folder, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!unread, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!total, MAPI_E_INVALID_PARAMETER, NULL);
 
-	mem_ctx = talloc_named(NULL, 0, "GetFolderItemsCount");
+	mem_ctx = talloc_named(mapi_object_get_session(obj_folder), 0, "GetFolderItemsCount");
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0x2, 
 					  PR_CONTENT_UNREAD,
 					  PR_CONTENT_COUNT);
 
-	retval = GetProps(obj_folder, SPropTagArray, &lpProps, &count);
+	retval = GetProps(obj_folder, 0, SPropTagArray, &lpProps, &count);
 	MAPIFreeBuffer(SPropTagArray);
 	OPENCHANGE_RETVAL_IF(retval, retval, mem_ctx);
 
@@ -456,50 +486,53 @@ _PUBLIC_ enum MAPISTATUS GetFolderItemsCount(mapi_object_t *obj_folder,
    - MAPI_E_NOT_INITIALIZED: MAPI subsystem has not been initialized.
    - MAPI_E_INVALID_PARAMETER: username is NULL
 
-   \sa ResolveNames, ModifyTable
+   \sa ResolveNames, ModifyPermissions
  */
 _PUBLIC_ enum MAPISTATUS AddUserPermission(mapi_object_t *obj_folder, const char *username, enum ACLRIGHTS role)
 {
-	enum MAPISTATUS		retval;
-	TALLOC_CTX		*mem_ctx;
-	struct SPropTagArray	*SPropTagArray;
-	const char		*names[2];
-	struct SRowSet		*rows = NULL;
-	struct SPropTagArray   	*flaglist = NULL;
-	struct mapi_SRowList	rowList;
+	enum MAPISTATUS                 retval;
+	TALLOC_CTX                      *mem_ctx;
+	struct SPropTagArray            *SPropTagArray;
+	const char                      *names[2];
+	struct SRowSet                  *rows = NULL;
+	struct PropertyTagArray_r	*flaglist = NULL;
+	struct mapi_PermissionsData     rowList;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_folder, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!username, MAPI_E_INVALID_PARAMETER, NULL);
 
-	rowList.padding = 0;
+	rowList.ModifyFlags = 0;
 
-	mem_ctx = talloc_named(NULL, 0, "AddUserPermission");
+	mem_ctx = talloc_named(mapi_object_get_session(obj_folder), 0, "AddUserPermission");
 
 	/* query Address book */
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 2, PR_ENTRYID, PR_DISPLAY_NAME);
 	names[0] = username;
 	names[1] = NULL;
-	retval = ResolveNames(mapi_object_get_session(obj_folder), (const char **)names, 
+	retval = ResolveNames(mapi_object_get_session(obj_folder), (const char **)names,
 			      SPropTagArray, &rows, &flaglist, 0);
 	MAPIFreeBuffer(SPropTagArray);
 	OPENCHANGE_RETVAL_IF(retval, retval, mem_ctx);
 
+	/* Sanity checks */
+	OPENCHANGE_RETVAL_IF(!flaglist, MAPI_E_NOT_FOUND, mem_ctx);
+	OPENCHANGE_RETVAL_IF(!rows, MAPI_E_NOT_FOUND, mem_ctx);
 	/* Check if the username was found */
 	OPENCHANGE_RETVAL_IF((flaglist->aulPropTag[0] != MAPI_RESOLVED), MAPI_E_NOT_FOUND, mem_ctx);
 
-	rowList.cEntries = 1;
-	rowList.aEntries = talloc_array(mem_ctx, struct mapi_SRow, 1);
-	rowList.aEntries[0].ulRowFlags = ROW_ADD;
-	rowList.aEntries[0].lpProps.cValues = 2;
-	rowList.aEntries[0].lpProps.lpProps = talloc_array(mem_ctx, struct mapi_SPropValue, 2);
-	cast_mapi_SPropValue(&rowList.aEntries[0].lpProps.lpProps[0], &rows->aRow[0].lpProps[0]);
-	rowList.aEntries[0].lpProps.lpProps[1].ulPropTag = PR_MEMBER_RIGHTS;
-	rowList.aEntries[0].lpProps.lpProps[1].value.l = role;
+	rowList.ModifyCount = 1;
+	rowList.PermissionsData = talloc_array(mem_ctx, struct PermissionData, 1);
+	rowList.PermissionsData[0].PermissionDataFlags = ROW_ADD;
+	rowList.PermissionsData[0].lpProps.cValues = 2;
+	rowList.PermissionsData[0].lpProps.lpProps = talloc_array(mem_ctx, struct mapi_SPropValue, 2);
+	cast_mapi_SPropValue((TALLOC_CTX *)rowList.PermissionsData[0].lpProps.lpProps,
+			     &rowList.PermissionsData[0].lpProps.lpProps[0], &rows->aRow[0].lpProps[0]);
+	rowList.PermissionsData[0].lpProps.lpProps[1].ulPropTag = PR_MEMBER_RIGHTS;
+	rowList.PermissionsData[0].lpProps.lpProps[1].value.l = role;
 
-	retval = ModifyTable(obj_folder, &rowList);
+	retval = ModifyPermissions(obj_folder, 0, &rowList);
 	OPENCHANGE_RETVAL_IF(retval, retval, mem_ctx);
 
 	talloc_free(mem_ctx);
@@ -511,8 +544,8 @@ _PUBLIC_ enum MAPISTATUS AddUserPermission(mapi_object_t *obj_folder, const char
 /**
    \details Modify permissions for a user on a given folder
    
-   \param obj_folder the folder we add permission for
-   \param username the Exchange username we modify permissions for
+   \param obj_folder the folder to modify permissions for
+   \param username the Exchange username to modify permissions for
    \param role the permission mask value (see AddUserPermission)
 
    \return MAPI_E_SUCCESS on success, otherwise a failure code (MAPISTATUS)
@@ -525,33 +558,34 @@ _PUBLIC_ enum MAPISTATUS AddUserPermission(mapi_object_t *obj_folder, const char
    - MAPI_E_NOT_FOUND: couldn't find or change permissions for the
      given user
 
-   \sa AddUserPermission, ResolveNames, GetTable, ModifyTable
+   \sa AddUserPermission, ResolveNames, GetPermissionsTable, ModifyPermissions
  */
-_PUBLIC_ enum MAPISTATUS ModifyUserPermission(mapi_object_t *obj_folder, const char *username, enum ACLRIGHTS role)
+_PUBLIC_ enum MAPISTATUS ModifyUserPermission(mapi_object_t *obj_folder, 
+					      const char *username, 
+					      enum ACLRIGHTS role)
 {
-	enum MAPISTATUS		retval;
-	TALLOC_CTX		*mem_ctx;
-	struct SPropTagArray	*SPropTagArray;
-	const char		*names[2];
-	const char		*user = NULL;
-	struct SRowSet		*rows = NULL;
-	struct SRowSet		rowset;
-	struct SPropTagArray   	*flaglist = NULL;
-	struct mapi_SRowList	rowList;
-	struct SPropValue	*lpProp;
-	mapi_object_t		obj_table;
-	uint32_t		Numerator;
-	uint32_t		Denominator;
-	bool			found = false;
-	uint32_t		i = 0;
+	enum MAPISTATUS			retval;
+	TALLOC_CTX			*mem_ctx;
+	struct SPropTagArray		*SPropTagArray;
+	const char			*names[2];
+	const char			*user = NULL;
+	struct SRowSet			*rows = NULL;
+	struct SRowSet			rowset;
+	struct PropertyTagArray_r	*flaglist = NULL;
+	struct mapi_PermissionsData	rowList;
+	struct SPropValue		*lpProp;
+	mapi_object_t			obj_table;
+	uint32_t			Numerator;
+	uint32_t			Denominator;
+	bool				found = false;
+	uint32_t			i = 0;
 
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_folder, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!username, MAPI_E_INVALID_PARAMETER, NULL);
 
-	rowList.padding = 0;
+	rowList.ModifyFlags = 0;
 
-	mem_ctx = talloc_named(NULL, 0, "ModifyUserPermission");
+	mem_ctx = talloc_named(mapi_object_get_session(obj_folder), 0, "ModifyUserPermission");
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 2, PR_ENTRYID, PR_DISPLAY_NAME);
 	names[0] = username;
@@ -562,7 +596,7 @@ _PUBLIC_ enum MAPISTATUS ModifyUserPermission(mapi_object_t *obj_folder, const c
 	OPENCHANGE_RETVAL_IF(retval, retval, mem_ctx);
 
 	if (flaglist->aulPropTag[0] == MAPI_RESOLVED) {
-		user = find_SPropValue_data(&(rows->aRow[0]), PR_DISPLAY_NAME);
+	  user = (const char *) find_SPropValue_data(&(rows->aRow[0]), PR_DISPLAY_NAME);
 	} else {
 		/* Special case: Not a AD user account but Default or
 		 * Anonymous. Since names are language specific, we
@@ -572,7 +606,8 @@ _PUBLIC_ enum MAPISTATUS ModifyUserPermission(mapi_object_t *obj_folder, const c
 	}
 
 	mapi_object_init(&obj_table);
-	retval = GetTable(obj_folder, &obj_table);
+	retval = GetPermissionsTable(obj_folder, 0x00, &obj_table);
+
 	OPENCHANGE_RETVAL_IF(retval, retval, mem_ctx);
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 4,
@@ -594,19 +629,23 @@ _PUBLIC_ enum MAPISTATUS ModifyUserPermission(mapi_object_t *obj_folder, const c
 		lpProp = get_SPropValue_SRow(&rowset.aRow[i], PR_MEMBER_NAME);
 		if (lpProp && lpProp->value.lpszA) {
 			if (!strcmp(lpProp->value.lpszA, user)) {
-				rowList.cEntries = 1;
-				rowList.aEntries = talloc_array(mem_ctx, struct mapi_SRow, 1);
-				rowList.aEntries[0].ulRowFlags = ROW_MODIFY;
-				rowList.aEntries[0].lpProps.cValues = 2;
-				rowList.aEntries[0].lpProps.lpProps = talloc_array(mem_ctx, struct mapi_SPropValue, 2);
+				rowList.ModifyCount = 1;
+				rowList.PermissionsData = talloc_array(mem_ctx, struct PermissionData, 1);
+				rowList.PermissionsData[0].PermissionDataFlags = ROW_MODIFY;
+				rowList.PermissionsData[0].lpProps.cValues = 2;
+				rowList.PermissionsData[0].lpProps.lpProps = talloc_array(mem_ctx, struct mapi_SPropValue, 2);
 				lpProp = get_SPropValue_SRow(&(rowset.aRow[i]), PR_MEMBER_ID);
-				rowList.aEntries[0].lpProps.lpProps[0].ulPropTag = PR_MEMBER_ID;
-				rowList.aEntries[0].lpProps.lpProps[0].value.d = lpProp->value.d;
-				rowList.aEntries[0].lpProps.lpProps[1].ulPropTag = PR_MEMBER_RIGHTS;
-				rowList.aEntries[0].lpProps.lpProps[1].value.l = role;
+				if (!lpProp) {
+					continue;
+				}
+				rowList.PermissionsData[0].lpProps.lpProps[0].ulPropTag = PR_MEMBER_ID;
+				rowList.PermissionsData[0].lpProps.lpProps[0].value.d = lpProp->value.d;
+				rowList.PermissionsData[0].lpProps.lpProps[1].ulPropTag = PR_MEMBER_RIGHTS;
+				rowList.PermissionsData[0].lpProps.lpProps[1].value.l = role;
 				
-				retval = ModifyTable(obj_folder, &rowList);
+				retval = ModifyPermissions(obj_folder, 0, &rowList);
 				OPENCHANGE_RETVAL_IF(retval, retval, mem_ctx);
+
 				found = true;
 				break;
 			}
@@ -615,8 +654,8 @@ _PUBLIC_ enum MAPISTATUS ModifyUserPermission(mapi_object_t *obj_folder, const c
 
 	mapi_object_release(&obj_table);
 	talloc_free(mem_ctx);
-	
-	OPENCHANGE_RETVAL_IF((found == true), MAPI_E_NOT_FOUND, 0);
+
+	OPENCHANGE_RETVAL_IF((!found), MAPI_E_NOT_FOUND, 0);
 
 	return MAPI_E_SUCCESS;
 }
@@ -625,8 +664,8 @@ _PUBLIC_ enum MAPISTATUS ModifyUserPermission(mapi_object_t *obj_folder, const c
 /**
    \details Remove permissions for a user on a given folder
 
-   \param obj_folder the folder we add permission for
-   \param username the Exchange username we remove permissions for
+   \param obj_folder the folder to remove permission from
+   \param username the Exchange username to remove permissions for
 
    \return MAPI_E_SUCCESS on success, otherwise a failure code (MAPISTATUS)
    indicating the error.
@@ -638,31 +677,31 @@ _PUBLIC_ enum MAPISTATUS ModifyUserPermission(mapi_object_t *obj_folder, const c
    - MAPI_E_NOT_FOUND: couldn't find or remove permissions for the
      given user
 
-   \sa ResolveNames, GetTable, ModifyTable
+   \sa ResolveNames, GetPermissionsTable, ModifyPermissions
  */
-_PUBLIC_ enum MAPISTATUS RemoveUserPermission(mapi_object_t *obj_folder, const char *username)
+_PUBLIC_ enum MAPISTATUS RemoveUserPermission(mapi_object_t *obj_folder, 
+					      const char *username)
 {
-	enum MAPISTATUS		retval;
-	TALLOC_CTX		*mem_ctx;
-	struct SPropTagArray	*SPropTagArray;
-	const char		*names[2];
-	const char		*user = NULL;
-	struct SRowSet		*rows = NULL;
-	struct SRowSet		rowset;
-	struct SPropTagArray   	*flaglist = NULL;
-	struct mapi_SRowList	rowList;
-	struct SPropValue	*lpProp;
-	mapi_object_t		obj_table;
-	uint32_t		Numerator;
-	uint32_t		Denominator;
-	bool			found = false;
-	uint32_t		i = 0;
+	enum MAPISTATUS			retval;
+	TALLOC_CTX			*mem_ctx;
+	struct SPropTagArray		*SPropTagArray;
+	const char			*names[2];
+	const char			*user = NULL;
+	struct SRowSet			*rows = NULL;
+	struct SRowSet			rowset;
+	struct PropertyTagArray_r	*flaglist = NULL;
+	struct mapi_PermissionsData	rowList;
+	struct SPropValue		*lpProp;
+	mapi_object_t			obj_table;
+	uint32_t			Numerator;
+	uint32_t			Denominator;
+	bool				found = false;
+	uint32_t			i = 0;
 
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_folder, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!username, MAPI_E_INVALID_PARAMETER, NULL);
 
-	mem_ctx = talloc_named(NULL, 0, "RemoveUserPermission");
+	mem_ctx = talloc_named(mapi_object_get_session(obj_folder), 0, "RemoveUserPermission");
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 2, PR_ENTRYID, PR_DISPLAY_NAME);
 	names[0] = username;
@@ -675,10 +714,10 @@ _PUBLIC_ enum MAPISTATUS RemoveUserPermission(mapi_object_t *obj_folder, const c
 	/* Check if the username was found */
 	OPENCHANGE_RETVAL_IF((flaglist->aulPropTag[0] != MAPI_RESOLVED), MAPI_E_NOT_FOUND, mem_ctx);
 
-	user = find_SPropValue_data(&(rows->aRow[0]), PR_DISPLAY_NAME);
+	user = (const char *)find_SPropValue_data(&(rows->aRow[0]), PR_DISPLAY_NAME);
 
 	mapi_object_init(&obj_table);
-	retval = GetTable(obj_folder, &obj_table);
+	retval = GetPermissionsTable(obj_folder, 0x00, &obj_table);
 	OPENCHANGE_RETVAL_IF(retval, retval, mem_ctx);
 
 	SPropTagArray = set_SPropTagArray(mem_ctx, 4,
@@ -700,16 +739,19 @@ _PUBLIC_ enum MAPISTATUS RemoveUserPermission(mapi_object_t *obj_folder, const c
 		lpProp = get_SPropValue_SRow(&rowset.aRow[i], PR_MEMBER_NAME);
 		if (lpProp && lpProp->value.lpszA) {
 			if (!strcmp(lpProp->value.lpszA, user)) {
-				rowList.cEntries = 1;
-				rowList.aEntries = talloc_array(mem_ctx, struct mapi_SRow, 1);
-				rowList.aEntries[0].ulRowFlags = ROW_REMOVE;
-				rowList.aEntries[0].lpProps.cValues = 1;
-				rowList.aEntries[0].lpProps.lpProps = talloc_array(mem_ctx, struct mapi_SPropValue, 1);
+				rowList.ModifyCount = 1;
+				rowList.PermissionsData = talloc_array(mem_ctx, struct PermissionData, 1);
+				rowList.PermissionsData[0].PermissionDataFlags = ROW_REMOVE;
+				rowList.PermissionsData[0].lpProps.cValues = 1;
+				rowList.PermissionsData[0].lpProps.lpProps = talloc_array(mem_ctx, struct mapi_SPropValue, 1);
 				lpProp = get_SPropValue_SRow(&(rowset.aRow[i]), PR_MEMBER_ID);
-				rowList.aEntries[0].lpProps.lpProps[0].ulPropTag = PR_MEMBER_ID;
-				rowList.aEntries[0].lpProps.lpProps[0].value.d = lpProp->value.d;
+				if (!lpProp) {
+					continue;
+				}
+				rowList.PermissionsData[0].lpProps.lpProps[0].ulPropTag = PR_MEMBER_ID;
+				rowList.PermissionsData[0].lpProps.lpProps[0].value.d = lpProp->value.d;
 				
-				retval = ModifyTable(obj_folder, &rowList);
+				retval = ModifyPermissions(obj_folder, 0, &rowList);
 				OPENCHANGE_RETVAL_IF(retval, retval, mem_ctx);
 				found = true;
 				break;
@@ -720,7 +762,7 @@ _PUBLIC_ enum MAPISTATUS RemoveUserPermission(mapi_object_t *obj_folder, const c
 	mapi_object_release(&obj_table);
 	talloc_free(mem_ctx);
 
-	OPENCHANGE_RETVAL_IF((found == true), MAPI_E_NOT_FOUND, 0);
+	OPENCHANGE_RETVAL_IF((found != true), MAPI_E_NOT_FOUND, 0);
 
 	return MAPI_E_SUCCESS;
 }
@@ -730,6 +772,9 @@ _PUBLIC_ enum MAPISTATUS RemoveUserPermission(mapi_object_t *obj_folder, const c
    \details Implement the BestBody algorithm and return the best body
    content type for a given message.
 
+   \param obj_message the message we find the best body for
+   \param format the format - see below.
+
    \return MAPI_E_SUCCESS on success, otherwise MAPI_E_NOT_FOUND. If
    MAPI_E_NOT_FOUND is returned then format is set to 0x0
    (undefined). If MAPI_E_SUCCESS is returned, then format can have
@@ -737,12 +782,12 @@ _PUBLIC_ enum MAPISTATUS RemoveUserPermission(mapi_object_t *obj_folder, const c
    - olEditorText: format is plain text
    - olEditorHTML: format is HTML
    - olEditorRTF: format is RTF
-
-   \param obj_message the message we find the best body for
-   \param format the format - see above.
  */
-_PUBLIC_ enum MAPISTATUS GetBestBody(mapi_object_t *obj_message, uint8_t *format)
+_PUBLIC_ enum MAPISTATUS GetBestBody(mapi_object_t *obj_message, 
+				     uint8_t *format)
 {
+	struct mapi_context	*mapi_ctx;
+	struct mapi_session	*session;
 	enum MAPISTATUS		retval;
 	struct SPropTagArray	*SPropTagArray = NULL;
 	struct SPropValue	*lpProps;
@@ -755,17 +800,19 @@ _PUBLIC_ enum MAPISTATUS GetBestBody(mapi_object_t *obj_message, uint8_t *format
 	const uint32_t		*err_code;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_message, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!format, MAPI_E_INVALID_PARAMETER, NULL);
 
+	session = mapi_object_get_session(obj_message);
+	mapi_ctx = session->mapi_ctx;
+
 	/* Step 1. Retrieve properties needed by the BestBody algorithm */
-	SPropTagArray = set_SPropTagArray(global_mapi_ctx->mem_ctx, 0x4,
-					  PR_BODY,
+	SPropTagArray = set_SPropTagArray(mapi_ctx->mem_ctx, 0x4,
+					  PR_BODY_UNICODE,
 					  PR_RTF_COMPRESSED,
 					  PR_HTML,
 					  PR_RTF_IN_SYNC);
-	retval = GetProps(obj_message, SPropTagArray, &lpProps, &count);
+	retval = GetProps(obj_message, 0, SPropTagArray, &lpProps, &count);
 	MAPIFreeBuffer(SPropTagArray);
 	if (retval != MAPI_E_SUCCESS) {
 		*format = 0;
@@ -777,7 +824,8 @@ _PUBLIC_ enum MAPISTATUS GetBestBody(mapi_object_t *obj_message, uint8_t *format
 	aRow.lpProps = lpProps;
 
 	/* Step 2. Retrieve properties values and map errors */
-	RtfInSync = *(const uint8_t *)find_SPropValue_data(&aRow, PR_RTF_IN_SYNC);
+	err_code = (const uint32_t *)find_SPropValue_data(&aRow, PR_RTF_IN_SYNC);
+	RtfInSync = (err_code) ? *err_code : 0;
 
 	err_code = (const uint32_t *)find_SPropValue_data(&aRow, PR_BODY_ERROR);
 	PlainStatus = (err_code) ? *err_code : 0;

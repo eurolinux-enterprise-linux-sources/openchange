@@ -22,7 +22,8 @@
 #ifndef __MAPITEST_H__
 #define	__MAPITEST_H__
 
-#include <libmapi/libmapi.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/mapi_nameid.h"
 
 #include <errno.h>
 #include <err.h>
@@ -47,10 +48,21 @@ struct mapitest_suite;
 enum TestApplicabilityFlags {
 	ApplicableToAllVersions = 0,	/*!< This test is always applicable */
 	NotInExchange2010 = 0x1,	/*!< This test is not applicable to Exchange 2010 */
+	NotInExchange2010SP0 = 0x2,	/*!< This test is not applicable to Exchange 2010
+	                                     Service Pack 0, but is applicable to later versions */
+	ExpectedFail = 0x8000,          /*!< This test is expected to fail */
 	LastTestApplicabilityFlag = 0xFFFF
 };
 
-
+/**
+  List of possible test results
+*/
+enum TestResult {
+	Pass,			/*!< The test was expected to pass, and it did */
+	Fail,			/*!< The test was expected to pass, but it failed */
+	UnexpectedPass,		/*!< The test was expected to fail, but it passed instead */
+	ExpectedFailure		/*!< The test was expected to fail, and it did */
+};
 
 #include "utils/mapitest/proto.h"
 
@@ -83,7 +95,7 @@ struct mapitest_unit {
 	struct mapitest_unit	*prev;		/*!< The previous test in the list */
 	struct mapitest_unit	*next;		/*!< The next test in the list */
 	char			*name;		/*!< The name of the test */
-	char			*reason;	/*!< Why this test was skipped (if applicable) */
+	char			*reason;	/*!< Why this test was skipped or failed (if applicable) */
 };
 
 /**
@@ -96,12 +108,13 @@ struct mapitest_unit {
 	There should be one entry in the failure_info list for each failure.
 */
 struct mapitest_stat {
-	uint32_t		success;       /*!< Number of tests in this suite that passed */
-	uint32_t		failure;       /*!< Number of tests in this suite that failed */
-	uint32_t		skipped;       /*!< Number of tests in this suite that were skipped */
-	struct mapitest_unit	*failure_info; /*!< List of names of the tests that failed */
-	struct mapitest_unit	*skip_info;    /*!< List of names of the tests that were skipped, and why */
-	bool			enabled;       /*!< Whether this statistics structure is valid */
+	uint32_t		success;        /*!< Number of tests in this suite that passed */
+	uint32_t		failure;        /*!< Number of tests in this suite that failed */
+	uint32_t		skipped;        /*!< Number of tests in this suite that were skipped */
+	uint32_t		x_fail;         /*!< Number of tests in this suite that were expected failures */
+	struct mapitest_unit	*failure_info;  /*!< List of names of the tests that failed */
+	struct mapitest_unit	*skip_info;     /*!< List of names of the tests that were skipped, and why */
+	bool			enabled;        /*!< Whether this statistics structure is valid */
 };
 
 /**
@@ -128,13 +141,16 @@ struct mapitest_suite {
 */
 struct mapitest {
 	TALLOC_CTX		*mem_ctx;	/*!< talloc memory context for memory allocations */
+	struct mapi_context	*mapi_ctx;	/*!< mapi context */
 	struct mapi_session	*session;
 	bool			confidential;	/*!< true if confidential information should be omitted */
 	bool			no_server;	/*!< true if only non-server tests should be run */
 	bool			mapi_all;	/*!< true if all tests should be run */
 	bool			online;		/*!< true if the server could be accessed */
 	bool			color;		/*!< true if the output should be colored */
+	bool			subunit_output; /*!< true if we should write output in subunit protocol format */
 	struct emsmdb_info	info;
+	struct mapi_profile	*profile;
 	struct mapitest_suite	*mapi_suite;	/*!< the various test suites */
 	struct mapitest_unit   	*cmdline_calls;
 	struct mapitest_unit   	*cmdline_suite;
@@ -182,19 +198,19 @@ struct mt_common_tf_ctx
 #define	MT_HDR_FMT_SUBSECTION	"%-21s: %-10s\n"
 #define	MT_HDR_FMT_VER_NORM	"%-21s: %02d.%02d.%04d.%04d\n"
 
-#define	MT_DIRNAME_TOP		"[MT] Top of Mailbox"
-#define	MT_DIRNAME_APPOINTMENT	"[MT] Calendar"
-#define	MT_DIRNAME_CONTACT	"[MT] Contact"
-#define	MT_DIRNAME_JOURNAL	"[MT] Journal"
-#define	MT_DIRNAME_POST		"[MT] Post"
-#define	MT_DIRNAME_NOTE		"[MT] Note"
-#define	MT_DIRNAME_STICKYNOTE	"[MT] Sticky Notes"
-#define	MT_DIRNAME_TASK		"[MT] Tasks"
-#define	MT_DIRNAME_TEST		"[MT] Test Folder1"
+#define	MT_DIRNAME_TOP		"MT Top of Mailbox"
+#define	MT_DIRNAME_APPOINTMENT	"MT Calendar"
+#define	MT_DIRNAME_CONTACT	"MT Contact"
+#define	MT_DIRNAME_JOURNAL	"MT Journal"
+#define	MT_DIRNAME_POST		"MT Post"
+#define	MT_DIRNAME_NOTE		"MT Note"
+#define	MT_DIRNAME_STICKYNOTE	"MT Sticky Notes"
+#define	MT_DIRNAME_TASK		"MT Tasks"
+#define	MT_DIRNAME_TEST		"MT Test Folder1"
 
-#define	MT_MAIL_SUBJECT		"[MT] Sample E-MAIL"
-#define	MT_MAIL_ATTACH		"[MT]_Sample_Attachment.txt"
-#define	MT_MAIL_ATTACH2		"[MT]_Sample_Attachment2.txt"
+#define	MT_MAIL_SUBJECT		"MT Sample E-MAIL"
+#define	MT_MAIL_ATTACH		"Attach1.txt"
+#define	MT_MAIL_ATTACH2		"Attach2.txt"
 
 #define	MODULE_TITLE		"[MODULE] %s\n"
 #define	MODULE_TITLE_DELIM	'#'
@@ -213,9 +229,8 @@ struct mt_common_tf_ctx
 #define	MT_ERROR       	"[ERROR]: %s\n"
 
 #define	MT_STAT_FAILED_TITLE	"[STAT] FAILED TEST CASES\n"
-#define	MT_STAT_FAILURE	"* %-35s: %s\n"
+#define	MT_STAT_RESULT	"* %-35s: %s (%s)\n"
 #define	MT_STAT_SKIPPED_TITLE	"[STAT] SKIPPED TEST CASES\n"
-#define	MT_STAT_SKIPPED	"* %-35s: %s (%s)\n"
 
 #define MT_SUMMARY_TITLE "[STAT] TEST SUMMARY\n"
 
@@ -223,6 +238,6 @@ struct mt_common_tf_ctx
 #define MT_RED             "\033[1;31m"
 #define MT_GREEN           "\033[1;32m"
 
-#define Exchange2010Version	0x0E00
+#define Exchange2010SP0Version	0x0E00
 
 #endif /* !__MAPITEST_H__ */

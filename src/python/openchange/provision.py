@@ -19,26 +19,49 @@
 #
 
 from base64 import b64encode
-import os
+import os,sys
+import struct
 import samba
 from openchange import mailbox
-from samba import Ldb
+from samba import param, Ldb, dsdb, substitute_var, read_and_sub_file
 from samba.samdb import SamDB
-from samba.auth import system_session
-from samba.provision import setup_add_ldif, setup_modify_ldif
 import ldb
+from ldb import (SCOPE_SUBTREE, SCOPE_BASE, FLAG_MOD_REPLACE, FLAG_MOD_ADD, FLAG_MOD_DELETE)
+from samba.auth import system_session, admin_session
+from samba.provision import (setup_add_ldif, setup_modify_ldif, setup_ldb,find_provision_key_parameters)
+from samba.upgradehelpers import (get_paths, get_ldbs)
+from openchange.urlutils import openchangedb_url
 
 __docformat__ = 'restructuredText'
 
 DEFAULTSITE = "Default-First-Site-Name"
 FIRST_ORGANIZATION = "First Organization"
-FIRST_ORGANIZATION_UNIT = "First Organization Unit"
+FIRST_ORGANIZATION_UNIT = "First Administrative Group"
 
-def openchangedb_url(lp):
-    return os.path.join(lp.get("private dir"), "openchange.ldb")
+# This is a hack. Kind-of cute, but still a hack
+def abstract():
+    import inspect
+    caller = inspect.getouterframes(inspect.currentframe())[1][3]
+    raise NotImplementedError(caller + ' must be implemented in subclass')
 
-def openchangedb_mapistore_url(lp):
-    return os.path.join(lp.get("private dir"), "mapistore");
+# Define an abstraction for progress reporting from the provisioning
+class AbstractProgressReporter(object):
+
+    def __init__(self):
+        self.currentStep = 0
+
+    def reportNextStep(self, stepName):
+        self.currentStep = self.currentStep + 1
+        self.doReporting(stepName)
+
+    def doReporting(self, stepName):
+        abstract()
+
+# A concrete example of a progress reporter - just provides text output for
+# each new step.
+class TextProgressReporter(AbstractProgressReporter):
+    def doReporting(self, stepName):
+        print "[+] Step %d: %s" % (self.currentStep, stepName)
 
 class ProvisionNames(object):
 
@@ -114,87 +137,27 @@ def guess_names_from_smbconf(lp, firstorg=None, firstou=None):
 
     return names
 
-
-def install_schemas(setup_path, names, lp, creds):
-    """Install the OpenChange-specific schemas in the SAM LDAP database. 
-    
+def provision_schema(setup_path, names, lp, creds, reporter, ldif, msg):
+    """Provision schema using LDIF specified file
     :param setup_path: Path to the setup directory.
     :param names: provision names object.
     :param lp: Loadparm context
     :param creds: Credentials Context
+    :param reporter: A progress reporter instance (subclass of AbstractProgressReporter)
+    :param ldif: path to the LDIF file
+    :param msg: reporter message
     """
+
     session_info = system_session()
 
-    # Step 1. Extending the prefixmap attribute of the schema DN record
-    db = SamDB(url=lp.get("sam database"), session_info=session_info,
-                  credentials=creds, lp=lp)
-
-    prefixmap = open(setup_path("AD/prefixMap.txt"), 'r').read()
+    db = SamDB(url=lp.samdb_url(), session_info=session_info,
+               credentials=creds, lp=lp)
 
     db.transaction_start()
 
     try:
-        print "[+] Step 1: Register Exchange OIDs"
-        setup_modify_ldif(db,
-                          setup_path("AD/provision_schema_basedn_modify.ldif"), {
-                "SCHEMADN": names.schemadn,
-                "NETBIOSNAME": names.netbiosname,
-                "DEFAULTSITE": names.sitename,
-                "CONFIGDN": names.configdn,
-                "SERVERDN": names.serverdn,
-                "PREFIXMAP_B64": b64encode(prefixmap)
-                })
-    except:
-        db.transaction_cancel()
-        raise
-
-    db.transaction_commit()
-
-
-    # Step 2. Add new Exchange classes to the schema
-    db = SamDB(url=lp.get("sam database"), session_info=session_info, 
-                  credentials=creds, lp=lp)
-
-    db.transaction_start()
-
-    try:
-        print "[+] Step 2: Add new Exchange classes and attributes to Samba schema"
-        setup_add_ldif(db, setup_path("AD/oc_provision_schema.ldif"), { 
-                "SCHEMADN": names.schemadn
-                })
-    except:
-        db.transaction_cancel()
-        raise
-
-    db.transaction_commit()
-
-    # Step 3. Extend existing classes and attributes
-    db = SamDB(url=lp.get("sam database"), session_info=session_info, 
-                  credentials=creds, lp=lp)
-
-    db.transaction_start()
-
-    try:
-        print "[+] Step 3: Extend existing Samba classes and attributes"
-        setup_modify_ldif(db, setup_path("AD/oc_provision_schema_modify.ldif"), {
-                "SCHEMADN": names.schemadn
-                })
-    except:
-        db.transaction_cancel()
-        raise
-
-    db.transaction_commit()
-
-
-    # Step 4. Add configuration objects
-    db = SamDB(url=lp.get("sam database"), session_info=session_info, 
-                  credentials=creds, lp=lp)
-
-    db.transaction_start()
-
-    try:
-        print "[+] Step 4: Exchange Samba with Exchange configuration objects"
-        setup_add_ldif(db, setup_path("AD/oc_provision_configuration.ldif"), {
+        reporter.reportNextStep(msg)
+        setup_add_ldif(db, setup_path(ldif), {
                 "FIRSTORG": names.firstorg,
                 "FIRSTORGDN": names.firstorgdn,
                 "CONFIGDN": names.configdn,
@@ -211,130 +174,83 @@ def install_schemas(setup_path, names, lp, creds):
 
     db.transaction_commit()
 
+def modify_schema(setup_path, names, lp, creds, reporter, ldif, msg):
+    """Modify schema using LDIF specified file                                                                                                                                                                          :param setup_path: Path to the setup directory.
+    :param names: provision names object.
+    :param lp: Loadparm context
+    :param creds: Credentials Context
+    :param reporter: A progress reporter instance (subclass of AbstractProgressReporter)
+    :param ldif: path to the LDIF file
+    :param msg: reporter message
+    """
 
-def newmailbox(lp, username, firstorg, firstou):
-    names = guess_names_from_smbconf(lp, firstorg, firstou)
+    session_info = system_session()
 
-    db = mailbox.OpenChangeDB(openchangedb_url(lp))
+    db = SamDB(url=lp.samdb_url(), session_info=session_info,
+               credentials=creds, lp=lp)
 
-    # Step 1. Retrieve current FID index
-    GlobalCount = db.get_message_GlobalCount(names.netbiosname)
-    ReplicaID = db.get_message_ReplicaID(names.netbiosname)
+    db.transaction_start()
 
-    print "[+] Mailbox for '%s'" % (username)
-    print "==================" + "=" * len(username)
-    print "* GlobalCount (0x%x) and ReplicaID (0x%x)" % (GlobalCount, ReplicaID)
+    try:
+        reporter.reportNextStep(msg)
+        setup_modify_ldif(db, setup_path(ldif), {
+                "SCHEMADN": names.schemadn,
+                "CONFIGDN": names.configdn
+                })
+    except:
+        db.transaction_cancel()
+        raise
 
-    # Step 2. Check if the user already exists
-    assert not db.user_exists(names.netbiosname, username)
+    db.transaction_commit()
 
-    # Step 3. Create a default mapistore content repository for this user
-    db.add_storage_dir(mapistoreURL=openchangedb_mapistore_url(lp), username=username)
-    print "* Mapistore content repository created: %s" % os.path.join(openchangedb_mapistore_url(lp), username)
 
-    # Step 4. Create the user object
-    retdn = db.add_mailbox_user(names.ocfirstorgdn, username=username)
-    print "* User object created: %s" % (retdn)
-
-    # Step 5. Create system mailbox folders for this user
-    print "* Adding System Folders"
-
-    system_folders = ({
-        "Deferred Actions": ({}, 2),
-        "Spooler Queue": ({}, 3),
-        "IPM Subtree": ({
-            "Inbox": ({}, 5),
-            "Outbox": ({}, 6),
-            "Sent Items": ({}, 7),
-            "Deleted Items": ({}, 8),
-        }, 4),
-        "Common Views": ({}, 9),
-        "Schedule": ({}, 10),
-        "Search": ({}, 11),
-        "Views": ({}, 12),
-        "Shortcuts": ({}, 13),
-        "Reminders": ({}, 14),
-    }, 1)
-
-    fids = {}
-    def add_folder(parent_fid, path, children, SystemIdx):
-        name = path[-1]
-
-        GlobalCount = db.get_message_GlobalCount(names.netbiosname)
-        ReplicaID = db.get_message_ReplicaID(names.netbiosname)
-
-        fid = db.add_mailbox_root_folder(names.ocfirstorgdn, 
-            username=username, foldername=name,
-            parentfolder=parent_fid, GlobalCount=GlobalCount, 
-            ReplicaID=ReplicaID, SystemIdx=SystemIdx, 
-            mapistoreURL=openchangedb_mapistore_url(lp))
-
-        GlobalCount += 1
-        db.set_message_GlobalCount(names.netbiosname, GlobalCount=GlobalCount)
-
-        fids[path] = fid
-
-        print "\t* %-40s: %s" % (name, fid)
-        for name, grandchildren in children.iteritems():
-            add_folder(fid, path + (name,), grandchildren[0], grandchildren[1])
-
-    add_folder(0, ("Mailbox Root",), system_folders[0], system_folders[1])
-
-    # Step 6. Add special folders
-    print "* Adding Special Folders:"
-    special_folders = [
-        (("Mailbox Root", "IPM Subtree"), "Calendar",   "IPF.Appointment",  "PidTagIpmAppointmentEntryId"),
-        (("Mailbox Root", "IPM Subtree"), "Contacts",   "IPF.Contact",      "PidTagIpmContactEntryId"),
-        (("Mailbox Root", "IPM Subtree"), "Journal",    "IPF.Journal",      "PidTagIpmJournalEntryId"),
-        (("Mailbox Root", "IPM Subtree"), "Notes",      "IPF.StickyNote",   "PidTagIpmNoteEntryId"),
-        (("Mailbox Root", "IPM Subtree"), "Tasks",      "IPF.Task",         "PidTagIpmTaskEntryId"),
-        (("Mailbox Root", "IPM Subtree"), "Drafts",     "IPF.Notes",        "PidTagIpmDraftsEntryId")
-        ]
-
-    fid_inbox = fids[("Mailbox Root", "IPM Subtree", "Inbox")]
-    fid_reminders = fids[("Mailbox Root", "Reminders")]
-    fid_mailbox = fids[("Mailbox Root",)]
-    for path, foldername, containerclass, pidtag in special_folders:
-        GlobalCount = db.get_message_GlobalCount(names.netbiosname)
-        ReplicaID = db.get_message_ReplicaID(names.netbiosname)
-        fid = db.add_mailbox_special_folder(username, fids[path], fid_inbox, foldername, 
-                                            containerclass, GlobalCount, ReplicaID, 
-                                            openchangedb_mapistore_url(lp))
-        db.add_folder_property(fid_inbox, pidtag, fid)
-        db.add_folder_property(fid_mailbox, pidtag, fid)
-        GlobalCount += 1
-        db.set_message_GlobalCount(names.netbiosname, GlobalCount=GlobalCount)
-        print "\t* %-40s: %s (%s)" % (foldername, fid, containerclass)
-
-    # Step 7. Set default receive folders
-    print "* Adding default Receive Folders:"
-    receive_folders = [
-        (("Mailbox Root", "IPM Subtree", "Inbox"), "All"),
-        (("Mailbox Root", "IPM Subtree", "Inbox"), "IPM"),
-        (("Mailbox Root", "IPM Subtree", "Inbox"), "Report.IPM"),
-        (("Mailbox Root", "IPM Subtree",), "IPC")
-        ]
+def install_schemas(setup_path, names, lp, creds, reporter):
+    """Install the OpenChange-specific schemas in the SAM LDAP database. 
     
-    for path, messageclass in receive_folders:
-        print "\t* %-40s Message Class added to %s" % (messageclass, fids[path])
-        db.set_receive_folder(username, names.ocfirstorgdn, fids[path], 
-                              messageclass)
+    :param setup_path: Path to the setup directory.
+    :param names: provision names object.
+    :param lp: Loadparm context
+    :param creds: Credentials Context
+    :param reporter: A progress reporter instance (subclass of AbstractProgressReporter)
+    """
+    session_info = system_session()
 
-    # Step 8. Set additional properties on Inbox
-    print "* Adding additional default properties to Inbox"
-    db.add_folder_property(fid_inbox, "PidTagContentCount", "0")
-    db.add_folder_property(fid_inbox, "PidTagContentUnreadCount", "0")
-    db.add_folder_property(fid_inbox, "PidTagSubFolders", "FALSE")
-    db.add_folder_property(fid_inbox, "PidTagAccess", "63")
+    lp.set("dsdb:schema update allowed", "yes")
 
-    print "* Adding additional default properties to Reminders"
-    db.add_folder_property(fid_reminders, "PidTagContainerClass", "Outlook.Reminder");
-    db.add_folder_property(fid_inbox, "PidTagRemindersOnlineEntryId", fid_reminders);
-    db.add_folder_property(fid_mailbox, "PidTagRemindersOnlineEntryId", fid_reminders);
+    # Step 1. Extending the prefixmap attribute of the schema DN record
+    samdb = SamDB(url=lp.samdb_url(), session_info=session_info,
+                  credentials=creds, lp=lp)
 
-    GlobalCount = db.get_message_GlobalCount(names.netbiosname)
-    print "* GlobalCount (0x%x)" % GlobalCount
+    schemadn = str(names.schemadn)
+    current = samdb.search(expression="objectClass=*", base=schemadn, 
+                           scope=SCOPE_SUBTREE)
+    
 
+    schema_ldif = ""
+    prefixmap_data = ""
+    for ent in current:
+        schema_ldif += samdb.write_ldif(ent, ldb.CHANGETYPE_NONE)
+
+    prefixmap_data = open(setup_path("AD/prefixMap.txt"), 'r').read()
+    prefixmap_data = b64encode(prefixmap_data)
+
+    # We don't actually add this ldif, just parse it
+    prefixmap_ldif = "dn: %s\nprefixMap:: %s\n\n" % (schemadn, prefixmap_data)
+    reporter.reportNextStep("Register Exchange OIDs")
+    dsdb._dsdb_set_schema_from_ldif(samdb, prefixmap_ldif, schema_ldif, schemadn)
+
+    provision_schema(setup_path, names, lp, creds, reporter, "AD/oc_provision_schema_attributes.ldif", "Add Exchange attributes to Samba schema")
+    provision_schema(setup_path, names, lp, creds, reporter, "AD/oc_provision_schema_auxiliary_class.ldif", "Add Exchange auxiliary classes to Samba schema")
+    provision_schema(setup_path, names, lp, creds, reporter, "AD/oc_provision_schema_objectCategory.ldif", "Add Exchange objectCategory to Samba schema")
+    provision_schema(setup_path, names, lp, creds, reporter, "AD/oc_provision_schema_container.ldif", "Add Exchange containers to Samba schema")
+    provision_schema(setup_path, names, lp, creds, reporter, "AD/oc_provision_schema_subcontainer.ldif", "Add Exchange *sub* containers to Samba schema")
+    provision_schema(setup_path, names, lp, creds, reporter, "AD/oc_provision_schema_sub_CfgProtocol.ldif", "Add Exchange CfgProtocol subcontainers to Samba schema")
+    provision_schema(setup_path, names, lp, creds, reporter, "AD/oc_provision_schema_sub_mailGateway.ldif", "Add Exchange mailGateway subcontainers to Samba schema")
+    provision_schema(setup_path, names, lp, creds, reporter, "AD/oc_provision_schema.ldif", "Add Exchange classes to Samba schema")
+    modify_schema(setup_path, names, lp, creds, reporter, "AD/oc_provision_schema_possSuperior.ldif", "Add possSuperior attributes to Exchange classes")
+    modify_schema(setup_path, names, lp, creds, reporter, "AD/oc_provision_schema_modify.ldif", "Extend existing Samba classes and attributes")
+    provision_schema(setup_path, names, lp, creds, reporter, "AD/oc_provision_configuration.ldif", "Exchange Samba with Exchange configuration objects")
+    print "[SUCCESS] Done!"
 
 def newuser(lp, creds, username=None):
     """extend user record with OpenChange settings.
@@ -346,8 +262,8 @@ def newuser(lp, creds, username=None):
 
     names = guess_names_from_smbconf(lp, None, None)
 
-    db = Ldb(url=os.path.join(lp.get("private dir"), lp.get("sam database")), 
-             session_info=system_session(), credentials=creds, lp=lp)
+    db = Ldb(url=lp.samdb_url(), session_info=system_session(), 
+             credentials=creds, lp=lp)
 
     user_dn = "CN=%s,CN=Users,%s" % (username, names.domaindn)
 
@@ -362,15 +278,18 @@ add: mailNickName
 mailNickname: %s
 add: homeMDB
 homeMDB: CN=Mailbox Store (%s),CN=First Storage Group,CN=InformationStore,CN=%s,CN=Servers,CN=First Administrative Group,CN=Administrative Groups,CN=%s,CN=Microsoft Exchange,CN=Services,CN=Configuration,%s
+add: homeMTA
+homeMTA: CN=Mailbox Store (%s),CN=First Storage Group,CN=InformationStore,CN=%s,CN=Servers,CN=First Administrative Group,CN=Administrative Groups,CN=%s,CN=Microsoft Exchange,CN=Services,CN=Configuration,%s
 add: legacyExchangeDN
 legacyExchangeDN: /o=%s/ou=First Administrative Group/cn=Recipients/cn=%s
 add: proxyAddresses
+proxyAddresses: =EX:/o=%s/ou=First Administrative Group/cn=Recipients/cn=%s
 proxyAddresses: smtp:postmaster@%s
 proxyAddresses: X400:c=US;a= ;p=First Organizati;o=Exchange;s=%s
 proxyAddresses: SMTP:%s@%s
 replace: msExchUserAccountControl
 msExchUserAccountControl: 0
-""" % (user_dn, username, username, names.netbiosname, names.netbiosname, names.firstorg, names.domaindn, names.firstorg, username, names.dnsdomain, username, username, names.dnsdomain)
+""" % (user_dn, username, username, names.netbiosname, names.netbiosname, names.firstorg, names.domaindn, names.netbiosname, names.netbiosname, names.firstorg, names.domaindn, names.firstorg, username, names.firstorg, username, names.dnsdomain, username, username, names.dnsdomain)
     db.modify_ldif(extended_user)
 
     print "[+] User %s extended and enabled" % username
@@ -387,7 +306,7 @@ def accountcontrol(lp, creds, username=None, value=0):
 
     names = guess_names_from_smbconf(lp, None, None)
 
-    db = Ldb(url=os.path.join(lp.get("private dir"), lp.get("sam database")), 
+    db = Ldb(url=os.path.join(lp.get("private dir"), lp.samdb_url()), 
              session_info=system_session(), credentials=creds, lp=lp)
 
     user_dn = "CN=%s,CN=Users,%s" % (username, names.domaindn)
@@ -404,7 +323,7 @@ msExchUserAccountControl: %d
         print "[+] Account %s enabled" % username
 
 
-def provision(setup_path, lp, creds, firstorg=None, firstou=None):
+def provision(setup_path, lp, creds, firstorg=None, firstou=None, reporter=None):
     """Extend Samba4 with OpenChange data.
     
     :param setup_path: Path to the setup directory
@@ -412,21 +331,28 @@ def provision(setup_path, lp, creds, firstorg=None, firstou=None):
     :param creds: Credentials context
     :param firstorg: First Organization
     :param firstou: First Organization Unit
+    :param reporter: A progress reporter instance (subclass of AbstractProgressReporter)
+
+    If a progress reporter is not provided, a text output reporter is provided
     """
     names = guess_names_from_smbconf(lp, firstorg, firstou)
 
     print "NOTE: This operation can take several minutes"
 
+    if reporter is None:
+        reporter = TextProgressReporter()
+
     # Install OpenChange-specific schemas
-    install_schemas(setup_path, names, lp, creds)
+    install_schemas(setup_path, names, lp, creds, reporter)
 
 
-def openchangedb_provision(lp, firstorg=None, firstou=None):
+def openchangedb_provision(lp, firstorg=None, firstou=None, mapistore=None):
     """Create the OpenChange database.
 
     :param lp: Loadparm context
     :param firstorg: First Organization
     :param firstou: First Organization Unit
+    :param mapistore: The public folder store type (fsocpf, sqlite, etc)
     """
     names = guess_names_from_smbconf(lp, firstorg, firstou)
     
@@ -434,12 +360,17 @@ def openchangedb_provision(lp, firstorg=None, firstou=None):
     openchange_ldb = mailbox.OpenChangeDB(openchangedb_url(lp))
     openchange_ldb.setup()
 
+    print "Adding root DSE"
+    openchange_ldb.add_rootDSE(names.ocserverdn, names.firstorg, names.firstou)
+
     # Add a server object
     # It is responsible for holding the GlobalCount identifier (48 bytes)
     # and the Replica identifier
-    openchange_ldb.add_server(names.ocserverdn, names.netbiosname, 
-        names.firstorg, names.firstou)
+    openchange_ldb.add_server(names.ocserverdn, names.netbiosname, names.firstorg, names.firstou)
 
+    print "[+] Public Folders"
+    print "==================="
+    openchange_ldb.add_public_folders(names)
 
 def find_setup_dir():
     """Find the setup directory used by provision."""

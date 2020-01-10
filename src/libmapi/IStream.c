@@ -17,8 +17,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libmapi/libmapi.h>
-#include <libmapi/proto_private.h>
+#include "libmapi/libmapi.h"
+#include "libmapi/libmapi_private.h"
 
 
 /**
@@ -49,7 +49,7 @@
    \return MAPI_E_SUCCESS on success, otherwise MAPI error. Possible MAPI
    error codes are:
    - MAPI_E_NOT_INITIALIZED: MAPI subsystem has not been initialized
-   - MAPI_E_INVALID_PARAMETER: A problem occured obtaining the session context
+   - MAPI_E_INVALID_PARAMETER: A problem occurred obtaining the session context
    - MAPI_E_CALL_FAILED: A network problem was encountered during the
      transaction
 
@@ -77,13 +77,12 @@ _PUBLIC_ enum MAPISTATUS OpenStream(mapi_object_t *obj_related, enum MAPITAGS Pr
 
 	/* Sanity checks */
 	session = mapi_object_get_session(obj_related);
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 
 	if ((retval = mapi_object_get_logon_id(obj_related, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "OpenStream");
+	mem_ctx = talloc_named(session, 0, "OpenStream");
 
 	size = 0;
 
@@ -112,7 +111,7 @@ _PUBLIC_ enum MAPISTATUS OpenStream(mapi_object_t *obj_related, enum MAPITAGS Pr
 	mapi_request->handles[0] = mapi_object_get_handle(obj_related);
 	mapi_request->handles[1] = 0xffffffff;
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -149,7 +148,7 @@ _PUBLIC_ enum MAPISTATUS OpenStream(mapi_object_t *obj_related, enum MAPITAGS Pr
    \return MAPI_E_SUCCESS on success, otherwise MAPI error. Possible MAPI
    error codes are:
    - MAPI_E_NOT_INITIALIZED: MAPI subsystem has not been initialized
-   - MAPI_E_INVALID_PARAMETER: A problem occured obtaining the session context
+   - MAPI_E_INVALID_PARAMETER: A problem occurred obtaining the session context
    - MAPI_E_CALL_FAILED: A network problem was encountered during the
      transaction
 
@@ -179,13 +178,12 @@ _PUBLIC_ enum MAPISTATUS ReadStream(mapi_object_t *obj_stream, unsigned char *bu
 
 	/* Sanity checks */
 	session = mapi_object_get_session(obj_stream);
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 
 	if ((retval = mapi_object_get_logon_id(obj_stream, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "ReadStream");
+	mem_ctx = talloc_named(session, 0, "ReadStream");
 
 	*ByteRead = 0;
 	size = 0;
@@ -210,7 +208,7 @@ _PUBLIC_ enum MAPISTATUS ReadStream(mapi_object_t *obj_stream, unsigned char *bu
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_stream);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -250,7 +248,7 @@ _PUBLIC_ enum MAPISTATUS ReadStream(mapi_object_t *obj_stream, unsigned char *bu
    \note Developers may also call GetLastError() to retrieve the last
    MAPI error code. Possible MAPI error codes are:
    - MAPI_E_NOT_INITIALIZED: MAPI subsystem has not been initialized
-   - MAPI_E_INVALID_PARAMETER: A problem occured obtaining the session
+   - MAPI_E_INVALID_PARAMETER: A problem occurred obtaining the session
      context, or blob was null.
    - MAPI_E_CALL_FAILED: A network problem was encountered during the
      transaction
@@ -278,7 +276,6 @@ _PUBLIC_ enum MAPISTATUS WriteStream(mapi_object_t *obj_stream, DATA_BLOB *blob,
 
 	/* Sanity Checks */
 	session = mapi_object_get_session(obj_stream);
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!blob, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(blob->length > 0x7000, MAPI_E_TOO_BIG, NULL);
@@ -286,7 +283,7 @@ _PUBLIC_ enum MAPISTATUS WriteStream(mapi_object_t *obj_stream, DATA_BLOB *blob,
 	if ((retval = mapi_object_get_logon_id(obj_stream, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "WriteStream");
+	mem_ctx = talloc_named(session, 0, "WriteStream");
 
 	size = 0;
 
@@ -312,7 +309,7 @@ _PUBLIC_ enum MAPISTATUS WriteStream(mapi_object_t *obj_stream, DATA_BLOB *blob,
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_stream);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -361,14 +358,13 @@ _PUBLIC_ enum MAPISTATUS CommitStream(mapi_object_t *obj_stream)
 
 	/* Sanity checks */
 	session = mapi_object_get_session(obj_stream);
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_stream, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 
 	if ((retval = mapi_object_get_logon_id(obj_stream, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "CommitStream");
+	mem_ctx = talloc_named(session, 0, "CommitStream");
 	size = 0;
 
 	/* Fill the MAPI_REQ request */
@@ -386,7 +382,7 @@ _PUBLIC_ enum MAPISTATUS CommitStream(mapi_object_t *obj_stream)
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_stream);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -432,7 +428,6 @@ _PUBLIC_ enum MAPISTATUS GetStreamSize(mapi_object_t *obj_stream, uint32_t *Stre
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_stream, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj_stream);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
@@ -440,7 +435,7 @@ _PUBLIC_ enum MAPISTATUS GetStreamSize(mapi_object_t *obj_stream, uint32_t *Stre
 	if ((retval = mapi_object_get_logon_id(obj_stream, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "GetStreamSize");
+	mem_ctx = talloc_named(session, 0, "GetStreamSize");
 	size = 0;
 
 	/* Fill the MAPI_REQ request */
@@ -458,7 +453,7 @@ _PUBLIC_ enum MAPISTATUS GetStreamSize(mapi_object_t *obj_stream, uint32_t *Stre
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_stream);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -519,7 +514,6 @@ _PUBLIC_ enum MAPISTATUS SeekStream(mapi_object_t *obj_stream, uint8_t Origin, u
 	uint8_t 		logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_stream, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj_stream);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
@@ -529,7 +523,7 @@ _PUBLIC_ enum MAPISTATUS SeekStream(mapi_object_t *obj_stream, uint8_t Origin, u
 	if ((retval = mapi_object_get_logon_id(obj_stream, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "SeekStream");
+	mem_ctx = talloc_named(session, 0, "SeekStream");
 	size = 0;
 
 	/* Fill the SeekStream operation */
@@ -555,7 +549,7 @@ _PUBLIC_ enum MAPISTATUS SeekStream(mapi_object_t *obj_stream, uint8_t Origin, u
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_stream);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -603,7 +597,6 @@ _PUBLIC_ enum MAPISTATUS SetStreamSize(mapi_object_t *obj_stream, uint64_t SizeS
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_stream, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj_stream);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
@@ -611,7 +604,7 @@ _PUBLIC_ enum MAPISTATUS SetStreamSize(mapi_object_t *obj_stream, uint64_t SizeS
 	if ((retval = mapi_object_get_logon_id(obj_stream, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "SetStreamSize");
+	mem_ctx = talloc_named(session, 0, "SetStreamSize");
 	size = 0;
 
 	/* Fill the SetStreamSize operation */
@@ -634,7 +627,7 @@ _PUBLIC_ enum MAPISTATUS SetStreamSize(mapi_object_t *obj_stream, uint64_t SizeS
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_stream);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -689,7 +682,6 @@ _PUBLIC_ enum MAPISTATUS CopyToStream(mapi_object_t *obj_src, mapi_object_t *obj
 	uint8_t 		logon_id = 0;
 
 	/* Sanity Check */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_src, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_dst, MAPI_E_INVALID_PARAMETER, NULL);
 
@@ -707,7 +699,7 @@ _PUBLIC_ enum MAPISTATUS CopyToStream(mapi_object_t *obj_src, mapi_object_t *obj
 	if ((retval = mapi_object_get_logon_id(obj_src, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "CopyToStream");
+	mem_ctx = talloc_named(session[0], 0, "CopyToStream");
 	size = 0;
 
 	/* Fill the CopyToStream operation */
@@ -734,7 +726,7 @@ _PUBLIC_ enum MAPISTATUS CopyToStream(mapi_object_t *obj_src, mapi_object_t *obj
 	mapi_request->handles[0] = mapi_object_get_handle(obj_src);
 	mapi_request->handles[1] = mapi_object_get_handle(obj_dst);
 
-	status = emsmdb_transaction(session[0]->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session[0], mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -790,7 +782,6 @@ _PUBLIC_ enum MAPISTATUS LockRegionStream(mapi_object_t *obj_stream, uint64_t Re
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_stream, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj_stream);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
@@ -798,7 +789,7 @@ _PUBLIC_ enum MAPISTATUS LockRegionStream(mapi_object_t *obj_stream, uint64_t Re
 	if ((retval = mapi_object_get_logon_id(obj_stream, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "LockRegionStream");
+	mem_ctx = talloc_named(session, 0, "LockRegionStream");
 	size = 0;
 
 	/* Fill the LockRegionStream operation */
@@ -825,7 +816,7 @@ _PUBLIC_ enum MAPISTATUS LockRegionStream(mapi_object_t *obj_stream, uint64_t Re
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_stream);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -873,7 +864,6 @@ _PUBLIC_ enum MAPISTATUS UnlockRegionStream(mapi_object_t *obj_stream, uint64_t 
 	uint8_t 			logon_id = 0;
 
 	/* Sanity checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_stream, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj_stream);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
@@ -881,7 +871,7 @@ _PUBLIC_ enum MAPISTATUS UnlockRegionStream(mapi_object_t *obj_stream, uint64_t 
 	if ((retval = mapi_object_get_logon_id(obj_stream, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "UnlockRegionStream");
+	mem_ctx = talloc_named(session, 0, "UnlockRegionStream");
 	size = 0;
 
 	/* Fill the LockRegionStream operation */
@@ -908,7 +898,7 @@ _PUBLIC_ enum MAPISTATUS UnlockRegionStream(mapi_object_t *obj_stream, uint64_t 
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_stream);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -951,7 +941,6 @@ _PUBLIC_ enum MAPISTATUS CloneStream(mapi_object_t *obj_src, mapi_object_t *obj_
 	uint8_t			logon_id;
 
 	/* Sanity Check */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_src, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_dst, MAPI_E_INVALID_PARAMETER, NULL);
 
@@ -961,7 +950,7 @@ _PUBLIC_ enum MAPISTATUS CloneStream(mapi_object_t *obj_src, mapi_object_t *obj_
 	if ((retval = mapi_object_get_logon_id(obj_src, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "CloneStream");
+	mem_ctx = talloc_named(session, 0, "CloneStream");
 	size = 0;
 
 	/* Fill the CloneStream operation */
@@ -985,7 +974,7 @@ _PUBLIC_ enum MAPISTATUS CloneStream(mapi_object_t *obj_src, mapi_object_t *obj_
 	mapi_request->handles[0] = mapi_object_get_handle(obj_src);
 	mapi_request->handles[1] = 0xFFFFFFFF;
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;
@@ -1017,7 +1006,7 @@ _PUBLIC_ enum MAPISTATUS CloneStream(mapi_object_t *obj_src, mapi_object_t *obj_
    \note Developers may also call GetLastError() to retrieve the last
    MAPI error code. Possible MAPI error codes are:
    - MAPI_E_NOT_INITIALIZED: MAPI subsystem has not been initialized
-   - MAPI_E_INVALID_PARAMETER: A problem occured obtaining the session
+   - MAPI_E_INVALID_PARAMETER: A problem occurred obtaining the session
      context, or the stream or blob were null.
    - MAPI_E_CALL_FAILED: A network problem was encountered during the
      transaction
@@ -1044,7 +1033,6 @@ _PUBLIC_ enum MAPISTATUS WriteAndCommitStream(mapi_object_t *obj_stream, DATA_BL
 	uint8_t 			logon_id = 0;
 
 	/* Sanity Checks */
-	OPENCHANGE_RETVAL_IF(!global_mapi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!obj_stream, MAPI_E_INVALID_PARAMETER, NULL);
 	session = mapi_object_get_session(obj_stream);
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
@@ -1054,7 +1042,7 @@ _PUBLIC_ enum MAPISTATUS WriteAndCommitStream(mapi_object_t *obj_stream, DATA_BL
 	if ((retval = mapi_object_get_logon_id(obj_stream, &logon_id)) != MAPI_E_SUCCESS)
 		return retval;
 
-	mem_ctx = talloc_named(NULL, 0, "WriteAndCommitStream");
+	mem_ctx = talloc_named(session, 0, "WriteAndCommitStream");
 
 	size = 0;
 
@@ -1080,7 +1068,7 @@ _PUBLIC_ enum MAPISTATUS WriteAndCommitStream(mapi_object_t *obj_stream, DATA_BL
 	mapi_request->handles = talloc_array(mem_ctx, uint32_t, 1);
 	mapi_request->handles[0] = mapi_object_get_handle(obj_stream);
 
-	status = emsmdb_transaction(session->emsmdb->ctx, mem_ctx, mapi_request, &mapi_response);
+	status = emsmdb_transaction_wrapper(session, mem_ctx, mapi_request, &mapi_response);
 	OPENCHANGE_RETVAL_IF(!NT_STATUS_IS_OK(status), MAPI_E_CALL_FAILED, mem_ctx);
 	OPENCHANGE_RETVAL_IF(!mapi_response->mapi_repl, MAPI_E_CALL_FAILED, mem_ctx);
 	retval = mapi_response->mapi_repl->error_code;

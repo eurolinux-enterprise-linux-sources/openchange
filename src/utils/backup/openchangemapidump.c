@@ -20,12 +20,12 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <libmapi/libmapi.h>
+#include "libmapi/libmapi.h"
 #include <samba/popt.h>
 #include <param.h>
 
 #include "openchangebackup.h"
-#include <utils/openchange-tools.h>
+#include "utils/openchange-tools.h"
 
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -138,7 +138,7 @@ static enum MAPISTATUS mapidump_walk_attachment(TALLOC_CTX *mem_ctx,
 			mapi_object_init(&obj_attach);
 			retval = OpenAttach(obj_message, *attach_num, &obj_attach);
 			if (retval == MAPI_E_SUCCESS) {
-				retval = GetPropsAll(&obj_attach, &props);
+				retval = GetPropsAll(&obj_attach, MAPI_UNICODE, &props);
 				if (retval == MAPI_E_SUCCESS) {
 					/* extract unique identifier from PR_RECORD_KEY */
 					sbin = (const struct SBinary_short *)find_mapi_SPropValue_data(&props, PR_RECORD_KEY);
@@ -206,7 +206,7 @@ static enum MAPISTATUS mapidump_walk_content(TALLOC_CTX *mem_ctx,
 			/* Open Message */
 			retval = OpenMessage(obj_folder, *fid, *mid, &obj_message, 0);
 			if (GetLastError() == MAPI_E_SUCCESS) {
-				retval = GetPropsAll(&obj_message, &props);
+				retval = GetPropsAll(&obj_message, MAPI_UNICODE, &props);
 				if (GetLastError() == MAPI_E_SUCCESS) {
 					/* extract unique identifier from PR_SOURCE_KEY */
 					sbin = (const struct SBinary_short *)find_mapi_SPropValue_data(&props, PR_SOURCE_KEY);
@@ -266,7 +266,7 @@ static enum MAPISTATUS mapidump_walk_container(TALLOC_CTX *mem_ctx,
 	MAPI_RETVAL_IF(retval, GetLastError(), NULL);
 
 	/* Retrieve all its properties */
-	retval = GetPropsAll(&obj_folder, &props);
+	retval = GetPropsAll(&obj_folder, MAPI_UNICODE, &props);
 	MAPI_RETVAL_IF(retval, GetLastError(), NULL);
 	child_content = (const uint32_t *)find_mapi_SPropValue_data(&props, PR_CONTENT_COUNT);
 	child_folder = (const uint32_t *)find_mapi_SPropValue_data(&props, PR_FOLDER_CHILD_COUNT);
@@ -344,6 +344,7 @@ int main(int argc, const char *argv[])
 	TALLOC_CTX			*mem_ctx;
 	enum MAPISTATUS			retval;
 	struct ocb_context		*ocb_ctx = NULL;
+	struct mapi_context		*mapi_ctx;
 	struct mapi_session		*session = NULL;
 	mapi_object_t			obj_store;
 	poptContext			pc;
@@ -405,24 +406,24 @@ int main(int argc, const char *argv[])
 	}
 
 	/* Initialize MAPI subsystem */
-	retval = MAPIInitialize(opt_profdb);
+	retval = MAPIInitialize(&mapi_ctx, opt_profdb);
 	if (retval != MAPI_E_SUCCESS) {
 		mapi_errstr("MAPIInitialize", GetLastError());
 		exit (1);
 	}
 
 	/* debug options */
-	SetMAPIDumpData(opt_dumpdata);
+	SetMAPIDumpData(mapi_ctx, opt_dumpdata);
 
 	if (opt_debug) {
-		SetMAPIDebugLevel(atoi(opt_debug));
+		SetMAPIDebugLevel(mapi_ctx, atoi(opt_debug));
 	}
 
 	/* If no profile is specified try to load the default one from
 	 * the database 
 	 */
 	if (!opt_profname) {
-		retval = GetDefaultProfile(&opt_profname);
+		retval = GetDefaultProfile(mapi_ctx, &opt_profname);
 		if (retval != MAPI_E_SUCCESS) {
 			mapi_errstr("GetDefaultProfile", GetLastError());
 			exit (1);
@@ -442,7 +443,7 @@ int main(int argc, const char *argv[])
 	}
 
 	/* We only need to log on EMSMDB to backup Mailbox store or Public Folders */
-	retval = MapiLogonProvider(&session, opt_profname, opt_password, PROVIDER_ID_EMSMDB);
+	retval = MapiLogonProvider(mapi_ctx, &session, opt_profname, opt_password, PROVIDER_ID_EMSMDB);
 	talloc_free(opt_profname);
 	if (retval != MAPI_E_SUCCESS) {
 		mapi_errstr("MapiLogonEx", GetLastError());
@@ -461,7 +462,7 @@ int main(int argc, const char *argv[])
 
 	/* Uninitialize MAPI and OCB subsystem */
 	mapi_object_release(&obj_store);
-	MAPIUninitialize();
+	MAPIUninitialize(mapi_ctx);
 	ocb_release(ocb_ctx);
 	talloc_free(mem_ctx);
 
