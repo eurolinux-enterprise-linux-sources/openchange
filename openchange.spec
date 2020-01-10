@@ -13,7 +13,7 @@
 
 Name: openchange
 Version: 1.0
-Release: 4%{?dist}
+Release: 6%{?dist}
 Group: Applications/System
 Summary: Provides access to Microsoft Exchange servers using native protocols
 License: GPLv3+ and Public Domain
@@ -74,6 +74,9 @@ Patch5: openchange-1.0-symbol-clash.patch
 
 # RH-bug #870405
 Patch6: openchange-1.0-writestream.patch
+
+# RH-bug #665967
+Patch7: openchange-1.0-freebusy.patch
 
 %description
 OpenChange provides libraries to access Microsoft Exchange servers
@@ -137,6 +140,7 @@ This package provides the server elements for OpenChange.
 %patch4 -p1 -b .uninit-crash
 %patch5 -p1 -b .symbol-clash
 %patch6 -p1 -b .writestream
+%patch7 -p1 -b .freebusy
 
 %build
 ./autogen.sh
@@ -272,6 +276,9 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %changelog
+* Wed Oct 16 2013 Milan Crha <mcrha@redhat.com> - 1.0-6
+- Add a patch for RH bug #665967 (Free/busy fails to be fetched)
+
 * Thu Jan 17 2013 Milan Crha <mcrha@redhat.com> - 1.0-4
 - Use current version (1.0-4) for a multilib obsolete (RH bug #881698).
 
