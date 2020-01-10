@@ -1,0 +1,1900 @@
+------------------------------------------------------------------------
+r1297 | jkerihuel | 2009-04-06 17:20:20 +0200 (Mon, 06 Apr 2009) | 4 lines
+
+- Add Implementation for Logon redirect response buffer in OpenChange IDL
+- Update libmapiserver size calculation routine for Logon call to handle this case
+
+
+------------------------------------------------------------------------
+r1298 | occl | 2009-04-07 00:00:34 +0200 (Tue, 07 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1299 | jkerihuel | 2009-04-07 00:37:20 +0200 (Tue, 07 Apr 2009) | 3 lines
+
+Use parent folder full replica ID: 2 bytes instead of 1 byte
+
+
+------------------------------------------------------------------------
+r1300 | occl | 2009-04-08 00:00:34 +0200 (Wed, 08 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1301 | bradh | 2009-04-08 03:49:41 +0200 (Wed, 08 Apr 2009) | 9 lines
+
+Implement LockRegionStream and UnlockRegionStream ROPs.
+
+These appear to be a relatively recent addition to the 
+documentation, possibly only used in Exchange 2007 / Outlook
+2007.
+
+This is complete except for testing of whether the locking
+actually works.
+
+------------------------------------------------------------------------
+r1302 | bradh | 2009-04-08 04:26:52 +0200 (Wed, 08 Apr 2009) | 2 lines
+
+Mapitest cleanups - remove GetLastError(), and other minor edits.
+
+------------------------------------------------------------------------
+r1303 | occl | 2009-04-09 00:00:36 +0200 (Thu, 09 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1304 | bradh | 2009-04-10 07:50:05 +0200 (Fri, 10 Apr 2009) | 6 lines
+
+Update IDL for ModifyRules (0x41) and add IDL for 
+UpdateDeferredActionMessages (0x57).
+
+This is a checkpoint commit, pending further investigation
+into how we handle PtypRestriction and PtypRuleAction.
+
+------------------------------------------------------------------------
+r1305 | occl | 2009-04-11 00:00:36 +0200 (Sat, 11 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1306 | bradh | 2009-04-11 06:01:51 +0200 (Sat, 11 Apr 2009) | 5 lines
+
+Add a new mapitest suite for OXCNOTIF (Core Notifications).
+
+Add a test to the OXCNOTIF suite based on test case provided by Paolo Abeni.
+
+
+------------------------------------------------------------------------
+r1307 | bradh | 2009-04-11 06:04:08 +0200 (Sat, 11 Apr 2009) | 5 lines
+
+Add session state to the notification.
+Patch by Paolo Abeni - thanks for the investigation and fix.
+
+Also remove a stray debug message.
+
+------------------------------------------------------------------------
+r1308 | occl | 2009-04-12 00:00:38 +0200 (Sun, 12 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1309 | jkerihuel | 2009-04-12 19:55:51 +0200 (Sun, 12 Apr 2009) | 8 lines
+
+- Add dcerpc_mapiproxy:delegated_auth option 
+This option delays mapiproxy-remote server authentication when
+the client sends the first request on a given pipe. This is
+mandatory in order to have delegated credentials to work.
+
+- Factor remote connection into mapiproxy_op_connect
+
+
+------------------------------------------------------------------------
+r1310 | occl | 2009-04-13 00:00:36 +0200 (Mon, 13 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1311 | bradh | 2009-04-13 04:08:54 +0200 (Mon, 13 Apr 2009) | 4 lines
+
+Add PT_ACTIONS to list of data types.
+
+Not fully/correctly handled yet.
+
+------------------------------------------------------------------------
+r1312 | occl | 2009-04-14 00:00:41 +0200 (Tue, 14 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1313 | jelmer | 2009-04-15 11:04:13 +0200 (Wed, 15 Apr 2009) | 1 line
+
+Ignore generated property file.
+------------------------------------------------------------------------
+r1314 | bradh | 2009-04-15 14:09:25 +0200 (Wed, 15 Apr 2009) | 4 lines
+
+Implement RopHardDeleteMessages (0x91). 
+
+Includes IDL, implementation and mapitest.
+
+------------------------------------------------------------------------
+r1315 | occl | 2009-04-16 00:00:39 +0200 (Thu, 16 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1316 | bradh | 2009-04-16 09:00:24 +0200 (Thu, 16 Apr 2009) | 4 lines
+
+Implement (IDL, libmapi, mapitest) RopHardDeleteMessagesAndSubfolders (0x92)
+
+Also fix some bugs in mapitest common code, and an incorrect sanity check in CreateFolder().
+
+------------------------------------------------------------------------
+r1317 | occl | 2009-04-17 00:00:42 +0200 (Fri, 17 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1318 | bradh | 2009-04-17 05:30:26 +0200 (Fri, 17 Apr 2009) | 5 lines
+
+Implement RopSetPropertiesNoReplicate (0x79).
+
+IDL was already done. mapitest for DeletePropertiesNoReplicate was
+reused / updated.
+
+------------------------------------------------------------------------
+r1319 | bradh | 2009-04-17 05:53:02 +0200 (Fri, 17 Apr 2009) | 2 lines
+
+Update GetStoreState documentation.
+
+------------------------------------------------------------------------
+r1320 | bradh | 2009-04-17 08:28:26 +0200 (Fri, 17 Apr 2009) | 7 lines
+
+Fix Search notifications.
+
+MS concurred that the docs are wrong.
+
+Patch by Paolo Abeni - thanks very much for the
+investigation and the patch.
+
+------------------------------------------------------------------------
+r1321 | occl | 2009-04-18 00:00:41 +0200 (Sat, 18 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1322 | bradh | 2009-04-18 13:05:09 +0200 (Sat, 18 Apr 2009) | 4 lines
+
+Implement RopCloneStream (0x3b) and RopWriteAndCommitStream (0x90).
+
+Includes IDL, implementation and mapitest tests.
+
+------------------------------------------------------------------------
+r1323 | occl | 2009-04-19 00:00:36 +0200 (Sun, 19 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1324 | jkerihuel | 2009-04-19 15:29:21 +0200 (Sun, 19 Apr 2009) | 6 lines
+
+- Add Redirect buffer support for OpenMsgStore and OpenPublicFolder.
+This commit fixes the ecWrongServer (0x478) error users encounter
+while running openchange based software in a clustered Exchange 
+environment.
+
+
+------------------------------------------------------------------------
+r1325 | occl | 2009-04-20 00:00:35 +0200 (Mon, 20 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1326 | bradh | 2009-04-21 08:48:25 +0200 (Tue, 21 Apr 2009) | 6 lines
+
+Implement RopTransportNewMail (0x51).
+
+Includes IDL, libmapi implementation, and basic mapitest coverage.
+
+Also fix a few doxygen / formatting things.
+
+------------------------------------------------------------------------
+r1327 | occl | 2009-04-22 00:00:36 +0200 (Wed, 22 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1328 | bradh | 2009-04-22 09:26:51 +0200 (Wed, 22 Apr 2009) | 2 lines
+
+Warning fix.
+
+------------------------------------------------------------------------
+r1329 | occl | 2009-04-23 00:00:46 +0200 (Thu, 23 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1330 | bradh | 2009-04-23 04:40:48 +0200 (Thu, 23 Apr 2009) | 2 lines
+
+Typo fix.
+
+------------------------------------------------------------------------
+r1331 | jkerihuel | 2009-04-23 12:36:12 +0200 (Thu, 23 Apr 2009) | 3 lines
+
+Make sure delayed authenication is not called when server mode is enabled
+
+
+------------------------------------------------------------------------
+r1332 | bradh | 2009-04-23 13:26:53 +0200 (Thu, 23 Apr 2009) | 4 lines
+
+Fix display of Folder ID values (one is filled with ., the other is prefixed with .16 instead of being filled.
+
+Also remove duplicate close() of file descriptor.
+
+------------------------------------------------------------------------
+r1333 | bradh | 2009-04-23 13:57:27 +0200 (Thu, 23 Apr 2009) | 4 lines
+
+Update property list to reflect current OAB props.
+
+This deletes a few incompatible properties. Cannot determine the history of the PR_MAILBEAT_ props.
+
+------------------------------------------------------------------------
+r1335 | occl | 2009-04-24 00:00:34 +0200 (Fri, 24 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1336 | jkerihuel | 2009-04-26 15:46:31 +0200 (Sun, 26 Apr 2009) | 14 lines
+
+Patch from Paolo Abeni <paolo.abeni@gmail.com>:
+
+ProcessNotification() is ignoring the handle value contained into the
+processed notifications. This means that if many Subscribe() calls are
+performed on different folders but with the same flags, all the
+registered callback are [incorrectly] signaled with each received
+notification.
+
+The attached patch match the handler contained into the notification
+message against the notification object handle to avoid such
+replication.
+
+
+
+------------------------------------------------------------------------
+r1337 | occl | 2009-04-27 00:00:38 +0200 (Mon, 27 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1338 | jkerihuel | 2009-04-27 13:39:45 +0200 (Mon, 27 Apr 2009) | 17 lines
+
+Patch from Paolo Abeni <paolo.abeni@gmail.com>:
+
+Mapi notifications can occurs inside any emsmdb_transaction; currently
+only the notification send by the server inside the
+emsmdb_transaction_null() in MonitorNotification() are
+parsed/processed/delivered to the appropriate callback.
+
+To be able to process all the received notifications, the notification
+structure must comprise the private data to be passed to the
+notification callback, since in the average mapi call this data is not
+available. This patch modifies the Subscribe() call and the 
+mapi_notification structure, adding the private_data parameter (also the 
+related Subscribe() calls are update)  and add a libmapi call 
+(DispatchNotifications) to force the notification dispatching in
+a [quite] non blocking way
+
+
+------------------------------------------------------------------------
+r1339 | jkerihuel | 2009-04-27 13:49:03 +0200 (Mon, 27 Apr 2009) | 6 lines
+
+Patch from Paolo Abeni <paolo.abeni@gmail.com>:
+
+call ProcessNotification() after each successful 
+emsmdb_transaction() in all the libmapi calls.
+
+
+------------------------------------------------------------------------
+r1340 | occl | 2009-04-28 00:00:36 +0200 (Tue, 28 Apr 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1341 | jkerihuel | 2009-05-07 15:20:00 +0200 (Thu, 07 May 2009) | 13 lines
+
+- Add preliminary IDL support for Exchange 2003/2007 EMSMDB RPC calls:
+  * EcDoConnectEx
+  * EcDoRpcExt2
+
+- Add LZxpress and XorMagic support to EcDoRpcExt2 request/reply
+  blob. However it doesn't yet support Chained calls.
+
+- Add AuxInfo/AUX_HEADER structures and IDL
+
+- Refactor mapi_request and mapi_response: move obfuscate_data calls
+  up to the EcDoRpc layer
+
+
+------------------------------------------------------------------------
+r1342 | occl | 2009-05-08 00:00:41 +0200 (Fri, 08 May 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1343 | jkerihuel | 2009-05-25 17:54:08 +0200 (Mon, 25 May 2009) | 3 lines
+
+Fix pull structure for QueryRows reply when no RowData is available
+
+
+------------------------------------------------------------------------
+r1344 | occl | 2009-05-26 00:00:56 +0200 (Tue, 26 May 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1345 | jkerihuel | 2009-05-28 14:42:48 +0200 (Thu, 28 May 2009) | 14 lines
+
+Patch from Erik Hovland <erik@hovland.org>:
+
+Make sure pointers are valid before dereferencing
+1. lpProps 'might' be null
+2. Add folder to variables checked before moving on.
+4. Check nprop->guid before giving to strcmp, two times
+6. Check definition before handing to strlen (which will dereference
+it) Reworked this one to include talloc_free
+7. Check MessageClass? before handing to strncasecmp
+8. Check backend, return if null.
+10. Don't print out anything if lpProp is null
+11. Check attach_size before dereferencing
+
+
+------------------------------------------------------------------------
+r1346 | jkerihuel | 2009-05-28 14:53:38 +0200 (Thu, 28 May 2009) | 5 lines
+
+Patch from Erik Hovland <erik@hovland.org>
+
+Adds a #include config.h to suppress compiler warnings for vasprintf
+
+
+------------------------------------------------------------------------
+r1347 | jkerihuel | 2009-05-28 15:07:41 +0200 (Thu, 28 May 2009) | 10 lines
+
+Patch from Erik Hovland <erik@hovland.org>
+
+1. In mapiproxy, the directory handle dir will be leaked after it is
+done being used.
+2. exchange2mbox main() should use exit at line 785 just like all of
+the other error paths so that we don't leak anything
+
+ref. ticket #157
+
+
+------------------------------------------------------------------------
+r1348 | jkerihuel | 2009-05-28 15:12:23 +0200 (Thu, 28 May 2009) | 11 lines
+
+Patch From Erik Hovland <erik@hovland.org>
+
+In torture_rpc_mapi_sendattach a call is made to the system function
+read at line 199. The return value of read is assigned to read_size,
+which happens to be of unsigned type. So if read returns -1 (which it
+can) it will not be noticed. The patch changes the type to ssize_t
+(signed) and checks for -1 as well as zero to break out of the loop.
+
+Ref ticket #156
+
+
+------------------------------------------------------------------------
+r1349 | jkerihuel | 2009-05-28 16:00:13 +0200 (Thu, 28 May 2009) | 7 lines
+
+- Add sanity check on mapitest_common creation routines within
+  mapitest modules
+
+- Apply patch from Erik Hovland <erik@hovland.org>: check return
+  types.
+
+
+------------------------------------------------------------------------
+r1350 | jkerihuel | 2009-05-28 16:31:22 +0200 (Thu, 28 May 2009) | 7 lines
+
+Patch from Erik Hovland <erik@hovland.org>:
+
+Initializes variables to make sure they aren't used uninitialized.
+
+Ref ticket #153
+
+
+------------------------------------------------------------------------
+r1351 | occl | 2009-05-29 00:00:48 +0200 (Fri, 29 May 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1357 | jkerihuel | 2009-06-18 16:20:19 +0200 (Thu, 18 Jun 2009) | 3 lines
+
+Add some PidTag* mapping involved with Recipients and RecipientRow
+
+
+------------------------------------------------------------------------
+r1358 | occl | 2009-06-19 00:00:44 +0200 (Fri, 19 Jun 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1362 | jelmer | 2009-06-21 03:50:29 +0200 (Sun, 21 Jun 2009) | 1 line
+
+Link libmapiserver against all libraries.
+------------------------------------------------------------------------
+r1364 | jelmer | 2009-06-21 11:57:53 +0200 (Sun, 21 Jun 2009) | 1 line
+
+Keep separate flags for libraries around in config.mk.
+------------------------------------------------------------------------
+r1365 | jelmer | 2009-06-21 12:00:01 +0200 (Sun, 21 Jun 2009) | 1 line
+
+Fix typo in Python variable name.
+------------------------------------------------------------------------
+r1366 | occl | 2009-06-22 00:00:36 +0200 (Mon, 22 Jun 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1416 | jelmer | 2009-07-18 15:25:53 +0200 (Sat, 18 Jul 2009) | 1 line
+
+Fix typo in variable name.
+------------------------------------------------------------------------
+r1417 | jelmer | 2009-07-18 16:46:02 +0200 (Sat, 18 Jul 2009) | 1 line
+
+Link libmapi against tevent since it uses tevent_context_init, link ndr_exchange.po into libmapiserver since it uses some ndr_push_* symbols.
+------------------------------------------------------------------------
+r1418 | jelmer | 2009-07-18 17:18:14 +0200 (Sat, 18 Jul 2009) | 1 line
+
+Create symlink for libmapistore.
+------------------------------------------------------------------------
+r1419 | jelmer | 2009-07-18 17:40:57 +0200 (Sat, 18 Jul 2009) | 1 line
+
+Use LDFLAGS when linking exchange2ical.
+------------------------------------------------------------------------
+r1420 | jelmer | 2009-07-18 18:06:13 +0200 (Sat, 18 Jul 2009) | 1 line
+
+Declare a SOVERSION for libmapistore.
+------------------------------------------------------------------------
+r1421 | jelmer | 2009-07-18 18:06:16 +0200 (Sat, 18 Jul 2009) | 1 line
+
+Link libmapiproxy against tdb.
+------------------------------------------------------------------------
+r1422 | jelmer | 2009-07-18 18:06:20 +0200 (Sat, 18 Jul 2009) | 1 line
+
+Update copies of config.guess and config.sub.
+------------------------------------------------------------------------
+r1423 | jelmer | 2009-07-18 18:06:22 +0200 (Sat, 18 Jul 2009) | 1 line
+
+Link libmapistore against tdb.
+------------------------------------------------------------------------
+r1424 | occl | 2009-07-19 00:00:44 +0200 (Sun, 19 Jul 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1432 | bradh | 2009-07-29 06:55:02 +0200 (Wed, 29 Jul 2009) | 2 lines
+
+Update test case to reflect new behaviour
+
+------------------------------------------------------------------------
+r1433 | bradh | 2009-07-29 06:57:55 +0200 (Wed, 29 Jul 2009) | 6 lines
+
+Remove dead / unused code.
+
+See http://trac.openchange.org/ticket/152#comment:1 for rationale.
+
+Original patch by Erik Hovland - thanks again.
+
+------------------------------------------------------------------------
+r1436 | occl | 2009-07-30 00:00:40 +0200 (Thu, 30 Jul 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1441 | bradh | 2009-08-02 04:10:01 +0200 (Sun, 02 Aug 2009) | 10 lines
+
+Fix potentially unused variable.
+
+Tested with mapitest (even though nothing should have been affected) and
+with libmapixx-test and libmapixx-attach under valgrind.
+
+Patch is remaining part of http://trac.openchange.org/ticket/153
+
+Thanks to Erik Hovland for the patch.
+
+
+------------------------------------------------------------------------
+r1442 | bradh | 2009-08-02 04:44:04 +0200 (Sun, 02 Aug 2009) | 3 lines
+
+Use array form of delete (error identified with libmapixx-attach test, using valgrind).
+
+
+------------------------------------------------------------------------
+r1443 | bradh | 2009-08-02 06:42:30 +0200 (Sun, 02 Aug 2009) | 17 lines
+
+Applied modified version of patch from Erik Hovland to address unused variables.
+
+See http://trac.openchange.org/attachment/ticket/160/unused-values for
+the rationale.
+
+This resolves #160.
+
+My version removes variables (rather than commenting them out) since we don't need
+them now. I also updated the documentation for options that are no longer available
+
+The origin of the unused PR_FOLDER_CHILD_COUNT is a bit strange. It was introduced
+in r808 (to resolve #103), and looks like it might have been used for debugging - no
+impact on the code. I pulled out the whole lot.
+
+Tested with openchangeclient --fetchmail --folder="Sent Mail" and mapitest.
+
+
+------------------------------------------------------------------------
+r1444 | bradh | 2009-08-02 07:08:12 +0200 (Sun, 02 Aug 2009) | 7 lines
+
+Avoid duplicate call to mapi_object_get_logon_id
+
+Based on a patch proposed by Erik Hovland, but adapted to follow the
+pattern used in OpenStream().
+
+Resolves issue #163.
+
+------------------------------------------------------------------------
+r1446 | occl | 2009-08-03 00:00:38 +0200 (Mon, 03 Aug 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1447 | bradh | 2009-08-03 11:58:34 +0200 (Mon, 03 Aug 2009) | 10 lines
+
+Apply patch from Erik Hovland, from ticket #162.
+
+From the original patch:
+"The problem is that when you do stat first w/ a file string anyone can
+exploit the time in between to do whatever they want with the file that
+the string is a name for. Instead, try to open straight away. Then fstat
+w/ the file descriptor."
+
+I think the patch is fine, although I didn't run the torture test.
+
+------------------------------------------------------------------------
+r1448 | bradh | 2009-08-03 13:08:08 +0200 (Mon, 03 Aug 2009) | 6 lines
+
+Remove unused headers.
+
+Patch by Erik Hovland - thanks very much,
+
+Resolves ticket #164.
+
+------------------------------------------------------------------------
+r1449 | occl | 2009-08-04 00:00:44 +0200 (Tue, 04 Aug 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1450 | jelmer | 2009-08-05 21:20:11 +0200 (Wed, 05 Aug 2009) | 1 line
+
+Add tevent to dependencies.
+------------------------------------------------------------------------
+r1451 | occl | 2009-08-06 00:00:44 +0200 (Thu, 06 Aug 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1454 | bradh | 2009-08-09 09:59:02 +0200 (Sun, 09 Aug 2009) | 2 lines
+
+Update the script version of samba4 to alpha8.
+
+------------------------------------------------------------------------
+r1455 | occl | 2009-08-10 00:00:42 +0200 (Mon, 10 Aug 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1460 | bradh | 2009-08-13 14:04:37 +0200 (Thu, 13 Aug 2009) | 2 lines
+
+Remove unused code - no simple tests.
+
+------------------------------------------------------------------------
+r1461 | bradh | 2009-08-13 14:05:19 +0200 (Thu, 13 Aug 2009) | 2 lines
+
+Remove unused enum values.
+
+------------------------------------------------------------------------
+r1462 | occl | 2009-08-14 00:00:47 +0200 (Fri, 14 Aug 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1464 | bradh | 2009-08-14 11:03:08 +0200 (Fri, 14 Aug 2009) | 6 lines
+
+Fix error handling case.
+
+Patch from Erik Hovland - thanks very much.
+
+Resolves ticket #175.
+
+------------------------------------------------------------------------
+r1465 | bradh | 2009-08-14 14:46:21 +0200 (Fri, 14 Aug 2009) | 6 lines
+
+Ensure that when we pass --profile to mapitest, that profile
+gets used instead of the default.
+
+Also fix a small memory leak when using --profile, and add some
+extra comments.
+
+------------------------------------------------------------------------
+r1466 | occl | 2009-08-15 00:00:56 +0200 (Sat, 15 Aug 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1467 | bradh | 2009-08-17 06:05:59 +0200 (Mon, 17 Aug 2009) | 2 lines
+
+Fix memory leak in mapiprofile utility
+
+------------------------------------------------------------------------
+r1468 | bradh | 2009-08-17 06:18:57 +0200 (Mon, 17 Aug 2009) | 4 lines
+
+fix leak in openchangeclient
+
+(as seen with valgrind of "openchangeclient -m")
+
+------------------------------------------------------------------------
+r1471 | bradh | 2009-08-17 08:38:22 +0200 (Mon, 17 Aug 2009) | 2 lines
+
+More cleanups of memory leaks for setting up database and an associated failure case.
+
+------------------------------------------------------------------------
+r1472 | bradh | 2009-08-17 10:14:22 +0200 (Mon, 17 Aug 2009) | 6 lines
+
+Make sure that return values are checked and report that given status if there is an error. 
+
+Patch from Erik Hovland, with minor additional changes. Thanks again for the patch.
+
+Resolves #176.
+
+------------------------------------------------------------------------
+r1473 | bradh | 2009-08-17 12:18:38 +0200 (Mon, 17 Aug 2009) | 6 lines
+
+Ensure that we check the result of the operation we just performed.
+
+Patch by Erik Hovland. Thanks very much for continuing to provide these.
+
+This is the third part of the patch in ticket #177. The first two parts are yet to be addressed.
+
+------------------------------------------------------------------------
+r1474 | occl | 2009-08-18 00:00:45 +0200 (Tue, 18 Aug 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1475 | bradh | 2009-08-19 00:40:15 +0200 (Wed, 19 Aug 2009) | 6 lines
+
+Remove unreachable code.
+
+Patch by Erik Hovland. Thanks very much.
+
+This is the first part of ticket #177.
+
+------------------------------------------------------------------------
+r1476 | bradh | 2009-08-19 01:20:44 +0200 (Wed, 19 Aug 2009) | 6 lines
+
+Remove unreachable code.
+
+Patch by Erik Hovland. Thanks again.
+
+This is the second part of ticket #177. This completes the checkin of that ticket.
+
+------------------------------------------------------------------------
+r1477 | bradh | 2009-08-19 01:44:03 +0200 (Wed, 19 Aug 2009) | 6 lines
+
+Move initialisation up, to make sure everything is valid in the failure paths
+
+Patch by Erik Hovland. Thanks once again.
+
+This closes out ticket #178.
+
+------------------------------------------------------------------------
+r1482 | occl | 2009-08-24 00:00:50 +0200 (Mon, 24 Aug 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1483 | bradh | 2009-08-24 03:48:03 +0200 (Mon, 24 Aug 2009) | 2 lines
+
+Minor cleanups.
+
+------------------------------------------------------------------------
+r1484 | bradh | 2009-08-24 04:37:19 +0200 (Mon, 24 Aug 2009) | 2 lines
+
+Minor rewording of description
+
+------------------------------------------------------------------------
+r1485 | occl | 2009-08-25 00:00:37 +0200 (Tue, 25 Aug 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1486 | bradh | 2009-08-29 03:47:43 +0200 (Sat, 29 Aug 2009) | 4 lines
+
+Fix some memory leaks and a bug in mapiprofile.
+
+I introduced the bug in r1467, there could be others that are similar.
+
+------------------------------------------------------------------------
+r1487 | bradh | 2009-08-29 12:04:27 +0200 (Sat, 29 Aug 2009) | 5 lines
+
+Remove explicit -Wstrict-aliasing=3 from command line.
+
+This is implied by gcc -Wall option, and icc produces nuisance warnings
+with it enabled (related to the -W option, not the code being compiled).
+
+------------------------------------------------------------------------
+r1488 | occl | 2009-08-30 00:00:43 +0200 (Sun, 30 Aug 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1489 | bradh | 2009-09-02 11:50:27 +0200 (Wed, 02 Sep 2009) | 2 lines
+
+Correct diagnostics messages.
+
+------------------------------------------------------------------------
+r1490 | occl | 2009-09-03 00:00:45 +0200 (Thu, 03 Sep 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1491 | bradh | 2009-09-10 13:55:44 +0200 (Thu, 10 Sep 2009) | 13 lines
+
+Portability fixes for Intel C Compiler.
+
+Set CFLAGS early, otherwise AC_PROG_CC will set
+CFLAGS to "-O2 -g", which later has -O3 appended, which
+icc complains about.
+
+Check if we're really icc, and if so, turn off some warnings.
+Also turn off the "FORTIFY_SOURCE" define which causes problems
+with missing builtins.
+
+The warnings can (and should) be turned back on later, after we
+fix the current issues.
+
+------------------------------------------------------------------------
+r1492 | occl | 2009-09-11 00:00:43 +0200 (Fri, 11 Sep 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1493 | bradh | 2009-09-11 02:51:24 +0200 (Fri, 11 Sep 2009) | 4 lines
+
+Remove unused variable, and change a name to avoid a "shadowed declaration" 
+warning.
+
+
+------------------------------------------------------------------------
+r1494 | bradh | 2009-09-11 03:51:38 +0200 (Fri, 11 Sep 2009) | 2 lines
+
+Match up data types in argument and format string.
+
+------------------------------------------------------------------------
+r1495 | bradh | 2009-09-11 03:52:25 +0200 (Fri, 11 Sep 2009) | 2 lines
+
+Help icc find comparison_fn_t.
+
+------------------------------------------------------------------------
+r1496 | bradh | 2009-09-11 10:43:05 +0200 (Fri, 11 Sep 2009) | 4 lines
+
+Namespace variable in macro, so we don't get noise about shadowing a
+declaration of "i"
+
+
+------------------------------------------------------------------------
+r1497 | bradh | 2009-09-11 10:45:18 +0200 (Fri, 11 Sep 2009) | 4 lines
+
+Add "static" to avoid the need for additional declarations.
+
+Avoids noise from the intel c compiler.
+
+------------------------------------------------------------------------
+r1498 | bradh | 2009-09-11 13:08:28 +0200 (Fri, 11 Sep 2009) | 2 lines
+
+Remove unreachable code.
+
+------------------------------------------------------------------------
+r1499 | bradh | 2009-09-11 14:10:41 +0200 (Fri, 11 Sep 2009) | 2 lines
+
+Use enumerated type instead of integer.
+
+------------------------------------------------------------------------
+r1500 | bradh | 2009-09-11 14:28:10 +0200 (Fri, 11 Sep 2009) | 5 lines
+
+Only pass "-Wmissing-prototypes -Wstrict-prototypes" to CFLAGS,
+not to CXXFLAGS as well.
+
+Avoids g++ warnings.
+
+------------------------------------------------------------------------
+r1501 | occl | 2009-09-12 00:00:45 +0200 (Sat, 12 Sep 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1502 | bradh | 2009-09-12 03:20:30 +0200 (Sat, 12 Sep 2009) | 4 lines
+
+Return a suitable MAPISTATUS if we can't talloc sufficient memory here.
+
+Fixes warning from Intel compiler.
+
+------------------------------------------------------------------------
+r1503 | bradh | 2009-09-12 09:32:40 +0200 (Sat, 12 Sep 2009) | 4 lines
+
+Use enum types where appropriate.
+
+Fixes warnings from Intel C compiler.
+
+------------------------------------------------------------------------
+r1504 | bradh | 2009-09-12 10:09:14 +0200 (Sat, 12 Sep 2009) | 2 lines
+
+Use enums instead of ints / hardcoded values.
+
+------------------------------------------------------------------------
+r1505 | bradh | 2009-09-12 10:23:53 +0200 (Sat, 12 Sep 2009) | 2 lines
+
+Use appropriate enums instead of int types.
+
+------------------------------------------------------------------------
+r1506 | bradh | 2009-09-12 10:25:09 +0200 (Sat, 12 Sep 2009) | 3 lines
+
+We are supposed to be returning a MAPISTATUS, so switch to using 
+the OPENCHANGE_RETVAL_ERR macro here.
+
+------------------------------------------------------------------------
+r1507 | bradh | 2009-09-12 12:31:25 +0200 (Sat, 12 Sep 2009) | 2 lines
+
+Update users of FindRow to use enums.
+
+------------------------------------------------------------------------
+r1508 | bradh | 2009-09-12 15:02:59 +0200 (Sat, 12 Sep 2009) | 2 lines
+
+Use enums where appropriate.
+
+------------------------------------------------------------------------
+r1509 | bradh | 2009-09-12 15:03:57 +0200 (Sat, 12 Sep 2009) | 2 lines
+
+Use enum for OpenEmbeddedMessage call.
+
+------------------------------------------------------------------------
+r1510 | bradh | 2009-09-12 15:04:34 +0200 (Sat, 12 Sep 2009) | 2 lines
+
+Use appropriate enum here.
+
+------------------------------------------------------------------------
+r1511 | bradh | 2009-09-12 15:05:10 +0200 (Sat, 12 Sep 2009) | 2 lines
+
+Update to match API change.
+
+------------------------------------------------------------------------
+r1512 | bradh | 2009-09-12 15:07:03 +0200 (Sat, 12 Sep 2009) | 2 lines
+
+Update API to use MAPITAGS enum.
+
+------------------------------------------------------------------------
+r1513 | occl | 2009-09-13 00:00:42 +0200 (Sun, 13 Sep 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1514 | bradh | 2009-09-14 12:58:11 +0200 (Mon, 14 Sep 2009) | 4 lines
+
+Update the properties list.
+
+Patch from Girish Venkatachalam <girish at gayatri-hitech.com>
+
+------------------------------------------------------------------------
+r1515 | occl | 2009-09-15 00:01:04 +0200 (Tue, 15 Sep 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1516 | bradh | 2009-09-16 07:50:23 +0200 (Wed, 16 Sep 2009) | 5 lines
+
+Whitespace cleanup.
+
+Patch by Erik Hovland <erik at hovland.org>
+
+
+------------------------------------------------------------------------
+r1517 | occl | 2009-09-17 00:00:43 +0200 (Thu, 17 Sep 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1518 | bradh | 2009-09-19 07:24:06 +0200 (Sat, 19 Sep 2009) | 9 lines
+
+Implement GetValidAttachments ROP (0x52).
+
+Includes IDL, implementation and mapitest.
+
+mapitest also checks DeleteAttach behaviour, which I don't think we previously
+covered anywhere. 
+
+Also includes a comment fix in the mapitest code.
+
+------------------------------------------------------------------------
+r1519 | bradh | 2009-09-19 13:54:15 +0200 (Sat, 19 Sep 2009) | 9 lines
+
+Implement RopReloadCachedInformation (0x10).
+
+Minor change to IDL (previously implemented), and adds
+implementaiton and mapitest code.
+
+Also editorial comment fix in some related mapitest stuff.
+
+Resolves ticket #186
+
+------------------------------------------------------------------------
+r1520 | occl | 2009-09-20 00:00:56 +0200 (Sun, 20 Sep 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1521 | bradh | 2009-09-20 02:50:15 +0200 (Sun, 20 Sep 2009) | 4 lines
+
+Modify mapi_object_set_logon_id() to be able to report errors.
+
+Original patch by Erik Hovland, I made some changes.
+
+------------------------------------------------------------------------
+r1522 | occl | 2009-09-21 00:00:44 +0200 (Mon, 21 Sep 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1523 | bradh | 2009-09-26 07:56:15 +0200 (Sat, 26 Sep 2009) | 3 lines
+
+Ensure that the libmapi++ messages example works even if there is no
+PR_CONVERSATION_TOPIC (subject).
+
+------------------------------------------------------------------------
+r1524 | bradh | 2009-09-26 08:57:34 +0200 (Sat, 26 Sep 2009) | 6 lines
+
+Make sure that the string given by what() can be used. 
+
+Patch by Erik Hovland - thanks very much.
+
+Resolves ticket #179.
+
+------------------------------------------------------------------------
+r1525 | jelmer | 2009-09-26 13:04:34 +0200 (Sat, 26 Sep 2009) | 1 line
+
+Add 'make dist'.
+------------------------------------------------------------------------
+r1526 | occl | 2009-09-27 00:00:45 +0200 (Sun, 27 Sep 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1527 | bradh | 2009-10-06 10:44:21 +0200 (Tue, 06 Oct 2009) | 11 lines
+
+Alternative solution to ticket #179, provided by Alan Alvarez.
+
+This alternative avoids the need for the user to clean up the string returned by what().
+
+Also includes a test case, which I've used to validate that the original (prior to r1524) code 
+is faulty, and that both fixes (From Erik Hovland and from Alan Alvarez) deal with it.
+
+Resolves Ticket #179 (again).
+
+
+
+------------------------------------------------------------------------
+r1528 | occl | 2009-10-07 00:01:03 +0200 (Wed, 07 Oct 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1529 | bradh | 2009-10-08 12:08:27 +0200 (Thu, 08 Oct 2009) | 5 lines
+
+Update buildsystem to avoid using bash-specific (well, not sh-supported) +=
+mechanism.
+
+Should allow FreeBSD to be supported.
+
+------------------------------------------------------------------------
+r1530 | occl | 2009-10-09 00:00:38 +0200 (Fri, 09 Oct 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1531 | clsk | 2009-10-09 11:02:12 +0200 (Fri, 09 Oct 2009) | 1 line
+
+Added libmapi++ wrapper function for CreateProfileStore
+------------------------------------------------------------------------
+r1532 | occl | 2009-10-10 00:00:49 +0200 (Sat, 10 Oct 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1534 | clsk | 2009-10-18 10:38:17 +0200 (Sun, 18 Oct 2009) | 2 lines
+
+Use mapi_profile_get_ldif_path to find ldif path when one is not given
+
+------------------------------------------------------------------------
+r1535 | occl | 2009-10-19 00:01:01 +0200 (Mon, 19 Oct 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1536 | bradh | 2009-10-19 10:06:58 +0200 (Mon, 19 Oct 2009) | 2 lines
+
+spello fixes.
+
+------------------------------------------------------------------------
+r1537 | occl | 2009-10-20 00:00:51 +0200 (Tue, 20 Oct 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1538 | jkerihuel | 2009-10-21 20:44:48 +0200 (Wed, 21 Oct 2009) | 6 lines
+
+Patches provided by raboof:
+- Ticket #213 deprecated include directive removal
+- Ticket #214 missing sanity check
+- Ticket #215 fix some DEBUG macro level for sain ouput
+
+
+------------------------------------------------------------------------
+r1539 | occl | 2009-10-22 00:00:59 +0200 (Thu, 22 Oct 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1540 | bradh | 2009-11-02 10:14:48 +0100 (Mon, 02 Nov 2009) | 7 lines
+
+Fix build problem using Sun Studio compiler.
+
+Reported by Brian Lu (Sun), including a patch (Ticket #219)
+
+I slightly modified the patch, but nothing substantial.
+
+
+------------------------------------------------------------------------
+r1541 | occl | 2009-11-03 00:00:54 +0100 (Tue, 03 Nov 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1542 | bradh | 2009-11-07 06:25:38 +0100 (Sat, 07 Nov 2009) | 7 lines
+
+Remove MAP_FILE flag from mmap(). Looks like this is only required on really
+old unix systems (e.g. NetBSD prior to 1.0), which we probably won't ever support.
+
+Patch by Brian Lu (Sun) - thanks very much.
+
+Partly resolves ticket #220 - still need to handle the first patch.
+
+------------------------------------------------------------------------
+r1543 | bradh | 2009-11-07 07:36:44 +0100 (Sat, 07 Nov 2009) | 8 lines
+
+Additional portability fixes for SunOS.
+
+Based on a patch (ticket #220) by Brian Lu (Sun). Thanks very much.
+
+I modified the patch to try to use autoconf where possible.
+
+Resolves ticket #220.
+
+------------------------------------------------------------------------
+r1544 | occl | 2009-11-08 00:00:40 +0100 (Sun, 08 Nov 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1545 | bradh | 2009-11-09 10:56:23 +0100 (Mon, 09 Nov 2009) | 6 lines
+
+Adding missing include.
+
+Ticket #220.
+
+Patch from Brian Lu (Sun). Thanks very much.
+
+------------------------------------------------------------------------
+r1546 | occl | 2009-11-10 00:00:43 +0100 (Tue, 10 Nov 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1547 | bradh | 2009-11-13 04:53:06 +0100 (Fri, 13 Nov 2009) | 10 lines
+
+Add support for the SunStudio compiler.
+
+I previously special-cased the Intel C compiler, and relied on some ugly ordering requirements to
+ensure it all worked.
+
+This approach is cleaner, allowing options to be build up separately for each compiler, and for
+the C and C++ versions.
+
+Tested on Linux with all three compilers.
+
+------------------------------------------------------------------------
+r1548 | occl | 2009-11-14 00:00:40 +0100 (Sat, 14 Nov 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1549 | bradh | 2009-11-19 07:01:52 +0100 (Thu, 19 Nov 2009) | 18 lines
+
+Add coverage testing support.
+
+./configure now supports --enable-coverage, which builds with the right options
+to support gcov. Also adds a new makefile target ("coverage") that runs the
+required post-processing steps.
+
+Also added a test script that does a range of openchange related (client side)
+operations. This is useful for generating the test load for coverage checks.
+
+So the basic recipe here is
+1. Add the --enable-coverage option at configure time.
+2. Do a clean build
+3. Install it, or otherwise ensure that coverage-enabled libs are used
+4. generate the test load (e.g. run ./script/smoketest.sh)
+5. "make coverage"
+6. Inspect the results in ./covresults
+
+
+------------------------------------------------------------------------
+r1550 | bradh | 2009-11-19 10:14:08 +0100 (Thu, 19 Nov 2009) | 2 lines
+
+Revert inadvertent part from previous commit (r1549)
+
+------------------------------------------------------------------------
+r1551 | bradh | 2009-11-19 20:38:43 +0100 (Thu, 19 Nov 2009) | 4 lines
+
+Improved Sun Studio compiler support.
+
+Patch by Brian Lu (Sun) - thanks again.
+
+------------------------------------------------------------------------
+r1552 | occl | 2009-11-20 00:00:46 +0100 (Fri, 20 Nov 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1553 | bradh | 2009-11-22 08:09:29 +0100 (Sun, 22 Nov 2009) | 4 lines
+
+Introduce a compile time definition that is set for SVN snapshot releases.
+
+The intent is to use this to protect assert() calls that indicate incomplete code.
+
+------------------------------------------------------------------------
+r1554 | bradh | 2009-11-22 08:14:07 +0100 (Sun, 22 Nov 2009) | 13 lines
+
+Minor cleanups for mapidump functions.
+
+- Add support for dumping property tags using PT_SHORT.
+- Modify the tag for PR_whatever_ERROR results to include the _ERROR bit
+- Minor format change for PT_BINARY (training colon)
+- Ensure PT_SYSTIME respects the seperator value (API change)
+- Add a conditional assert() using infrastructure introduced in r1553.
+
+Implement mapitest support for all of libmapi/mapidump.c
+
+Update openchangeclient for the API change.
+
+
+------------------------------------------------------------------------
+r1555 | bradh | 2009-11-22 10:44:00 +0100 (Sun, 22 Nov 2009) | 2 lines
+
+Add test for get_proptag_value().
+
+------------------------------------------------------------------------
+r1556 | occl | 2009-11-23 00:01:02 +0100 (Mon, 23 Nov 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1557 | bradh | 2009-11-23 03:16:06 +0100 (Mon, 23 Nov 2009) | 4 lines
+
+Avoid use-after-free for the number of rows in the SRowSet.
+
+Resolves issue #212, which has the valgrind error.
+
+------------------------------------------------------------------------
+r1558 | occl | 2009-11-24 00:00:55 +0100 (Tue, 24 Nov 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1559 | bradh | 2009-11-25 11:06:31 +0100 (Wed, 25 Nov 2009) | 6 lines
+
+Add additional mapidump functions for notifications
+
+This is a patch from Johnny Jacob (Novell), with unit tests and some extra checks by me.
+
+Maintains good test coverage for this file.
+
+------------------------------------------------------------------------
+r1560 | bradh | 2009-11-25 11:45:03 +0100 (Wed, 25 Nov 2009) | 4 lines
+
+Ensure API documentation gets generated for utilities functions.
+
+Some undocumented stuff in here to look at later.
+
+------------------------------------------------------------------------
+r1561 | occl | 2009-11-26 00:00:49 +0100 (Thu, 26 Nov 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1562 | bradh | 2009-11-26 06:34:21 +0100 (Thu, 26 Nov 2009) | 2 lines
+
+Fix attribution, per IRC discussion.
+
+------------------------------------------------------------------------
+r1563 | occl | 2009-11-27 00:01:16 +0100 (Fri, 27 Nov 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1564 | bradh | 2009-11-27 04:00:47 +0100 (Fri, 27 Nov 2009) | 4 lines
+
+Ensure we get output if sqlite3 isn't found at configure time.
+
+Now outputs "no" instead of a blank.
+
+------------------------------------------------------------------------
+r1565 | occl | 2009-11-29 00:00:55 +0100 (Sun, 29 Nov 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1566 | jkerihuel | 2009-12-02 16:08:25 +0100 (Wed, 02 Dec 2009) | 6 lines
+
+- Update openchange code to work with samba4-alpha9 release
+- Apply minor fix to ldb_wrap_connect (number of parameters)
+- Update mapiproxy code to handle new Samba4 assoc_group implementation properly
+- Update samba4 version script to match alpha9 and related git commit
+
+
+------------------------------------------------------------------------
+r1567 | jkerihuel | 2009-12-02 17:52:20 +0100 (Wed, 02 Dec 2009) | 4 lines
+
+- Update openchange libraries to 0.9: close trac ticket #165
+- Propagate pkgconfig solution in trac ticket #94 to other libs
+
+
+------------------------------------------------------------------------
+r1568 | jkerihuel | 2009-12-02 18:07:35 +0100 (Wed, 02 Dec 2009) | 2 lines
+
+Fix a cast warning at compilation time for libmapi++
+
+------------------------------------------------------------------------
+r1569 | occl | 2009-12-03 00:00:47 +0100 (Thu, 03 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1570 | jkerihuel | 2009-12-08 19:18:11 +0100 (Tue, 08 Dec 2009) | 6 lines
+
+- Fix OpenChange server provisioning (exchange classes and attribute only)
+- Remove deprecated provisioning steps
+- OpenChange user provisioning is still broken at this point, but will be
+fixed in further revisions.
+
+
+------------------------------------------------------------------------
+r1571 | occl | 2009-12-09 00:00:50 +0100 (Wed, 09 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1572 | jkerihuel | 2009-12-09 13:40:02 +0100 (Wed, 09 Dec 2009) | 2 lines
+
+Forgot to commit this LDIF modifications for openchange provisioning
+
+------------------------------------------------------------------------
+r1573 | jkerihuel | 2009-12-09 14:31:56 +0100 (Wed, 09 Dec 2009) | 3 lines
+
+Fix openchange user provisioning scripts
+
+
+------------------------------------------------------------------------
+r1574 | occl | 2009-12-10 00:00:41 +0100 (Thu, 10 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1575 | jkerihuel | 2009-12-10 17:24:34 +0100 (Thu, 10 Dec 2009) | 12 lines
+
+Fix OpenChange server code and access to Samba4 databases.
+Starting with samba4-alpha9, there is no more configuration.ldb or users.ldb.
+All information can be accessed through a single access to SamDB and configuration records
+accessed through ldb_get_config_basedn.
+
+The following implementation has been tested and is working with:
+- mapiprofile profile creation
+- openchangeclient --mailbox
+- Outlook 2003 account creation
+- Outlook 2003 mailbox opening
+
+
+------------------------------------------------------------------------
+r1576 | bradh | 2009-12-11 04:30:14 +0100 (Fri, 11 Dec 2009) | 7 lines
+
+Roll to the latest Samba4 version.
+
+This should have no noticeable difference over the
+Samba4 alpha9 release, but its nice to use the latest
+version, and it might make a difference on the server
+side.
+
+------------------------------------------------------------------------
+r1577 | bradh | 2009-12-11 08:01:33 +0100 (Fri, 11 Dec 2009) | 2 lines
+
+Update docs to match those in mapiproxy doxygen docs.
+
+------------------------------------------------------------------------
+r1578 | jkerihuel | 2009-12-11 15:39:42 +0100 (Fri, 11 Dec 2009) | 5 lines
+
+Fix samdb_connect warning.
+Add function prototype to nsp,emsmdb header files.
+Change samdb_ctx from void * to ldb_context *
+
+
+------------------------------------------------------------------------
+r1579 | jkerihuel | 2009-12-11 16:49:49 +0100 (Fri, 11 Dec 2009) | 12 lines
+
+- Replace emsabp_get_server_GUID with samdb_ntds_objectGUID Samba4
+  function.
+- Change the way we initially fetched server GUID
+
+Credits to Kamen Mazdrashki <kamen.mazdrashki@postpath.com> for
+initial patch and associated research:
+
+It turns out MS implementation for NSPI reads the guid from: "CN=NTDS
+Settings,CN=<NETBIOS_NAME>,CN=Servers,CN=Default-First-Site-Name,CN=Sites,<CONFIG_DN>" entry.
+
+
+
+------------------------------------------------------------------------
+r1580 | jkerihuel | 2009-12-11 17:08:18 +0100 (Fri, 11 Dec 2009) | 6 lines
+
+Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+
+emsabp_set_PermanentEntryID() implements MS specification more
+closely.  For reference: [MS-NSPI] and [MS-OXOABK]
+
+
+------------------------------------------------------------------------
+r1581 | jkerihuel | 2009-12-11 17:23:25 +0100 (Fri, 11 Dec 2009) | 10 lines
+
+Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+
+- Extend NspiDNToMId() to search in Configuration and Domain
+  partitions.
+
+- NspiDNToMId() has been extended to cache returned data properly,
+  i.e. DNs from Configuration partition are cached in ttb_ctx db, DNs
+  from Domain partition are cached in in-memory db ttdb_ctx.
+
+
+------------------------------------------------------------------------
+r1582 | jkerihuel | 2009-12-11 17:36:32 +0100 (Fri, 11 Dec 2009) | 5 lines
+
+Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>
+
+Add PR_ADDRTYPE_UNICODE and PR_EMS_AB_PROXY_ADDRESSES_UNICODE getters.
+
+
+------------------------------------------------------------------------
+r1583 | jkerihuel | 2009-12-11 17:57:14 +0100 (Fri, 11 Dec 2009) | 5 lines
+
+Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+
+Implement PR_SEARCH_KEY attribute getter
+
+
+------------------------------------------------------------------------
+r1584 | jkerihuel | 2009-12-11 23:24:49 +0100 (Fri, 11 Dec 2009) | 9 lines
+
+Path from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+
+Propagate dwFlags for incoming call to get EntryIDs correctly.
+
+Actually we need to propagate dwFlags so that emsabp_query()
+function to be able to determine whether EphemeralEntryID
+or PermanentEntryID is requested to be built.
+
+
+------------------------------------------------------------------------
+r1585 | occl | 2009-12-12 00:01:01 +0100 (Sat, 12 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1586 | jkerihuel | 2009-12-12 14:03:06 +0100 (Sat, 12 Dec 2009) | 11 lines
+
+Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+
+NspiGetProps() reimplemented to match [MS-NSPI] specification more
+closely.
+
+As a side-effect, emsabp_fetch_attrs() was altered to return
+MAPI_E_INVALID_BOOKMARK in case requested MId is not found.  This way
+the function returns more meaningful error codes - if requested MId is
+not found this surely means InvalidBookmark rather than CorruptStore
+
+
+------------------------------------------------------------------------
+r1587 | jkerihuel | 2009-12-12 15:43:54 +0100 (Sat, 12 Dec 2009) | 11 lines
+
+Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+
+- Add server side implementation for NspiResolveNamesW
+- Refactor and split emsabp_verify_user in two functions
+
+A new function emsabp_get_account_info() implemented to fetch info
+about given user name.  emsabp_verify_user() uses the above function
+check if authenticated account_name is valid mail account and if so,
+account_name is cached in emsabp context for future use
+
+
+------------------------------------------------------------------------
+r1588 | jkerihuel | 2009-12-12 16:32:40 +0100 (Sat, 12 Dec 2009) | 14 lines
+
+Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+
+Implement NspiQueryRows() address list enumeration
+
+We can now run openchangeclient --userlist on OpenChange NSPI server
+and Outlook 2003 is able to query GAL.
+
+Note: the initial patch was proposing:
+"(&%s(showInAddressBook=*))", purportedSearch
+
+I replaced it with "%s", purportedSearch only since we don't have yet
+any showInAddressBook attribute in AD.
+
+
+------------------------------------------------------------------------
+r1589 | jkerihuel | 2009-12-12 16:42:17 +0100 (Sat, 12 Dec 2009) | 8 lines
+
+Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+
+bugfix: Bugs in abp_tdb layer fixed.
+
+emsabp_tdb_traverse_MId() returns 'false' (i.e. not found) in most of
+the cases.
+
+
+------------------------------------------------------------------------
+r1590 | jkerihuel | 2009-12-12 16:53:37 +0100 (Sat, 12 Dec 2009) | 5 lines
+
+Patch from Kamen Mazdrashki <kamen.mazdrashki@postpath.com>:
+
+Fix MAPI Warning error codes
+
+
+------------------------------------------------------------------------
+r1591 | jkerihuel | 2009-12-12 17:14:53 +0100 (Sat, 12 Dec 2009) | 7 lines
+
+Patch from Erik Hovland <erik@hovland.org>:
+
+NotificationData 'could' be null. Check it before handing it to
+notification-callback(). This is important because eventually
+NotificationData will be dereferenced in the code path.
+
+
+------------------------------------------------------------------------
+r1592 | jkerihuel | 2009-12-12 17:18:04 +0100 (Sat, 12 Dec 2009) | 8 lines
+
+Patch from Erik Hovland <erik@hovland.org>:
+
+fid might be null. Check it before dereferencing in the
+ocpf_folder_lookup() call. Similar behavior fixed in openchangeclient
+folder_lookup() function.
+
+
+
+------------------------------------------------------------------------
+r1593 | jkerihuel | 2009-12-12 17:22:16 +0100 (Sat, 12 Dec 2009) | 8 lines
+
+Temporary bug fix in emsabp.c - If restrictions are NULL in
+emsabp_search, return MAPI_E_INVALID_OBJECT. This prevents from using
+invalid res pointer leading in segmentation fault.
+
+Initial fix proposed by Erik Hovland <erik@hovland.org>
+
+
+
+------------------------------------------------------------------------
+r1594 | jkerihuel | 2009-12-12 21:02:54 +0100 (Sat, 12 Dec 2009) | 8 lines
+
+Patch from Bryan Lu <brian.lu@sun.com>:
+
+Create symbol link only on Solaris
+
+This closes ticket #221 and makes it possible to compile openchange
+on Solaris.
+
+
+------------------------------------------------------------------------
+r1595 | occl | 2009-12-13 00:00:34 +0100 (Sun, 13 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1596 | bradh | 2009-12-13 02:40:38 +0100 (Sun, 13 Dec 2009) | 6 lines
+
+Add support for manually creating the library symlinks for FreeBSD
+
+This is a somewhat speculative commit. 
+
+Also fixes a couple of cosmetic whitespace issues.
+
+------------------------------------------------------------------------
+r1597 | bradh | 2009-12-13 04:53:10 +0100 (Sun, 13 Dec 2009) | 2 lines
+
+Trivial fix (newline) for warning on FreeBSD compiler.
+
+------------------------------------------------------------------------
+r1598 | jkerihuel | 2009-12-13 16:00:26 +0100 (Sun, 13 Dec 2009) | 5 lines
+
+This doesn't really fix ticket #149, but this should
+at least prevent from triggering segmentation fault when
+PR_EMAIL_ADDRESS_UNICODE doesn't have any cn=Recipients,cn= substring 
+
+
+------------------------------------------------------------------------
+r1599 | occl | 2009-12-14 00:00:40 +0100 (Mon, 14 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1600 | bradh | 2009-12-14 10:14:41 +0100 (Mon, 14 Dec 2009) | 4 lines
+
+Add documentation for set_SPropTagArray().
+
+Thanks to Brian Lu (Sun) for reporting.
+
+------------------------------------------------------------------------
+r1601 | occl | 2009-12-15 00:00:42 +0100 (Tue, 15 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1602 | jkerihuel | 2009-12-15 18:35:27 +0100 (Tue, 15 Dec 2009) | 8 lines
+
+- Make OpenChange natively working with Exchange 2010
+- Factorize binding string construction code within a single function
+- the seal flag is mandatory to connect to Exchange 2010
+- add seal boolean value to MAPI profile creation and mapi_profile
+  structure
+- add --encrypt option to mapiprofile to set the seal value
+
+
+------------------------------------------------------------------------
+r1603 | jkerihuel | 2009-12-15 19:47:29 +0100 (Tue, 15 Dec 2009) | 4 lines
+
+Automatically switch from connect to seal on the emsmdb pipe if
+ecNotEncrypted is returned by EcDoConnect.
+
+
+------------------------------------------------------------------------
+r1604 | occl | 2009-12-16 00:00:56 +0100 (Wed, 16 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1605 | bradh | 2009-12-16 01:27:24 +0100 (Wed, 16 Dec 2009) | 2 lines
+
+Fix a couple of typos that trash CFLAGS during build.
+
+------------------------------------------------------------------------
+r1606 | jkerihuel | 2009-12-16 01:29:20 +0100 (Wed, 16 Dec 2009) | 3 lines
+
+Fix compilation warnings
+
+
+------------------------------------------------------------------------
+r1607 | jkerihuel | 2009-12-16 02:25:16 +0100 (Wed, 16 Dec 2009) | 3 lines
+
+Fix segfaults in mapitest launched with exchange2010
+
+
+------------------------------------------------------------------------
+r1608 | bradh | 2009-12-16 08:17:51 +0100 (Wed, 16 Dec 2009) | 2 lines
+
+Add documentation for new mapiprofile --encrypt option, introduced in r1602.
+
+------------------------------------------------------------------------
+r1609 | bradh | 2009-12-16 22:29:02 +0100 (Wed, 16 Dec 2009) | 6 lines
+
+Add missing -L directory specifier.
+
+Looks like this was tolerated by gnu ld, but not by opensolaris ld.
+
+Patch by Brian Lu (Sun). Thanks again.
+
+------------------------------------------------------------------------
+r1610 | occl | 2009-12-17 00:01:18 +0100 (Thu, 17 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1611 | jkerihuel | 2009-12-17 08:07:31 +0100 (Thu, 17 Dec 2009) | 3 lines
+
+Fix 'unused variable' warning on FreeBSD for exchange2mbox
+
+
+------------------------------------------------------------------------
+r1612 | bradh | 2009-12-17 08:50:10 +0100 (Thu, 17 Dec 2009) | 2 lines
+
+Warning fix.
+
+------------------------------------------------------------------------
+r1613 | bradh | 2009-12-17 10:47:12 +0100 (Thu, 17 Dec 2009) | 2 lines
+
+Add documentation for the --freebusy option.
+
+------------------------------------------------------------------------
+r1614 | occl | 2009-12-18 00:01:01 +0100 (Fri, 18 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1615 | bradh | 2009-12-18 12:22:32 +0100 (Fri, 18 Dec 2009) | 4 lines
+
+Minor updates to provisioning instructions.
+
+Thanks to Girish Venkatachalam for some suggestions.
+
+------------------------------------------------------------------------
+r1616 | occl | 2009-12-19 00:01:08 +0100 (Sat, 19 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1617 | bradh | 2009-12-19 01:14:30 +0100 (Sat, 19 Dec 2009) | 7 lines
+
+Merge in Ryan Lepinski's Google Summer of Code work on exchange2ical.
+
+See the gsoc_exchange2ical branch history for commits.
+
+I also made a change to address ticket #216, and
+fixed a couple of typos.
+
+------------------------------------------------------------------------
+r1618 | bradh | 2009-12-19 01:56:21 +0100 (Sat, 19 Dec 2009) | 3 lines
+
+Add some missing newlines to reduce compilation noise.
+
+
+------------------------------------------------------------------------
+r1619 | jkerihuel | 2009-12-19 14:58:47 +0100 (Sat, 19 Dec 2009) | 2 lines
+
+Minor indentation fix
+
+------------------------------------------------------------------------
+r1620 | jkerihuel | 2009-12-19 17:13:46 +0100 (Sat, 19 Dec 2009) | 9 lines
+
+- Add a macro to mparse.pl to free both mapi_response 
+  and mem_ctx within OpenChange calls implementation.
+  For the moment it is only implemented in OpenUserMailbox call.
+
+- Fix a memory leak in OpenUserMailbox: When the call failed 
+  (ecUnknownUser or ecUseEnryption) mapi_response was not free'd
+  properly.
+
+
+------------------------------------------------------------------------
+r1621 | occl | 2009-12-20 00:00:34 +0100 (Sun, 20 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1622 | bradh | 2009-12-20 09:14:02 +0100 (Sun, 20 Dec 2009) | 2 lines
+
+Minor API documentation fixes.
+
+------------------------------------------------------------------------
+r1623 | jkerihuel | 2009-12-20 12:13:02 +0100 (Sun, 20 Dec 2009) | 30 lines
+
+This patch fixes most of the leaks coming from pull_emsmdb_property() function.
+pull_emsmdb_property is using pointers and allocate memory to prevent from
+returning a local variable address. Such pointers include PT_I2, PT_I8, PT_LONG, 
+PT_ERROR or PT_BOOLEAN. Pointer's values are assigned in set_SPropValue but were
+never released/free'd. This patch implements free_emsmdb_property to fix this problem.
+
+valgrind before patch (mapitest):
+==26674== LEAK SUMMARY:
+==26674==    definitely lost: 0 bytes in 0 blocks
+==26674==    indirectly lost: 0 bytes in 0 blocks
+==26674==      possibly lost: 3,264,485 bytes in 23,387 blocks
+==26674==    still reachable: 345 bytes in 2 blocks
+==26674==         suppressed: 0 bytes in 0 blocks
+==26674==
+==26674== For counts of detected and suppressed errors, rerun with: -v
+==26674== ERROR SUMMARY: 2370 errors from 2370 contexts (suppressed: 45 from 10)
+
+valgrind after patch (mapitest):
+==27270== LEAK SUMMARY:
+==27270==    definitely lost: 0 bytes in 0 blocks
+==27270==    indirectly lost: 0 bytes in 0 blocks
+==27270==      possibly lost: 3,127,733 bytes in 23,293 blocks
+==27270==    still reachable: 345 bytes in 2 blocks
+==27270==         suppressed: 0 bytes in 0 blocks
+==27270==
+==27270== For counts of detected and suppressed errors, rerun with: -v
+==27270== ERROR SUMMARY: 2348 errors from 2348 contexts (suppressed: 45 from 10)
+
+
+
+------------------------------------------------------------------------
+r1624 | jkerihuel | 2009-12-20 13:33:04 +0100 (Sun, 20 Dec 2009) | 36 lines
+
+Sanitize RfrGetNewDSA function and memory usage.
+
+The function was returning either a const char * passed in parameter
+or the string returned by RfrGetNewDSA call. Furthermore we were using
+the session pointer for the memory context. Finally the function description
+was not matching its behavior.
+
+What this patch does:
+- use a named memory context for RfrGetNewDSA call
+- return an allocated string on success otherwise NULL
+- release RFR memory context properly
+
+valgrind before patch (mapitest):
+==28876== LEAK SUMMARY:
+==28876==    definitely lost: 0 bytes in 0 blocks
+==28876==    indirectly lost: 0 bytes in 0 blocks
+==28876==      possibly lost: 3,193,529 bytes in 23,296 blocks
+==28876==    still reachable: 345 bytes in 2 blocks
+==28876==         suppressed: 0 bytes in 0 blocks
+==28876==
+==28876== For counts of detected and suppressed errors, rerun with: -v
+==28876== ERROR SUMMARY: 2351 errors from 2351 contexts (suppressed: 45 from 10)
+
+valgrind after patch (mapitest):
+==29083== LEAK SUMMARY:
+==29083==    definitely lost: 0 bytes in 0 blocks
+==29083==    indirectly lost: 0 bytes in 0 blocks
+==29083==      possibly lost: 3,190,285 bytes in 23,256 blocks
+==29083==    still reachable: 345 bytes in 2 blocks
+==29083==         suppressed: 0 bytes in 0 blocks
+==29083==
+==29083== For counts of detected and suppressed errors, rerun with: -v
+==29083== ERROR SUMMARY: 2338 errors from 2338 contexts (suppressed: 45 from 10)
+
+
+
+------------------------------------------------------------------------
+r1625 | jkerihuel | 2009-12-20 14:57:26 +0100 (Sun, 20 Dec 2009) | 3 lines
+
+Missing mapi_object_release leading in small leaks.
+
+
+------------------------------------------------------------------------
+r1626 | jkerihuel | 2009-12-20 15:14:02 +0100 (Sun, 20 Dec 2009) | 10 lines
+
+Clarify the developer's task when using GetPropList.
+
+We were allocating the SPropTag proptag array with the session context
+pointer, which was not released with a MAPIFreeBuffer(SPropTagArray).
+
+We are now using SPropTagArray pointer as parent context and clarify
+that the developer must pass an allocated SPropTagArray pointer to the
+function.
+
+
+------------------------------------------------------------------------
+r1627 | jkerihuel | 2009-12-20 15:40:13 +0100 (Sun, 20 Dec 2009) | 4 lines
+
+Fix store version info assignment - Exchange version now works again
+in mapitest.
+
+
+------------------------------------------------------------------------
+r1628 | occl | 2009-12-21 00:01:15 +0100 (Mon, 21 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1629 | jkerihuel | 2009-12-21 12:27:45 +0100 (Mon, 21 Dec 2009) | 16 lines
+
+- Fix important memory leaks within the OpenChange stack. Most of the
+  leaks came from the pipe memory context used in emsmdb_transaction
+  which was only released on MAPIUninitialize and sometimes leaded in
+  lost blocks. This fix makes extensive usage of the temporary memory
+  context used in top MAPI calls implementation. This context is
+  passed in argument to emsmdb_transaction and used for dcerpc_*
+  operations.
+
+  When we return from any libmapi call implementation, this context is
+  destroyed. This guarantee no extra memory within NDR layer is kept.
+
+  The only requirement for this patch to work is to make sure the data
+  we return from MAPI calls is either reparent to another memory
+  context or copied properly.
+
+
+------------------------------------------------------------------------
+r1630 | jkerihuel | 2009-12-21 12:32:55 +0100 (Mon, 21 Dec 2009) | 3 lines
+
+Return (const void *) instead of (void *) where missing
+
+
+------------------------------------------------------------------------
+r1631 | jkerihuel | 2009-12-21 12:35:02 +0100 (Mon, 21 Dec 2009) | 3 lines
+
+Minor changes to match our coding convention more closely
+
+
+------------------------------------------------------------------------
+r1632 | jkerihuel | 2009-12-21 12:38:21 +0100 (Mon, 21 Dec 2009) | 2 lines
+
+Minor cosmetic change
+
+------------------------------------------------------------------------
+r1633 | jkerihuel | 2009-12-21 13:13:28 +0100 (Mon, 21 Dec 2009) | 12 lines
+
+- Fix important memory leaks in OpenChange NSPI stack. The memory
+  context modifications applied to the EMSMDB stack have been
+  propagated to the NSPI one. NSPI dcerpc_* functions now rely on a
+  temporary context passed in parameter to the nspi_* functions from
+  libmapi/nspi.c.
+
+- Changes propagated to torture, mapitest, IProfAdmin interface and
+  ResolveNames function to match the internal API.
+
+- Add missing MAPIFreeBuffer call in mapitest modules
+
+
+------------------------------------------------------------------------
+r1634 | jkerihuel | 2009-12-21 13:31:52 +0100 (Mon, 21 Dec 2009) | 4 lines
+
+Open Profile Store using global_mapi_ctx for the memory context. This
+fix removes 20 context errors when running valgrind on mapitest.
+
+
+------------------------------------------------------------------------
+r1635 | jkerihuel | 2009-12-21 13:53:05 +0100 (Mon, 21 Dec 2009) | 6 lines
+
+Patch from Johnny Jacob <johnnyjacob@gmail.com>:
+
+Changed MonitorNotification to be non-blocking.
+Also checks whether to process notifications using a callback.
+
+
+------------------------------------------------------------------------
+r1636 | occl | 2009-12-22 00:00:32 +0100 (Tue, 22 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1637 | bradh | 2009-12-22 00:22:30 +0100 (Tue, 22 Dec 2009) | 3 lines
+
+Change the format of the server version, so it matches the Microsoft
+way of doing versions.
+
+------------------------------------------------------------------------
+r1638 | bradh | 2009-12-22 00:23:23 +0100 (Tue, 22 Dec 2009) | 3 lines
+
+Add support for skipping tests that don't apply to some
+server versions.
+
+------------------------------------------------------------------------
+r1639 | bradh | 2009-12-22 05:39:23 +0100 (Tue, 22 Dec 2009) | 2 lines
+
+Remove this file - converted it to trac tasks.
+
+------------------------------------------------------------------------
+r1640 | bradh | 2009-12-22 07:07:58 +0100 (Tue, 22 Dec 2009) | 2 lines
+
+temporary fix for building on FreeBSD 7.2.
+
+------------------------------------------------------------------------
+r1641 | bradh | 2009-12-22 08:33:22 +0100 (Tue, 22 Dec 2009) | 2 lines
+
+Minor documentation update to reflect GSoC exchange2ical merge.
+
+------------------------------------------------------------------------
+r1642 | occl | 2009-12-23 00:00:53 +0100 (Wed, 23 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1643 | bradh | 2009-12-23 07:03:39 +0100 (Wed, 23 Dec 2009) | 7 lines
+
+Handle all day events for UTC+  timezones.
+
+This resolves ticket #217. Thanks to Arnout Engelen for both reporting
+the problem, and providing a patch. In the end I heavily modified the 
+patch, and implemented a much simpler version while we sort out the
+timezone identifier problems.
+
+------------------------------------------------------------------------
+r1644 | bradh | 2009-12-23 23:45:21 +0100 (Wed, 23 Dec 2009) | 6 lines
+
+Add protection against null CN values.
+
+Resolves ticket #232.
+
+Thanks to Arnout Engelen for the bug report and the patch to fix the problem.
+
+------------------------------------------------------------------------
+r1645 | bradh | 2009-12-23 23:54:27 +0100 (Wed, 23 Dec 2009) | 3 lines
+
+Fix property tag array count, so we get the language in Summary
+lines in the ical output.
+
+------------------------------------------------------------------------
+r1646 | occl | 2009-12-24 00:01:12 +0100 (Thu, 24 Dec 2009) | 1 line
+
+Daily ChangeLog Update
+------------------------------------------------------------------------
+r1647 | bradh | 2009-12-24 00:42:56 +0100 (Thu, 24 Dec 2009) | 2 lines
+
+Fix some exchange2ical memory leaks / "still reachable" memory.
+
+------------------------------------------------------------------------
+r1648 | bradh | 2009-12-24 04:30:48 +0100 (Thu, 24 Dec 2009) | 2 lines
+
+Minor API documentation fix.
+
+------------------------------------------------------------------------
+r1649 | jkerihuel | 2009-12-24 14:11:15 +0100 (Thu, 24 Dec 2009) | 9 lines
+
+New ModifyRecipients IDL and implementation.
+
+This patch improves the logic within the RecipientFlags bitmask
+calculation function and make use of different MAPI properties for
+ModifyRecipients. 
+
+Fix trac ticket #125 and https://bugzilla.gnome.org/show_bug.cgi?id=568763
+
+
+------------------------------------------------------------------------
+r1650 | jkerihuel | 2009-12-24 14:16:45 +0100 (Thu, 24 Dec 2009) | 3 lines
+
+Fix format string warnings.
+
+
+------------------------------------------------------------------------
+r1651 | jkerihuel | 2009-12-24 14:21:29 +0100 (Thu, 24 Dec 2009) | 4 lines
+
+Rename libmapi into openchange in our release script.
+Makes more sense given the scope of our releases.
+
+
+------------------------------------------------------------------------
