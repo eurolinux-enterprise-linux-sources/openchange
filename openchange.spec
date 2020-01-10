@@ -13,7 +13,7 @@
 
 Name: openchange
 Version: 1.0
-Release: 6%{?dist}
+Release: 7%{?dist}
 Group: Applications/System
 Summary: Provides access to Microsoft Exchange servers using native protocols
 License: GPLv3+ and Public Domain
@@ -78,6 +78,9 @@ Patch6: openchange-1.0-writestream.patch
 # RH-bug #665967
 Patch7: openchange-1.0-freebusy.patch
 
+# Fix connection arguments for newer samba
+Patch8: openchange-1.0-fix-connection-args.patch
+
 %description
 OpenChange provides libraries to access Microsoft Exchange servers
 using native protocols.
@@ -141,6 +144,7 @@ This package provides the server elements for OpenChange.
 %patch5 -p1 -b .symbol-clash
 %patch6 -p1 -b .writestream
 %patch7 -p1 -b .freebusy
+%patch8 -p1 -b .fix-connection-args
 
 %build
 ./autogen.sh
@@ -276,6 +280,9 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %changelog
+* Thu Apr 07 2016 Milan Crha <mcrha@redhat.com> - 1.0-7
+- Add a patch to fix connection string (Related: #1322688)
+
 * Wed Oct 16 2013 Milan Crha <mcrha@redhat.com> - 1.0-6
 - Add a patch for RH bug #665967 (Free/busy fails to be fetched)
 
