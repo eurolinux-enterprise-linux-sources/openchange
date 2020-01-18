@@ -1,6 +1,6 @@
 %{!?python_sitearch: %global python_sitearch %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib(1)")}
 
-%global samba_version 4.0.1
+%global samba_version 4.2.2
 %global talloc_version 2.0.5
 %global nickname QUADRANT
 
@@ -19,7 +19,7 @@
 
 Name: openchange
 Version: 2.0
-Release: 4%{?dist}
+Release: 9%{?dist}
 Group: Applications/System
 Summary: Provides access to Microsoft Exchange servers using native protocols
 License: GPLv3+ and Public Domain
@@ -37,7 +37,7 @@ BuildRequires: doxygen
 BuildRequires: file-devel
 BuildRequires: flex
 BuildRequires: gcc
-BuildRequires: libical-devel
+BuildRequires: libical-devel >= 1.0.1
 BuildRequires: libldb-devel
 BuildRequires: libtalloc-devel >= %{talloc_version}
 BuildRequires: libtdb-devel
@@ -70,6 +70,15 @@ Patch2: openchange-1.0-OC_RULE_ADD-fix.patch
 
 # Avoid multilib issue in libmapi/version.h
 Patch3: openchange-2.0-multilib-issue-libmapi-version-h.patch
+
+# RH bug #1222605
+Patch4: openchange-1.0-symbol-clash.patch
+
+# RH bug #1019901
+Patch5: openchange-1.0-freebusy.patch
+
+# RH bug #1238537
+Patch6: openchange-2.0-samba-4.2.patch
 
 %description
 OpenChange provides libraries to access Microsoft Exchange servers
@@ -134,6 +143,9 @@ This package provides the server elements for OpenChange.
 %patch1 -p1 -b .generate-xml-doc
 %patch2 -p1 -b .OC_RULE_ADD-fix
 %patch3 -p1 -b .multilib-issue-libmapi-version-h
+%patch4 -p1 -b .symbol-clash
+%patch5 -p1 -b .freebusy
+%patch6 -p1 -b .samba-4.2
 
 %build
 ./autogen.sh
@@ -186,7 +198,7 @@ rm -r $RPM_BUILD_ROOT%{_datadir}/setup/*
 %endif
 
 %if !%{build_python_package} && !%{build_server_package}
-rm $RPM_BUILD_ROOT%{_bindir}/check_fasttransfer
+#rm $RPM_BUILD_ROOT%{_bindir}/check_fasttransfer
 %endif
 
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-libmapi
@@ -277,6 +289,21 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %changelog
+* Mon Jul 20 2015 Milan Crha <mcrha@redhat.com> - 2.0-9
+- Rebuild against updated samba
+
+* Wed Jul 08 2015 Milan Crha <mcrha@redhat.com> - 2.0-8
+- Rebuild against updated libical
+
+* Thu Jul 02 2015 Milan Crha <mcrha@redhat.com> - 2.0-7
+- Add patch and rebuild against samba 4.2.2 (RH bug #1238537)
+
+* Tue Jun 16 2015 Milan Crha <mcrha@redhat.com> - 2.0-6
+- Add patch for RH bug #1019901 (Free/busy fetch broken)
+
+* Thu May 28 2015 Milan Crha <mcrha@redhat.com> - 2.0-5
+- Add patch for RH bug #1222605 (Often crash due to load_interfaces() symbol clash)
+
 * Fri Jan 24 2014 Daniel Mach <dmach@redhat.com> - 2.0-4
 - Mass rebuild 2014-01-24
 
