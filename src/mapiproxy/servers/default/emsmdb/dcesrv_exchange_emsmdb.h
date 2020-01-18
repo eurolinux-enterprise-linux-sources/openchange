@@ -24,13 +24,13 @@
 
 #include "libmapi/libmapi.h"
 #include "libmapi/libmapi_private.h"
+#include "libmapi/fxics.h"
 #include "mapiproxy/libmapiproxy/libmapiproxy.h"
 #include "mapiproxy/libmapistore/mapistore.h"
 #include "mapiproxy/libmapistore/mapistore_errors.h"
 #include <ldb.h>
 #include <ldb_errors.h>
 #include <tevent.h>
-#include <util/debug.h>
 #include <time.h>
 #include <inttypes.h>
 
@@ -49,13 +49,15 @@ struct emsmdbp_context {
 	char					*szDisplayName;
 	uint32_t				userLanguage;
 	char					*username;
+	char					*szDNPrefix;
 	struct loadparm_context			*lp_ctx;
-	struct ldb_context			*oc_ctx;
+	struct openchangedb_context		*oc_ctx;
 	struct ldb_context			*samdb_ctx;
 	struct mapistore_context		*mstore_ctx;
 	struct mapi_handles_context		*handles_ctx;
 
 	TALLOC_CTX				*mem_ctx;
+	struct GUID				session_uuid;
 };
 
 struct exchange_emsmdb_session {
@@ -111,7 +113,7 @@ enum emsmdbp_object_type {
 	EMSMDBP_OBJECT_TABLE		= 0x4,
 	EMSMDBP_OBJECT_STREAM		= 0x5,
 	EMSMDBP_OBJECT_ATTACHMENT	= 0x6,
-        EMSMDBP_OBJECT_SUBSCRIPTION     = 0x7,
+	EMSMDBP_OBJECT_SUBSCRIPTION	= 0x7,
 	EMSMDBP_OBJECT_FTCONTEXT	= 0x8, /* Fast Transfer */
 	EMSMDBP_OBJECT_SYNCCONTEXT	= 0x9
 };
@@ -133,7 +135,6 @@ struct emsmdbp_object_folder {
 };
 
 struct emsmdbp_object_message {
-	uint64_t				folderID;
 	uint64_t				messageID;
 	bool					read_write;
 	struct mapistore_freebusy_properties	*fb_properties;
@@ -147,7 +148,8 @@ struct emsmdbp_object_table {
 	enum MAPITAGS				*properties;
 	uint32_t				numerator;
 	uint32_t				denominator;
-        struct mapistore_subscription_list	*subscription_list;
+	uint8_t					flags;
+	bool					subscription;
 };
 
 struct emsmdbp_object_stream {
@@ -169,8 +171,7 @@ struct emsmdbp_object_attachment {
 };
 
 struct emsmdbp_object_subscription {
-	uint32_t				handle;
-        struct mapistore_subscription_list	*subscription_list;
+	uint32_t			handle;
 };
 
 struct emsmdbp_object_synccontext {
@@ -286,18 +287,23 @@ struct emsmdbp_special_folder {
 	const char			*name;
 };
 
+#define PROVISIONING_SPECIAL_FOLDERS_SIZE 6
+#define PROVISIONING_FOLDERS_SIZE EMSMDBP_DELETED_ITEMS
 __BEGIN_DECLS
 
 NTSTATUS	samba_init_module(void);
-struct ldb_context *samdb_connect(TALLOC_CTX *, struct tevent_context *, struct loadparm_context *, struct auth_session_info *, int);
+struct ldb_context *samdb_connect_url(TALLOC_CTX *, struct tevent_context *, struct loadparm_context *, struct auth_session_info *, unsigned int, const char *);
 
 /* definitions from emsmdbp.c */
 struct emsmdbp_context	*emsmdbp_init(struct loadparm_context *, const char *, void *);
-void			*emsmdbp_openchange_ldb_init(struct loadparm_context *);
+bool			emsmdbp_set_session_uuid(struct emsmdbp_context *, struct GUID);
+void			*emsmdbp_openchangedb_init(struct loadparm_context *);
 bool			emsmdbp_destructor(void *);
 bool			emsmdbp_verify_user(struct dcesrv_call_state *, struct emsmdbp_context *);
 bool			emsmdbp_verify_userdn(struct dcesrv_call_state *, struct emsmdbp_context *, const char *, struct ldb_message **);
 enum MAPISTATUS		emsmdbp_resolve_recipient(TALLOC_CTX *, struct emsmdbp_context *, char *, struct mapi_SPropTagArray *, struct RecipientRow *);
+enum MAPISTATUS		emsmdbp_fetch_organizational_units(TALLOC_CTX *, struct emsmdbp_context *, char **, char **);
+enum MAPISTATUS		emsmdbp_get_org_dn(struct emsmdbp_context *, struct ldb_dn **);
 
 const struct GUID *const	MagicGUIDp;
 int				emsmdbp_guid_to_replid(struct emsmdbp_context *, const char *username, const struct GUID *, uint16_t *);
@@ -314,27 +320,34 @@ int		      emsmdbp_get_uri_from_fid(TALLOC_CTX *, struct emsmdbp_context *, uint
 int		      emsmdbp_get_fid_from_uri(struct emsmdbp_context *, const char *, uint64_t *);
 uint32_t	      emsmdbp_get_contextID(struct emsmdbp_object *);
 
-/* definitions from emsmdbp_privisioning.c */
+/* definitions from emsmdbp_provisioning.c */
 enum MAPISTATUS       emsmdbp_mailbox_provision(struct emsmdbp_context *, const char *);
 enum MAPISTATUS       emsmdbp_mailbox_provision_public_freebusy(struct emsmdbp_context *, const char *);
 
+/* definitions from emsmdbp_provisioning_names.c */
+const char **emsmdbp_get_folders_names(TALLOC_CTX *, struct emsmdbp_context *);
+const char **emsmdbp_get_special_folders(TALLOC_CTX *, struct emsmdbp_context *);
+
 /* With emsmdbp_object_create_folder and emsmdbp_object_open_folder, the parent object IS the direct parent */
 enum mapistore_error  emsmdbp_object_get_fid_by_name(struct emsmdbp_context *, struct emsmdbp_object *, const char *, uint64_t *);
-enum MAPISTATUS       emsmdbp_object_create_folder(struct emsmdbp_context *, struct emsmdbp_object *, TALLOC_CTX *, uint64_t, struct SRow *, struct emsmdbp_object **);
+enum MAPISTATUS       emsmdbp_object_create_folder(struct emsmdbp_context *, struct emsmdbp_object *, TALLOC_CTX *, uint64_t, struct SRow *, bool, struct emsmdbp_object **);
 enum mapistore_error  emsmdbp_object_open_folder(TALLOC_CTX *, struct emsmdbp_context *, struct emsmdbp_object *, uint64_t, struct emsmdbp_object **);
-enum mapistore_error  emsmdbp_object_open_folder_by_fid(TALLOC_CTX *, struct emsmdbp_context *, struct emsmdbp_object *, uint64_t, struct emsmdbp_object **);
+enum MAPISTATUS       emsmdbp_object_open_folder_by_fid(TALLOC_CTX *, struct emsmdbp_context *, struct emsmdbp_object *, uint64_t, struct emsmdbp_object **);
 
 struct emsmdbp_object *emsmdbp_object_init(TALLOC_CTX *, struct emsmdbp_context *, struct emsmdbp_object *parent_object);
 int emsmdbp_object_copy_properties(struct emsmdbp_context *, struct emsmdbp_object *, struct emsmdbp_object *, struct SPropTagArray *, bool);
 struct emsmdbp_object *emsmdbp_object_mailbox_init(TALLOC_CTX *, struct emsmdbp_context *, const char *, bool);
 struct emsmdbp_object *emsmdbp_object_folder_init(TALLOC_CTX *, struct emsmdbp_context *, uint64_t, struct emsmdbp_object *);
-int emsmdbp_folder_get_folder_count(struct emsmdbp_context *, struct emsmdbp_object *, uint32_t *);
+enum MAPISTATUS      emsmdbp_folder_get_folder_count(struct emsmdbp_context *, struct emsmdbp_object *, uint32_t *);
+enum MAPISTATUS emsmdbp_folder_get_recursive_folder_count(struct emsmdbp_context *, struct emsmdbp_object *, uint32_t *);
+enum mapistore_error emsmdbp_folder_delete_indexing_records(struct mapistore_context *, uint32_t, char *, uint64_t, uint64_t *, uint32_t, uint8_t);
 enum mapistore_error emsmdbp_folder_delete(struct emsmdbp_context *, struct emsmdbp_object *, uint64_t, uint8_t);
 enum mapistore_error emsmdbp_folder_move_folder(struct emsmdbp_context *, struct emsmdbp_object *, struct emsmdbp_object *, TALLOC_CTX *, const char *);
 struct emsmdbp_object *emsmdbp_folder_open_table(TALLOC_CTX *, struct emsmdbp_object *, uint32_t, uint32_t);
 struct emsmdbp_object *emsmdbp_object_table_init(TALLOC_CTX *, struct emsmdbp_context *, struct emsmdbp_object *);
 int emsmdbp_object_table_get_available_properties(TALLOC_CTX *, struct emsmdbp_context *, struct emsmdbp_object *, struct SPropTagArray **);
 void **emsmdbp_object_table_get_row_props(TALLOC_CTX *, struct emsmdbp_context *, struct emsmdbp_object *, uint32_t, enum mapistore_query_type, enum MAPISTATUS **);
+enum MAPISTATUS emsmdbp_object_table_get_recursive_row_props(TALLOC_CTX *, struct emsmdbp_context *, struct emsmdbp_object *, DATA_BLOB *, struct SPropTagArray *, uint64_t, int64_t *, uint32_t *);
 struct emsmdbp_object *emsmdbp_object_message_init(TALLOC_CTX *, struct emsmdbp_context *, uint64_t, struct emsmdbp_object *);
 enum mapistore_error emsmdbp_object_message_open(TALLOC_CTX *, struct emsmdbp_context *, struct emsmdbp_object *, uint64_t, uint64_t, bool, struct emsmdbp_object **, struct mapistore_message **);
 struct emsmdbp_object *emsmdbp_object_message_open_attachment_table(TALLOC_CTX *, struct emsmdbp_context *, struct emsmdbp_object *);
@@ -353,6 +366,8 @@ DATA_BLOB emsmdbp_stream_read_buffer(struct emsmdbp_stream *, uint32_t);
 void emsmdbp_stream_write_buffer(TALLOC_CTX *, struct emsmdbp_stream *, DATA_BLOB);
 void emsmdbp_fill_table_row_blob(TALLOC_CTX *, struct emsmdbp_context *, DATA_BLOB *, uint16_t, enum MAPITAGS *, void **, enum MAPISTATUS *);
 void emsmdbp_fill_row_blob(TALLOC_CTX *, struct emsmdbp_context *, uint8_t *, DATA_BLOB *,struct SPropTagArray *, void **, enum MAPISTATUS *, bool *);
+enum MAPISTATUS emsmdbp_object_attach_sharing_metadata_XML_file(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *sharing_object);
+
 
 /* definitions from oxcfold.c */
 enum MAPISTATUS EcDoRpc_RopOpenFolder(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
@@ -377,6 +392,7 @@ enum MAPISTATUS EcDoRpc_RopRemoveAllRecipients(TALLOC_CTX *, struct emsmdbp_cont
 enum MAPISTATUS EcDoRpc_RopModifyRecipients(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
 enum MAPISTATUS EcDoRpc_RopReloadCachedInformation(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
 enum MAPISTATUS EcDoRpc_RopSetMessageReadFlag(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
+enum MAPISTATUS EcDoRpc_RopGetMessageStatus(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
 enum MAPISTATUS EcDoRpc_RopGetAttachmentTable(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
 enum MAPISTATUS EcDoRpc_RopOpenAttach(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
 enum MAPISTATUS EcDoRpc_RopCreateAttach(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
@@ -409,6 +425,7 @@ enum MAPISTATUS	EcDoRpc_RopLogon(TALLOC_CTX *, struct emsmdbp_context *, struct 
 enum MAPISTATUS	EcDoRpc_RopRelease(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, uint32_t *, uint16_t *);
 enum MAPISTATUS	EcDoRpc_RopGetReceiveFolder(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
 enum MAPISTATUS	EcDoRpc_RopSetReceiveFolder(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
+enum MAPISTATUS	EcDoRpc_RopGetReceiveFolderTable(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
 enum MAPISTATUS	EcDoRpc_RopGetPerUserLongTermIds(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
 enum MAPISTATUS	EcDoRpc_RopGetPerUserGuid(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
 enum MAPISTATUS	EcDoRpc_RopGetStoreState(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
@@ -458,6 +475,9 @@ enum MAPISTATUS EcDoRpc_RopGetLocalReplicaIds(TALLOC_CTX *, struct emsmdbp_conte
 enum MAPISTATUS EcDoRpc_RopSyncImportReadStateChanges(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
 enum MAPISTATUS EcDoRpc_RopSyncGetTransferState(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
 enum MAPISTATUS EcDoRpc_RopSetLocalReplicaMidsetDeleted(TALLOC_CTX *, struct emsmdbp_context *, struct EcDoRpc_MAPI_REQ *, struct EcDoRpc_MAPI_REPL *, uint32_t *, uint16_t *);
+
+/* definition from oxosfld.c */
+bool oxosfld_is_special_folder(struct emsmdbp_context *, uint64_t);
 
 __END_DECLS
 

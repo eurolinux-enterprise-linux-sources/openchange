@@ -1,10 +1,11 @@
 %{!?python_sitearch: %global python_sitearch %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib(1)")}
 
-%global samba_version 4.2.2
+%global samba_version 4.2.0-2
 %global talloc_version 2.0.5
-%global nickname QUADRANT
+%global nickname VULCAN
 
 %global build_python_package 0
+%global built_mapitest 0
 
 %if 0%{?rhel}
 %global build_server_package 0
@@ -18,13 +19,13 @@
 # Licensing Note: The code is GPLv3+ and the IDL files are public domain.
 
 Name: openchange
-Version: 2.0
-Release: 9%{?dist}
+Version: 2.3
+Release: 2%{?dist}
 Group: Applications/System
 Summary: Provides access to Microsoft Exchange servers using native protocols
 License: GPLv3+ and Public Domain
 URL: http://www.openchange.org/
-Source0: http://tracker.openchange.org/attachments/download/220/openchange-%{version}-%{nickname}.tar.gz
+Source0: https://github.com/openchange/openchange/archive/openchange-%{version}-%{nickname}.tar.gz
 Source1: doxygen_to_devhelp.xsl
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -33,12 +34,15 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildRequires: autoconf
 BuildRequires: automake
 BuildRequires: bison
+BuildRequires: mariadb-devel
 BuildRequires: doxygen
 BuildRequires: file-devel
 BuildRequires: flex
 BuildRequires: gcc
-BuildRequires: libical-devel >= 1.0.1
+BuildRequires: gcc-c++
+BuildRequires: libical-devel
 BuildRequires: libldb-devel
+# BuildRequires: libmemcached-devel
 BuildRequires: libtalloc-devel >= %{talloc_version}
 BuildRequires: libtdb-devel
 BuildRequires: pkgconfig
@@ -68,17 +72,16 @@ Patch1: openchange-0.9-generate-xml-doc.patch
 # Do not build server and python parts
 Patch2: openchange-1.0-OC_RULE_ADD-fix.patch
 
-# Avoid multilib issue in libmapi/version.h
-Patch3: openchange-2.0-multilib-issue-libmapi-version-h.patch
-
-# RH bug #1222605
+# RH-bug #1028698
 Patch4: openchange-1.0-symbol-clash.patch
 
-# RH bug #1019901
-Patch5: openchange-1.0-freebusy.patch
+Patch5: openchange-2.2-samba-4.2.0-rc2.patch
+Patch6: openchange-2.3-disable-server-tools-build.patch
+Patch7: openchange-2.3-samba-4.4.patch
+Patch8: openchange-2.3-nomemcached.patch
 
-# RH bug #1238537
-Patch6: openchange-2.0-samba-4.2.patch
+# Fix connection arguments to work properly with newer samba
+Patch9: openchange-1.0-fix-connection-args.patch
 
 %description
 OpenChange provides libraries to access Microsoft Exchange servers
@@ -138,14 +141,16 @@ This package provides the server elements for OpenChange.
 %endif
 
 %prep
-%setup -q -n %{name}-%{version}-%{nickname}
+%setup -q -n openchange-%{name}-%{version}-%{nickname}
 %patch0 -p1 -b .libmapi-conflict
 %patch1 -p1 -b .generate-xml-doc
 %patch2 -p1 -b .OC_RULE_ADD-fix
-%patch3 -p1 -b .multilib-issue-libmapi-version-h
 %patch4 -p1 -b .symbol-clash
-%patch5 -p1 -b .freebusy
-%patch6 -p1 -b .samba-4.2
+%patch5 -p1 -b .samba-4.2.0-rc2
+%patch6 -p1 -b .disable-server-tools-build
+%patch7 -p1 -b .samba-4.4
+%patch8 -p1 -b .nomemcached
+%patch9 -p1 -b .fix-connection-args
 
 %build
 ./autogen.sh
@@ -157,18 +162,23 @@ This package provides the server elements for OpenChange.
 
 # Parallel builds prohibited by makefile
 make
-rm -r apidocs
+if test -d apidocs ; then
+	rm -r apidocs
+fi
 make doxygen
 
 xsltproc -o openchange-libmapi.devhelp --stringparam "booktitle" "MAPI client library (libmapi)" --stringparam "bookpart" "libmapi" %{SOURCE1} apidocs/xml/libmapi/index.xml
 xsltproc -o openchange-libmapiadmin.devhelp --stringparam "booktitle" "MAPI administration libraries (libmapiadmin)" --stringparam "bookpart" "libmapiadmin" %{SOURCE1} apidocs/xml/libmapiadmin/index.xml
 xsltproc -o openchange-libocpf.devhelp --stringparam "booktitle" "OpenChange Property Files (libocpf)" --stringparam "bookpart" "libocpf" %{SOURCE1} apidocs/xml/libocpf/index.xml
+%if %{built_mapitest}
 xsltproc -o openchange-mapitest.devhelp --stringparam "booktitle" "MA regression test framework (mapitest)" --stringparam "bookpart" "mapitest" %{SOURCE1} apidocs/xml/mapitest/index.xml
+%endif
 xsltproc -o openchange-mapiproxy.devhelp --stringparam "booktitle" "MAPIProxy project (mapiproxy)" --stringparam "bookpart" "mapiproxy" %{SOURCE1} apidocs/xml/mapiproxy/index.xml
 xsltproc -o openchange-libmapi++.devhelp --stringparam "booktitle" "C++ bindings for libmapi (libmapi++)" --stringparam "bookpart" "libmapi++" %{SOURCE1} apidocs/xml/libmapi++/index.xml
 
 %install
 rm -rf $RPM_BUILD_ROOT
+
 make install DESTDIR=$RPM_BUILD_ROOT
 
 cp -r libmapi++ $RPM_BUILD_ROOT%{_includedir}
@@ -197,9 +207,9 @@ rm $RPM_BUILD_ROOT%{_libdir}/nagios/check_exchange
 rm -r $RPM_BUILD_ROOT%{_datadir}/setup/*
 %endif
 
-%if !%{build_python_package} && !%{build_server_package}
+#%if !%{build_python_package} && !%{build_server_package}
 #rm $RPM_BUILD_ROOT%{_bindir}/check_fasttransfer
-%endif
+#%endif
 
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-libmapi
 cp openchange-libmapi.devhelp $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-libmapi
@@ -213,9 +223,11 @@ mkdir -p $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-libocpf
 cp openchange-libocpf.devhelp $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-libocpf
 cp -r apidocs/html/libocpf/* $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-libocpf
 
+%if %{built_mapitest}
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-mapitest
 cp openchange-mapitest.devhelp $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-mapitest
 cp -r apidocs/html/mapitest/* $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-mapitest
+%endif
 
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-mapiproxy
 cp openchange-mapiproxy.devhelp $RPM_BUILD_ROOT%{_datadir}/devhelp/books/openchange-mapiproxy
@@ -239,10 +251,10 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %files
-%defattr(-,root,root,-)
-%doc ChangeLog COPYING IDL_LICENSE.txt VERSION
+%doc COPYING IDL_LICENSE.txt VERSION
 %{_libdir}/libmapi-openchange.so.*
 %{_libdir}/libmapiadmin.so.*
+%{_libdir}/libmapipp.so.*
 %if %{build_python_package} || %{build_server_package}
 %{_libdir}/libmapiproxy.so.*
 %{_libdir}/libmapistore.so.*
@@ -250,14 +262,12 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/libocpf.so.*
 
 %files devel
-%defattr(-,root,root,-)
 %{_includedir}/*
 %{_libdir}/*.so
 %{_libdir}/pkgconfig/*
 
 %files devel-docs
-%defattr(-,root,root,-)
-#%{_mandir}/man3/*
+#%%{_mandir}/man3/*
 %doc %{_datadir}/devhelp/books/*
 %doc apidocs/html/libmapi
 %doc apidocs/html/libocpf
@@ -265,20 +275,19 @@ rm -rf $RPM_BUILD_ROOT
 %doc apidocs/html/index.html
 
 %files client
-%defattr(-,root,root,-)
 %{_bindir}/*
 %{_mandir}/man1/*
+%if %{built_mapitest}
 %{_datadir}/mapitest/*
+%endif
 
 %if %{build_python_package}
 %files python
-%defattr(-,root,root,-)
 %{python_sitearch}/openchange
 %endif
 
 %if %{build_server_package}
 %files server
-%defattr(-,root,root,-)
 %{_libdir}/libmapiserver.so.*
 %{_libdir}/samba/dcerpc_server/dcesrv_mapiproxy.so
 %{_libdir}/samba/modules/*
@@ -289,6 +298,12 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %changelog
+* Thu Apr 07 2016 Milan Crha <mcrha@redhat.com> - 2.3-2
+- Add patch to fix connection string
+
+* Fri Mar 04 2016 Milan Crha <mcrha@redhat.com> - 2.3-1
+- Rebase to 2.3 release
+
 * Mon Jul 20 2015 Milan Crha <mcrha@redhat.com> - 2.0-9
 - Rebuild against updated samba
 

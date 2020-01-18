@@ -19,9 +19,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "libmapi/libmapi.h"
 #include "mapiproxy/dcesrv_mapiproxy.h"
 #include "libmapiproxy.h"
-#include <util/debug.h>
+#include "utils/dlinklist.h"
 
 /**
    \file dcesrv_mapiproxy_server.c
@@ -94,7 +95,7 @@ extern NTSTATUS mapiproxy_server_register(const void *_server_module)
 
 	num_server_modules++;
 
-	DEBUG(3, ("MAPIPROXY server '%s' registered\n", server_module->name));
+	OC_DEBUG(3, "MAPIPROXY server '%s' registered", server_module->name);
 
 	return NT_STATUS_OK;
 }
@@ -128,13 +129,13 @@ static NTSTATUS mapiproxy_server_overwrite(TALLOC_CTX *mem_ctx, const char *name
 	server_load = talloc_zero(mem_ctx, struct mapiproxy_module_list);
 	server_load->module = mapiproxy_server_byname(name);
 	if (!server_load->module) {
-		DEBUG(0, ("MAPIPROXY ERROR: couldn't load server '%s'\n", name));
+		oc_log(OC_LOG_ERROR, "MAPIPROXY ERROR: couldn't load server '%s'", name);
 		talloc_free(server_load);
 		return NT_STATUS_NOT_FOUND;
 	} else {
 		if (strcmp(server_load->module->endpoint, endpoint)) {
-			DEBUG(0, ("MAPIPROXY ERROR: %s endpoint expected for %s but %s found!\n",
-				  endpoint, server_load->module->name, server_load->module->endpoint));
+			OC_DEBUG(0, "MAPIPROXY ERROR: %s endpoint expected for %s but %s found!",
+				  endpoint, server_load->module->name, server_load->module->endpoint);
 			talloc_free(server_load);
 			return NT_STATUS_NOT_FOUND;
 		}
@@ -144,7 +145,7 @@ static NTSTATUS mapiproxy_server_overwrite(TALLOC_CTX *mem_ctx, const char *name
 	for (server = server_list; server; server = server->next) {
 		if (!strcmp(server->module->name, name) &&
 		    !strcmp(server->module->endpoint, endpoint)) {
-			DEBUG(0, ("MAPIPROXY: server '%s' already loaded - skipped\n", name));
+			oc_log(OC_LOG_WARNING, "MAPIPROXY: server '%s' already loaded - skipped", name);
 			talloc_free(server_load);
 			return NT_STATUS_OK;
 		}
@@ -179,11 +180,11 @@ static NTSTATUS mapiproxy_server_load(struct dcesrv_context *dce_ctx)
 								   NDR_EXCHANGE_DS_RFR_NAME, NULL };
 
 	/* Check server mode */
-	server_mode = lpcfg_parm_bool(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "server", false);
-	DEBUG(0, ("MAPIPROXY server mode %s\n", (server_mode == false) ? "disabled" : "enabled"));
+	server_mode = lpcfg_parm_bool(dce_ctx->lp_ctx, NULL, "dcerpc_mapiproxy", "server", true);
+	oc_log(OC_LOG_INFO, "MAPIPROXY server mode %s\n", (server_mode == false) ? "disabled" : "enabled");
 
 	if (server_mode == true) {
-		DEBUG(0, ("MAPIPROXY proxy mode disabled\n"));
+		OC_DEBUG(0, "MAPIPROXY proxy mode disabled\n");
 
 		for (i = 0; server_name[i]; i++) {
 			server = talloc_zero(dce_ctx, struct mapiproxy_module_list);
@@ -191,7 +192,7 @@ static NTSTATUS mapiproxy_server_load(struct dcesrv_context *dce_ctx)
 			if (server->module) {
 				DLIST_ADD_END(server_list, server, struct mapiproxy_module_list *);
 			} else {
-				DEBUG(0, ("MAPIPROXY ERROR: couldn't load server '%s'\n", server_name[i]));
+				oc_log(OC_LOG_ERROR, "MAPIPROXY ERROR: couldn't load server '%s'", server_name[i]);
 			}
 		}
 	}
@@ -209,8 +210,8 @@ static NTSTATUS mapiproxy_server_load(struct dcesrv_context *dce_ctx)
 	mapiproxy_server_overwrite(dce_ctx, rfr, NDR_EXCHANGE_DS_RFR_NAME);
 
 	for (server = server_list; server; server = server->next) {
-		DEBUG(3, ("mapiproxy_server_load '%s' (%s)\n", 
-			  server->module->name, server->module->description));
+		OC_DEBUG(3, "mapiproxy_server_load '%s' (%s)", 
+			  server->module->name, server->module->description);
 		if (server->module->init) {
 			status = server->module->init(dce_ctx);
 			NT_STATUS_NOT_OK_RETURN(status);
@@ -308,7 +309,7 @@ _PUBLIC_ TDB_CONTEXT *mapiproxy_server_emsabp_tdb_init(struct loadparm_context *
 	emsabp_tdb_ctx = tdb_open(tdb_path, 0, 0, O_RDWR|O_CREAT, 0600);
 	talloc_free(tdb_path);
 	if (!emsabp_tdb_ctx) {
-		DEBUG(3, ("[%s:%d]: %s\n", __FUNCTION__, __LINE__, strerror(errno)));
+		OC_DEBUG(3, "tdb_open: %s", strerror(errno));
 		talloc_free(mem_ctx);
 		return NULL;
 	}
@@ -320,8 +321,8 @@ _PUBLIC_ TDB_CONTEXT *mapiproxy_server_emsabp_tdb_init(struct loadparm_context *
 
 
 /**
-   \details Initialize an openchange LDB context available to all
-   mapiproxy instances. This LDB context points on the OpenChange
+   \details Initialize an openchangedb context available to all
+   mapiproxy instances. This context points on the OpenChange
    dispatcher database used within emsmdb default provider.
 
    \param lp_ctx pointer to the loadparm context
@@ -329,68 +330,23 @@ _PUBLIC_ TDB_CONTEXT *mapiproxy_server_emsabp_tdb_init(struct loadparm_context *
    \note The memory context is not free'd leading and causes a loss
    record.
 
-   \return Allocated LDB context on success, otherwise NULL
+   \return Allocated openchangedb context on success, otherwise NULL
  */
-_PUBLIC_ void *mapiproxy_server_openchange_ldb_init(struct loadparm_context *lp_ctx)
+_PUBLIC_ void *mapiproxy_server_openchangedb_init(struct loadparm_context *lp_ctx)
 {
-	char			*ldb_path;
-	TALLOC_CTX		*mem_ctx;
-	struct tevent_context	*ev;
-	int			ret;
-	struct ldb_result	*res;
-	struct ldb_dn		*tmp_dn = NULL;
-	static const char	*attrs[] = {
-		"rootDomainNamingContext",
-		"defaultNamingContext",
-		NULL
-	};
+	TALLOC_CTX	*mem_ctx;
+	enum MAPISTATUS	ret;
 
 	/* Sanity checks */
 	if (openchange_ldb_ctx) return openchange_ldb_ctx;
 
-	ev = tevent_context_init(talloc_autofree_context());
-	if (!ev) return NULL;
-
-	mem_ctx = talloc_named(NULL, 0, "openchange_ldb_init");
+	mem_ctx = talloc_named(NULL, 0, "mapiproxy_server_openchangedb_init");
 	if (!mem_ctx) return NULL;
 
-	/* Step 0. Retrieve a LDB context pointer on openchange.ldb database */
-	ldb_path = talloc_asprintf(mem_ctx, "%s/%s", lpcfg_private_dir(lp_ctx), OPENCHANGE_LDB_NAME);
-	openchange_ldb_ctx = ldb_init(mem_ctx, ev);
-	if (!openchange_ldb_ctx) {
-		talloc_free(mem_ctx);
-		return NULL;
-	}
+	ret = openchangedb_initialize(mem_ctx, lp_ctx,
+		(struct openchangedb_context **)&openchange_ldb_ctx);
 
-	/* Step 1. Connect to the database */
-	ret = ldb_connect((struct ldb_context *)openchange_ldb_ctx, ldb_path, 0, NULL);
-	talloc_free(ldb_path);
-	if (ret != LDB_SUCCESS) {
-		talloc_free(mem_ctx);
-		return NULL;
-	}
-
-	/* Step 2. Search for the rootDSE record */
-	ret = ldb_search(openchange_ldb_ctx, mem_ctx, &res, ldb_dn_new(mem_ctx, openchange_ldb_ctx, "@ROOTDSE"),
-			  LDB_SCOPE_BASE, attrs, NULL);
-	if (ret != LDB_SUCCESS) {
-		talloc_free(mem_ctx);
-		return NULL;
-	}
-
-	if (res->count != 1) {
-		talloc_free(mem_ctx);
-		return NULL;
-	}
-
-	/* Step 3. Set opaque naming */
-	tmp_dn = ldb_msg_find_attr_as_dn((struct ldb_context *)openchange_ldb_ctx, openchange_ldb_ctx,
-					 res->msgs[0], "rootDomainNamingContext");
-	ldb_set_opaque((struct ldb_context *)openchange_ldb_ctx, "rootDomainNamingContext", tmp_dn);
-
-	tmp_dn = ldb_msg_find_attr_as_dn((struct ldb_context *)openchange_ldb_ctx, openchange_ldb_ctx,
-					 res->msgs[0], "defaultNamingContext");
-	ldb_set_opaque((struct ldb_context *)openchange_ldb_ctx, "defaultNamingContext", tmp_dn);
+	if (ret != MAPI_E_SUCCESS) return NULL;
 
 	return openchange_ldb_ctx;
 }

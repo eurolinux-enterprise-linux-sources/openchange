@@ -22,6 +22,7 @@
 #include "libmapi/libmapi.h"
 #include "mapiproxy/libmapistore/mapistore.h"
 #include "mapiproxy/libmapistore/mapistore_errors.h"
+#include "utils/dlinklist.h"
 
 #include <popt.h>
 #include <ldb.h>
@@ -116,7 +117,7 @@ static enum MAPISTATUS mapistore_marker(uint32_t marker, void *priv)
 	}
 
 	switch (marker) {
-	case PidTagStartTopFld:
+	case StartTopFld:
 	{
 		/* start collecting properties */
 		struct SPropValue one_prop;
@@ -136,26 +137,26 @@ static enum MAPISTATUS mapistore_marker(uint32_t marker, void *priv)
 		mapistore->current_output_type = MAPISTORE_FOLDER;
 		break;
 	}
-	case PidTagStartSubFld:
+	case StartSubFld:
 		mapistore->proplist = talloc_zero(mapistore->mstore_ctx, struct SRow);
 		mapistore->current_output_type = MAPISTORE_FOLDER;
 		break;
-	case PidTagStartMessage:
+	case StartMessage:
 		mapistore->proplist = talloc_zero(mapistore->mstore_ctx, struct SRow);
 		mapistore->current_output_type = MAPISTORE_MESSAGE;
 		break;
-	case PidTagStartFAIMsg:
-	case PidTagStartRecip:
-	case PidTagStartEmbed:
-	case PidTagNewAttach:
+	case StartFAIMsg:
+	case StartRecip:
+	case StartEmbed:
+	case NewAttach:
 		break;
-	case PidTagEndFolder:
+	case EndFolder:
 		DLIST_REMOVE(mapistore->parent_fids, mapistore->parent_fids);
 		break;
-	case PidTagEndMessage:
-	case PidTagEndToRecip:
-	case PidTagEndAttach:
-	case PidTagEndEmbed:
+	case EndMessage:
+	case EndToRecip:
+	case EndAttach:
+	case EndEmbed:
 		break;
 	default:
 		printf("***unhandled *** TODO: Marker: %s (0x%08x)\n", get_proptag_name(marker), marker);
@@ -404,7 +405,7 @@ int main(int argc, const char *argv[])
 
 		mretval = mapistore_add_context(output_ctx.mstore_ctx, "openchange", root_folder, output_ctx.root_fid, &(output_ctx.mapistore_context_id), &output_ctx.root_folder);
 		if (mretval != MAPISTORE_SUCCESS) {
-			DEBUG(0, ("%s\n", mapistore_errstr(mretval)));
+			OC_DEBUG(0, "%s", mapistore_errstr(mretval));
 			exit (1);
 		}
 		
@@ -445,13 +446,13 @@ int main(int argc, const char *argv[])
 	if (opt_mapistore) {
 		mretval = mapistore_del_context(output_ctx.mstore_ctx, output_ctx.mapistore_context_id);
 		if (mretval != MAPISTORE_SUCCESS) {
-			mapi_errstr("mapistore_del_context", mretval);
+			printf("mapistore_del_context: %s\n", mapistore_errstr(mretval));
 			exit (1);
 		}
 
 		mretval = mapistore_release(output_ctx.mstore_ctx);
 		if (mretval != MAPISTORE_SUCCESS) {
-			mapi_errstr("mapistore_release", mretval);
+			printf("mapistore_release: %s\n", mapistore_errstr(mretval));
 			exit (1);
 		}
 	}
@@ -459,7 +460,6 @@ int main(int argc, const char *argv[])
 	talloc_free(parser);
 
 	mapi_object_release(&obj_fx_context);
-
 	mapi_object_release(&obj_folder);
 	mapi_object_release(&obj_store);
 	MAPIUninitialize(mapi_ctx);

@@ -3,7 +3,7 @@
 
    OpenChange Project
 
-   Copyright (C) Julien Kerihuel 2008
+   Copyright (C) Julien Kerihuel 2008-2014
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -42,6 +42,8 @@ _PUBLIC_ uint32_t mapitest_register_modules(struct mapitest *mt)
 	ret += module_lcid_init(mt);
 	ret += module_mapidump_init(mt);
 	ret += module_lzxpress_init(mt);
+	ret += module_zentyal_init(mt);
+	ret += module_oxosfld_init(mt);
 
 	return ret;
 }
@@ -93,6 +95,8 @@ _PUBLIC_ uint32_t module_oxcfold_init(struct mapitest *mt)
 	mapitest_suite_add_test(suite, "CREATE-DELETE", "Do a basic create / delete cycle on a folder", mapitest_oxcfold_CreateDeleteFolder);
 	mapitest_suite_add_test(suite, "CREATE", "Create a folder", mapitest_oxcfold_CreateFolder);
 	mapitest_suite_add_test(suite, "CREATE-VARIANTS", "More folder creation variations", mapitest_oxcfold_CreateFolderVariants);
+	mapitest_suite_add_test(suite, "DELETE-VARIANTS", "More folder deletion variations", mapitest_oxcfold_DeleteFolderVariants);
+	mapitest_suite_add_test(suite, "CREATE-SIMPLE", "Simple folder creation", mapitest_oxcfold_CreateDeleteSimpleFolder);
 	mapitest_suite_add_test(suite, "GET-HIERARCHY-TABLE", "Retrieve the hierarchy table", mapitest_oxcfold_GetHierarchyTable);
 	mapitest_suite_add_test(suite, "GET-CONTENTS-TABLE", "Retrieve the contents table", mapitest_oxcfold_GetContentsTable);
 	mapitest_suite_add_test(suite, "SET-SEARCHCRITERIA", "Set a search criteria on a container", mapitest_oxcfold_SetSearchCriteria);
@@ -364,6 +368,30 @@ _PUBLIC_ uint32_t module_nspi_init(struct mapitest *mt)
 	return MAPITEST_SUCCESS;
 }
 
+/**
+   \details Register the Functional Testing NSPI test suite
+
+   \param mt pointer on the top-level mapitest structure
+
+   \return MAPITEST_SUCCESS on success, otherwise MAPITEST_ERROR
+ */
+_PUBLIC_ uint32_t module_zentyal_init(struct mapitest *mt)
+{
+	struct mapitest_suite	*suite = NULL;
+
+	suite = mapitest_suite_init(mt, "ZENTYAL", "Functional Testing for Zentyal", true);
+
+	mapitest_suite_add_test(suite, "NSPI-1872", "Test pStat overflow in QueryRows", mapitest_zentyal_1872);
+	mapitest_suite_add_test(suite, "NSPI-1863", "Test PR_ENTRYID retrieval on non OpenChange user", mapitest_zentyal_1863);
+	mapitest_suite_add_test(suite, "NSPI-1645", "Test SortTypePhoneticDisplayName is not supported in UpdateStat", mapitest_zentyal_1645);
+	mapitest_suite_add_test(suite, "OXCMSG-1804", "Test multi-value properties in ModifyRecipients", mapitest_zentyal_1804);
+	mapitest_suite_add_test(suite, "OXCMSG-4872", "Test different prop count in Recipient Row and ModifyRecipients", mapitest_zentyal_4872);
+	mapitest_suite_add_test(suite, "OXCTABL-6723", "Test Backward Read on QueryRows", mapitest_zentyal_6723);
+
+	mapitest_suite_register(mt, suite);
+
+	return MAPITEST_SUCCESS;
+}
 
 /**
    \details Return the no server test suite
@@ -485,6 +513,29 @@ _PUBLIC_ uint32_t module_lzxpress_init(struct mapitest *mt)
 	suite = mapitest_suite_init(mt, "LZXPRESS", "lzxpress algorithm test suite", false);
 
 	mapitest_suite_add_test_flagged(suite, "VALIDATE-001", "Validate LZXPRESS implementation using sample file 001", mapitest_lzxpress_validate_test_001, ExpectedFail);
+
+	mapitest_suite_register(mt, suite);
+
+	return MAPITEST_SUCCESS;
+}
+
+/**
+   \details Register the Special Folders Protocol test suite
+
+   \param mt pointer on the top-level mapitest structure
+
+   \return MAPITEST_SUCCESS on success, otherwise MAPITEST_ERROR
+ */
+_PUBLIC_ uint32_t module_oxosfld_init(struct mapitest *mt)
+{
+	struct mapitest_suite	*suite = NULL;
+
+	suite = mapitest_suite_init(mt, "OXOSFLD", "Special Folders Protocol", true);
+
+	mapitest_suite_add_test(suite, "CREATE-FOLDER", "Create special folders",
+				mapitest_oxosfld_CreateFolder);
+	mapitest_suite_add_test(suite, "DELETE-FOLDER", "Delete special folders",
+				mapitest_oxosfld_DeleteFolder);
 
 	mapitest_suite_register(mt, suite);
 

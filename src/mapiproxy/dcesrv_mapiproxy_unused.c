@@ -19,8 +19,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define	_GNU_SOURCE 1
-
 #include "config.h"
 
 #include <sys/types.h>
@@ -38,7 +36,6 @@
 #include "gen_ndr/exchange.h"
 
 #include <dcerpc_server.h>
-#include <samba_util.h>
 #include <param.h>
 
 #include "gen_ndr/ndr_exchange.h"
@@ -718,10 +715,10 @@ enum MAPISTATUS dcesrv_EcRUnregisterPushNotification(struct dcesrv_call_state *d
 /* 
   EcDummyRpc 
 */
-void dcesrv_EcDummyRpc(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
-		       struct EcDummyRpc *r)
+enum MAPISTATUS dcesrv_EcDummyRpc(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
+		                  struct EcDummyRpc *r)
 {
-	DCESRV_FAULT_VOID(DCERPC_FAULT_OP_RNG_ERROR);
+	DCESRV_FAULT(DCERPC_FAULT_OP_RNG_ERROR);
 }
 
 
@@ -795,15 +792,6 @@ void dcesrv_EcUnknown0xD(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx
  */
 enum MAPISTATUS dcesrv_EcDoAsyncConnectEx(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
 					  struct EcDoAsyncConnectEx *r)
-{
-	DCESRV_FAULT(DCERPC_FAULT_OP_RNG_ERROR);
-}
-
-/*
-  endpoint server for the exchange_async_emsmdb pipe
- */
-enum MAPISTATUS dcesrv_EcDoAsyncWaitEx(struct dcesrv_call_state *dce_call, TALLOC_CTX *mem_ctx,
-				       struct EcDoAsyncWaitEx *r)
 {
 	DCESRV_FAULT(DCERPC_FAULT_OP_RNG_ERROR);
 }

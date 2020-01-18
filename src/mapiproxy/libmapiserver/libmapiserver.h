@@ -22,10 +22,6 @@
 #ifndef	__LIBMAPISERVER_H__
 #define	__LIBMAPISERVER_H__
 
-#ifndef	_GNU_SOURCE
-#define	_GNU_SOURCE 1
-#endif
-
 #include <sys/types.h>
 
 #include <stdio.h>
@@ -37,6 +33,7 @@
 #include <dcerpc.h>
 #include <param.h>
 
+#include "libmapi/oc_log.h"
 #include "gen_ndr/exchange.h"
 
 #ifndef	__BEGIN_DECLS
@@ -138,10 +135,16 @@
 #define	SIZE_DFLT_ROPRELOADCACHEDINFORMATION	4
 
 /**
-   \details: SetMessageReadFlagRop has fixed response size for:
+   \details: SetMessageReadFlag has fixed response size for:
    -# ReadStatusChanged: uint8_t
  */
 #define	SIZE_DFLT_ROPSETMESSAGEREADFLAG		1
+
+/**
+   \details: GetMessageStatus has fixed response size for:
+   -# MessageStatusFlags: uint32_t
+ */
+#define	SIZE_DFLT_ROPGETMESSAGESTATUS		4
 
 /**
    \details: CreateAttachRop has fixed response size for:
@@ -499,6 +502,7 @@ uint16_t libmapiserver_RopRemoveAllRecipients_size(struct EcDoRpc_MAPI_REPL *);
 uint16_t libmapiserver_RopModifyRecipients_size(struct EcDoRpc_MAPI_REPL *);
 uint16_t libmapiserver_RopReloadCachedInformation_size(struct EcDoRpc_MAPI_REPL *);
 uint16_t libmapiserver_RopSetMessageReadFlag_size(struct EcDoRpc_MAPI_REPL *);
+uint16_t libmapiserver_RopGetMessageStatus_size(struct EcDoRpc_MAPI_REPL *);
 uint16_t libmapiserver_RopGetAttachmentTable_size(struct EcDoRpc_MAPI_REPL *);
 uint16_t libmapiserver_RopOpenAttach_size(struct EcDoRpc_MAPI_REPL *);
 uint16_t libmapiserver_RopCreateAttach_size(struct EcDoRpc_MAPI_REPL *);

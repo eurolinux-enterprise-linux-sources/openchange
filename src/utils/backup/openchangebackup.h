@@ -34,7 +34,6 @@
 #include <inttypes.h>
 
 /* Samba4 includes */
-#include <samba_util.h>
 #include <talloc.h>
 #include <ldb_errors.h>
 #include <ldb.h>
@@ -75,7 +74,7 @@ __END_DECLS
 #define	OCB_RETVAL_IF_CODE(x, m, c, r)	       	\
 do {						\
 	if (x) {				\
-		DEBUG(3, ("[OCB] %s\n", m));	\
+		OC_DEBUG(3, "[OCB] %s\n", m);	\
 		if (c) {			\
 			talloc_free(c);		\
 		}				\

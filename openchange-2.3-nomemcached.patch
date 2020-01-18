@@ -1,0 +1,12 @@
+diff -up openchange-openchange-2.3-VULCAN/configure.ac.nomemcached openchange-openchange-2.3-VULCAN/configure.ac
+--- openchange-openchange-2.3-VULCAN/configure.ac.nomemcached	2016-03-03 10:47:03.071794467 +0100
++++ openchange-openchange-2.3-VULCAN/configure.ac	2016-03-03 10:47:06.452774681 +0100
+@@ -429,7 +429,7 @@ AC_SUBST(MYSQL_LIBS)
+ dnl ----------------------------------------------------------------------------
+ dnl Check for memcached
+ dnl ----------------------------------------------------------------------------
+-PKG_CHECK_MODULES([MEMCACHED], [libmemcached >= 1.0.18], [], [AC_MSG_ERROR(memcached >= 1.0.18 required to build mapistore library)])
++dnl PKG_CHECK_MODULES([MEMCACHED], [libmemcached >= 1.0.18], [], [AC_MSG_ERROR(memcached >= 1.0.18 required to build mapistore library)])
+ 
+ dnl ----------------------------------------------------------------------------
+ dnl Check for Flex

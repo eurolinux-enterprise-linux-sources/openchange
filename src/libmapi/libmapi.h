@@ -2,7 +2,7 @@
    OpenChange MAPI implementation.
    libmapi public header file
 
-   Copyright (C) Julien Kerihuel 2007-2011.
+   Copyright (C) Julien Kerihuel 2007-2013.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,10 +20,6 @@
 
 #ifndef __LIBMAPI_H__
 #define __LIBMAPI_H__
-
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE 1
-#endif
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -47,15 +43,14 @@
 /* Samba4 includes */
 #include <talloc.h>
 #include <dcerpc.h>
-#include <util/debug.h>
 #include <param.h>
-#include <dlinklist.h>
 
 /* OpenChange includes */
 #include <gen_ndr/exchange.h>
 #include <gen_ndr/property.h>
 
 #include "libmapi/version.h"
+#include "libmapi/oc_log.h"
 #include "libmapi/nspi.h"
 #include "libmapi/emsmdb.h"
 #include "libmapi/mapi_context.h"
@@ -70,6 +65,7 @@
 #include "libmapi/idset.h"
 #include "libmapi/property_tags.h"
 #include "libmapi/property_altnames.h"
+#include "libmapi/fxics.h"
 
 #undef _PRINTF_ATTRIBUTE
 #define _PRINTF_ATTRIBUTE(a1, a2) PRINTF_ATTRIBUTE(a1, a2)
@@ -93,7 +89,7 @@ __BEGIN_DECLS
 /* The following public definitions come from libmapi/nspi.c */
 struct nspi_context	*nspi_bind(TALLOC_CTX *, struct dcerpc_pipe *, struct cli_credentials *, uint32_t, uint32_t, uint32_t);
 enum MAPISTATUS		nspi_unbind(struct nspi_context *);
-enum MAPISTATUS		nspi_UpdateStat(struct nspi_context *, TALLOC_CTX *, uint32_t *);
+enum MAPISTATUS		nspi_UpdateStat(struct nspi_context *, TALLOC_CTX *, int32_t *);
 enum MAPISTATUS		nspi_QueryRows(struct nspi_context *, TALLOC_CTX *, struct SPropTagArray *, struct PropertyTagArray_r *MIds, uint32_t, struct PropertyRowSet_r **);
 enum MAPISTATUS		nspi_SeekEntries(struct nspi_context *, TALLOC_CTX *, enum TableSortOrders, struct PropertyValue_r *, struct SPropTagArray *, struct PropertyTagArray_r *pMIds, struct PropertyRowSet_r **);
 enum MAPISTATUS		nspi_GetMatches(struct nspi_context *, TALLOC_CTX *, struct SPropTagArray *, struct Restriction_r *, uint32_t ulRequested, struct PropertyRowSet_r **, struct PropertyTagArray_r **ppOutMIds);
@@ -111,6 +107,7 @@ enum MAPISTATUS		nspi_GetNamesFromIDs(struct nspi_context *, TALLOC_CTX *, struc
 enum MAPISTATUS		nspi_GetIDsFromNames(struct nspi_context *, TALLOC_CTX *, bool, uint32_t, struct PropertyName_r *, struct SPropTagArray **);
 enum MAPISTATUS		nspi_ResolveNames(struct nspi_context *, TALLOC_CTX *, const char **, struct SPropTagArray *, struct PropertyRowSet_r ***, struct PropertyTagArray_r ***);
 enum MAPISTATUS		nspi_ResolveNamesW(struct nspi_context *, TALLOC_CTX *, const char **, struct SPropTagArray *, struct PropertyRowSet_r ***, struct PropertyTagArray_r ***);
+void			nspi_dump_STAT(const char *, struct STAT *);
 
 /* The following public definitions come from libmapi/emsmdb.c */
 NTSTATUS		emsmdb_transaction_null(struct emsmdb_context *, struct mapi_response **);
@@ -132,6 +129,7 @@ enum MAPISTATUS		GetLoadparmContext(struct mapi_context *, struct loadparm_conte
 /* The following public definitions come from libmapi/simple_mapi.c */
 enum MAPISTATUS		GetDefaultPublicFolder(mapi_object_t *, uint64_t *, const uint32_t);
 enum MAPISTATUS		GetDefaultFolder(mapi_object_t *, uint64_t *, const uint32_t);
+enum MAPISTATUS		GetSpecialAdditionalFolder(mapi_object_t *, uint64_t *, const uint32_t);
 bool			IsMailboxFolder(mapi_object_t *, uint64_t, uint32_t *);
 enum MAPISTATUS		GetFolderItemsCount(mapi_object_t *, uint32_t *, uint32_t *);
 enum MAPISTATUS		AddUserPermission(mapi_object_t *, const char *, enum ACLRIGHTS);
@@ -251,6 +249,8 @@ struct SPropTagArray	*set_SPropTagArray(TALLOC_CTX *, uint32_t, ...);
 enum MAPISTATUS		SPropTagArray_add(TALLOC_CTX *, struct SPropTagArray *, enum MAPITAGS);
 enum MAPISTATUS		SPropTagArray_delete(TALLOC_CTX *, struct SPropTagArray *, uint32_t);
 enum MAPISTATUS		SPropTagArray_find(struct SPropTagArray, enum MAPITAGS, uint32_t *);
+int                     get_email_address_index_SPropTagArray(struct SPropTagArray*);
+int                     get_display_name_index_SPropTagArray(struct SPropTagArray*);
 const void		*get_SPropValue(struct SPropValue *, enum MAPITAGS);
 struct SPropValue	*get_SPropValue_SRowSet(struct SRowSet *, uint32_t);
 const void		*get_SPropValue_SRowSet_data(struct SRowSet *, uint32_t);
@@ -287,6 +287,9 @@ struct GlobalObjectId	*get_GlobalObjectId(TALLOC_CTX *, struct Binary_r *);
 struct MessageEntryId	*get_MessageEntryId(TALLOC_CTX *, struct Binary_r *);
 struct FolderEntryId	*get_FolderEntryId(TALLOC_CTX *, struct Binary_r *);
 struct AddressBookEntryId *get_AddressBookEntryId(TALLOC_CTX *, struct Binary_r *);
+struct OneOffEntryId	*get_OneOffEntryId(TALLOC_CTX *, struct Binary_r *);
+struct PersistData      *get_PersistData(TALLOC_CTX *, struct Binary_r *);
+struct PersistDataArray *get_PersistDataArray(TALLOC_CTX *, struct Binary_r *);
 const char		*get_TypedString(struct TypedString *);
 bool			set_mapi_SPropValue(TALLOC_CTX *, struct mapi_SPropValue *, const void *);
 bool			set_mapi_SPropValue_proptag(TALLOC_CTX *, struct mapi_SPropValue *, uint32_t, const void *);
@@ -385,7 +388,7 @@ enum MAPISTATUS		MonitorNotification(struct mapi_session *, void *, struct mapi_
 /* The following public definitions come from libmapi/IMAPITable.c */
 enum MAPISTATUS		SetColumns(mapi_object_t *, struct SPropTagArray *);
 enum MAPISTATUS		QueryPosition(mapi_object_t *, uint32_t *, uint32_t *);
-enum MAPISTATUS		QueryRows(mapi_object_t *, uint16_t, enum QueryRowsFlags, struct SRowSet *);
+enum MAPISTATUS		QueryRows(mapi_object_t *, uint16_t, enum QueryRowsFlags, enum ForwardRead, struct SRowSet *);
 enum MAPISTATUS		QueryColumns(mapi_object_t *, struct SPropTagArray *);
 enum MAPISTATUS		SeekRow(mapi_object_t *, enum BOOKMARK, int32_t, uint32_t *);
 enum MAPISTATUS		SeekRowBookmark(mapi_object_t *, uint32_t, uint32_t, uint32_t *);
@@ -549,6 +552,7 @@ bool			IDSET_includes_guid_glob(const struct idset *, struct GUID *, uint64_t);
 bool			IDSET_includes_eid(const struct idset *, uint64_t);
 void			IDSET_remove_rawidset(struct idset *, const struct rawidset *);
 void			IDSET_dump(const struct idset *, const char *);
+enum MAPISTATUS	IDSET_check_ranges(const struct idset *);
 void			ndr_push_idset(struct ndr_push *, struct idset *);
 
 struct globset_range *	GLOBSET_parse(TALLOC_CTX *, DATA_BLOB, uint32_t *, uint32_t *);

@@ -3,7 +3,7 @@
 
    EMSABP: Address Book Provider implementation
 
-   Copyright (C) Julien Kerihuel 2009.
+   Copyright (C) Julien Kerihuel 2009-2013.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -42,8 +42,8 @@ static const struct emsabp_property emsabp_property[] = {
 	{ PidTagSurname,			"sn",			false,	NULL			},
 	{ PidTagOriginalDisplayName,		"displayName",		false,	NULL			},
 	{ PidTagTransmittableDisplayName,	"displayName",		false,	NULL			},
-	{ PidTagPrimarySmtpAddress,		"mail",			false,	NULL			},
-	{ PidTag7BitDisplayName,		"displayName",		false,	NULL			},
+	{ PidTagSmtpAddress,			"mail",			false,	NULL			},
+	{ PidTagAddressBookDisplayNamePrintable,"displayName",		false,	NULL			},
 	{ PR_EMS_AB_HOME_MTA,			"homeMTA",		true,	"legacyExchangeDN"	},
 	{ PR_EMS_AB_ASSOC_NT_ACCOUNT,		"assocNTAccount",	false,	NULL			},
 	{ PidTagDepartmentName,			"department",		false,	NULL			},
@@ -55,8 +55,39 @@ static const struct emsabp_property emsabp_property[] = {
 	{ PidTagAddressBookNetworkAddress,	"networkAddress",	false,	NULL			},
 	{ PidTagTitle,				"personalTitle",	false,	NULL			},
 	{ PidTagAddressBookObjectGuid,		"objectGUID",		false,	NULL			},
+	{ PidTagObjectType,			"msExchRecipientTypeDetails",		false,	NULL			},
+	{ PidTagDisplayType,			"msExchRecipientDisplayType",		false,	NULL			},
 	{ 0,					NULL,			false,	NULL			}
 };
+
+
+/**
+   /details Maps ulPropTag ot its PT_STRING8 and PT_UNICODE versions
+   /param ulPropTag the proptag to map
+   /param pAnsiPropTag pointer to the ansi version of the tag to return
+   /param pUniPropTag pointer to the unicode version of the tag to return
+
+   /note When the function return, ulPropTag holds the PT_STRING8 version
+         of the tag and uniPropTag the PT_UNICODE version.
+         Note that the mapping is only going to work for string properties
+ */
+static inline void _map_proptag_to_unicode_ansi(uint32_t ulPropTag, uint32_t *pAnsiPropTag, uint32_t *pUniPropTag)
+{
+	switch (ulPropTag & 0x0FFF) {
+	case PT_STRING8:
+		*pAnsiPropTag = ulPropTag;
+		*pUniPropTag = (ulPropTag & 0xfffff000) | PT_UNICODE;
+		break;
+	case PT_UNICODE:
+		*pAnsiPropTag = (ulPropTag & 0xfffff000) | PT_STRING8;
+		*pUniPropTag = ulPropTag;
+		break;
+	default:
+		// not a string value, just return what we have as input
+		*pAnsiPropTag = *pUniPropTag = ulPropTag;
+		break;
+	}
+}
 
 
 /**
@@ -70,17 +101,13 @@ static const struct emsabp_property emsabp_property[] = {
 _PUBLIC_ const char *emsabp_property_get_attribute(uint32_t ulPropTag)
 {
 	int		i;
-	uint32_t	uniPropTag;
+	uint32_t	ansiPropTag, uniPropTag;
 
-	if ((ulPropTag & 0x0fff) == PT_STRING8) {
-		uniPropTag = (ulPropTag & 0xfffff000) | PT_UNICODE;
-	}
-	else {
-		uniPropTag = ulPropTag;
-	}
+	_map_proptag_to_unicode_ansi(ulPropTag, &ansiPropTag, &uniPropTag);
 
 	for (i = 0; emsabp_property[i].attribute; i++) {
-		if (uniPropTag == emsabp_property[i].ulPropTag) {
+		if ((uniPropTag == emsabp_property[i].ulPropTag) || 
+		    (ansiPropTag == emsabp_property[i].ulPropTag)) {
 			return emsabp_property[i].attribute;
 		}
 	}
@@ -124,19 +151,15 @@ _PUBLIC_ uint32_t emsabp_property_get_ulPropTag(const char *attribute)
 _PUBLIC_ int emsabp_property_is_ref(uint32_t ulPropTag)
 {
 	int		i;
-	uint32_t	uniPropTag;
+	uint32_t	ansiPropTag, uniPropTag;
 
 	if (!ulPropTag) return -1;
 
-	if ((ulPropTag & 0x0fff) == PT_STRING8) {
-		uniPropTag = (ulPropTag & 0xfffff000) | PT_UNICODE;
-	}
-	else {
-		uniPropTag = ulPropTag;
-	}
+	_map_proptag_to_unicode_ansi(ulPropTag, &ansiPropTag, &uniPropTag);
 
 	for (i = 0; emsabp_property[i].attribute; i++) {
-		if (uniPropTag == emsabp_property[i].ulPropTag) {
+		if ((uniPropTag == emsabp_property[i].ulPropTag) ||
+		    (ansiPropTag == emsabp_property[i].ulPropTag)) {
 			return (emsabp_property[i].ref == true) ? 1 : 0;
 		}
 	}
@@ -156,19 +179,15 @@ _PUBLIC_ int emsabp_property_is_ref(uint32_t ulPropTag)
 _PUBLIC_ const char *emsabp_property_get_ref_attr(uint32_t ulPropTag)
 {
 	int		i;
-	uint32_t	uniPropTag;
+	uint32_t	ansiPropTag, uniPropTag;
 
 	if (!ulPropTag) return NULL;
 
-	if ((ulPropTag & 0x0fff) == PT_STRING8) {
-		uniPropTag = (ulPropTag & 0xfffff000) | PT_UNICODE;
-	}
-	else {
-		uniPropTag = ulPropTag;
-	}
+	_map_proptag_to_unicode_ansi(ulPropTag, &ansiPropTag, &uniPropTag);
 
 	for (i = 0; emsabp_property[i].attribute; i++) {
-		if (uniPropTag == emsabp_property[i].ulPropTag) {
+		if ((uniPropTag == emsabp_property[i].ulPropTag) ||
+		    (ansiPropTag == emsabp_property[i].ulPropTag)) {
 			return emsabp_property[i].ref_attr;
 		}
 	}

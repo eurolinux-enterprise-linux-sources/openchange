@@ -23,6 +23,9 @@
 #define	__MAPISTORE_PRIVATE_H__
 
 #include <talloc.h>
+#include "backends/namedprops_backend.h"
+#include "utils/dlinklist.h"
+#include "mapiproxy/libmapistore/gen_ndr/mapistore_notification.h"
 
 #ifndef	ISDOT
 #define ISDOT(path) ( \
@@ -45,18 +48,6 @@ struct tdb_wrap {
 	const char		*name;
 	struct tdb_wrap		*prev;
 	struct tdb_wrap		*next;
-};
-
-
-struct ldb_wrap {
-  struct ldb_wrap			*next;
-	struct ldb_wrap			*prev;
-	struct ldb_wrap_context {
-		const char		*url;
-		struct tevent_context	*ev;
-		unsigned int		flags;
-	} context;
-	struct ldb_context		*ldb;
 };
 
 /**
@@ -96,21 +87,11 @@ struct processing_context {
 	uint64_t			dflt_start_id;
 };
 
-
-/**
-   Indexing identifier list
- */
 struct indexing_context_list {
-	struct tdb_wrap			*index_ctx;
-	char				*username;
-	// uint32_t			ref_count;
+	struct indexing_context		*ctx;
 	struct indexing_context_list	*prev;
 	struct indexing_context_list	*next;
 };
-
-#define	MAPISTORE_DB_NAMED		"named_properties.ldb"
-#define	MAPISTORE_DB_INDEXING		"indexing.tdb"
-#define	MAPISTORE_SOFT_DELETED_TAG	"SOFT_DELETED:"
 
 struct replica_mapping_context_list {
 	struct tdb_context		*tdb;
@@ -154,8 +135,8 @@ enum mapistore_error mapistore_free_context_id(struct processing_context *, uint
 /* definitions from mapistore_backend.c */
 enum mapistore_error mapistore_backend_init(TALLOC_CTX *, const char *);
 enum mapistore_error mapistore_backend_registered(const char *);
-enum mapistore_error mapistore_backend_list_contexts(const char *, struct tdb_wrap *, TALLOC_CTX *, struct mapistore_contexts_list **);
-enum mapistore_error mapistore_backend_create_context(TALLOC_CTX *, struct mapistore_connection_info *, struct tdb_wrap *, const char *, const char *, uint64_t, struct backend_context **);
+enum mapistore_error mapistore_backend_list_contexts(const char *, struct indexing_context *, TALLOC_CTX *, struct mapistore_contexts_list **);
+enum mapistore_error mapistore_backend_create_context(TALLOC_CTX *, struct mapistore_connection_info *, struct indexing_context *, const char *, const char *, uint64_t, struct backend_context **);
 enum mapistore_error mapistore_backend_create_root_folder(const char *, enum mapistore_context_role, uint64_t, const char *, TALLOC_CTX *, char **);
 enum mapistore_error mapistore_backend_add_ref_count(struct backend_context *);
 enum mapistore_error mapistore_backend_delete_context(struct backend_context *);
@@ -180,7 +161,7 @@ enum mapistore_error mapistore_backend_folder_preload_message_bodies(struct back
 enum mapistore_error mapistore_backend_message_get_message_data(struct backend_context *, void *, TALLOC_CTX *, struct mapistore_message **);
 enum mapistore_error mapistore_backend_message_modify_recipients(struct backend_context *, void *, struct SPropTagArray *, uint16_t, struct mapistore_message_recipient *);
 enum mapistore_error mapistore_backend_message_set_read_flag(struct backend_context *, void *, uint8_t);
-enum mapistore_error mapistore_backend_message_save(struct backend_context *, void *);
+enum mapistore_error mapistore_backend_message_save(struct backend_context *, void *, TALLOC_CTX *);
 enum mapistore_error mapistore_backend_message_submit(struct backend_context *, void *, enum SubmitFlags);
 enum mapistore_error mapistore_backend_message_get_attachment_table(struct backend_context *, void *, TALLOC_CTX *, void **, uint32_t *);
 enum mapistore_error mapistore_backend_message_open_attachment(struct backend_context *, void *, TALLOC_CTX *, uint32_t, void **);
@@ -205,21 +186,16 @@ enum mapistore_error mapistore_backend_manager_generate_uri(struct backend_conte
 /* definitions from mapistore_tdb_wrap.c */
 struct tdb_wrap *mapistore_tdb_wrap_open(TALLOC_CTX *, const char *, int, int, int, mode_t);
 
-/* definitions from mapistore_ldb_wrap.c */
-struct ldb_context *mapistore_ldb_wrap_connect(TALLOC_CTX *, struct tevent_context *, const char *, unsigned int);
-
 /* definitions from mapistore_indexing.c */
-struct indexing_context_list *mapistore_indexing_search(struct mapistore_context *, const char *);
-enum mapistore_error mapistore_indexing_add(struct mapistore_context *, const char *, struct indexing_context_list **);
-enum mapistore_error mapistore_indexing_search_existing_fmid(struct indexing_context_list *, uint64_t, bool *);
+struct indexing_context *mapistore_indexing_search(struct mapistore_context *, const char *);
+enum mapistore_error mapistore_indexing_add(struct mapistore_context *, const char *, struct indexing_context **);
 enum mapistore_error mapistore_indexing_record_add(TALLOC_CTX *, struct indexing_context_list *, uint64_t, const char *);
-enum mapistore_error mapistore_indexing_record_add_fmid(struct mapistore_context *, uint32_t, const char *, uint64_t);
-enum mapistore_error mapistore_indexing_record_del_fmid(struct mapistore_context *, uint32_t, const char *, uint64_t, uint8_t);
-// enum mapistore_error mapistore_indexing_add_ref_count(struct indexing_context_list *);
-// enum mapistore_error mapistore_indexing_del_ref_count(struct indexing_context_list *);
+enum mapistore_error mapistore_indexing_record_add_fmid(struct mapistore_context *, uint32_t, const char *, uint64_t, int type);
+enum mapistore_error mapistore_indexing_record_del_fmid(struct mapistore_context *, uint32_t, const char *, uint64_t, uint8_t, int type);
 
-/* definitions from mapistore_namedprops.c */
-enum mapistore_error mapistore_namedprops_init(TALLOC_CTX *, struct ldb_context **);
+/* definitions from mapistore_notification.c */
+enum mapistore_error mapistore_notification_init(TALLOC_CTX *, struct loadparm_context *, struct mapistore_notification_context **);
+enum mapistore_error mapistore_notification_subscription_get(TALLOC_CTX *, struct mapistore_context *, struct GUID, struct mapistore_notification_subscription *);
 
 __END_DECLS
 

@@ -2,23 +2,23 @@
 # OpenChange provision script
 #
 # Copyright (C) Jelmer Vernooij <jelmer@openchange.org> 2008
-#   
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
 # (at your option) any later version.
-#   
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-#   
+#
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
 import optparse
-import os,sys
+import os, sys
 
 # To allow running from the source directory
 sys.path.append("python")
@@ -29,6 +29,24 @@ import samba
 import samba.getopt as options
 import openchange.provision as openchange
 
+def check_incompatible_options(parser, opts):
+    incompatible_options = ['deprovision', 'standalone', 'additional', 'primary_server', 'openchangedb', 'migrate', 'check']
+    active_option = None
+    for option_name in incompatible_options:
+        if getattr(opts, option_name, None):
+            if active_option:
+                if active_option == 'additional' and option_name == 'primary_server':
+                    # this combination is compatible
+                    continue
+                else:
+                    # for the error msg put the options in their command line shape
+                    active_option = '--' + active_option.replace('_', '-')                    
+                    option_name   = '--' + option_name.replace('_', '-')
+                    parser.error("The options " + active_option + " and " + option_name + " are mutually exclusive")
+            else:
+                active_option = option_name
+
+
 parser = optparse.OptionParser("openchange_provision [options]")
 
 sambaopts = options.SambaOptions(parser)
@@ -36,17 +54,30 @@ parser.add_option_group(sambaopts)
 
 credopts = options.CredentialsOptions(parser)
 parser.add_option_group(credopts)
-parser.add_option("--firstorg", type="string", metavar="FIRSTORG", 
-                  help="set OpenChange First Organization (otherwise First Organization)")
-parser.add_option("--firstou", type="string", metavar="FIRSTOU", 
-                  help="set OpenChange First Organization Unit (otherwise First Organization Unit)")
+parser.add_option("--firstorg", type="string", metavar="FIRSTORG",
+                  default="First Organization",
+                  help="set OpenChange Organization Name (otherwise 'First Organization')")
+parser.add_option("--firstou", type="string", metavar="FIRSTOU",
+                  default="First Administrative Group",
+                  help="set OpenChange Administrative Group (otherwise 'First Administrative Group')")
+parser.add_option("--standalone", action="store_true", help="Provisioning an standalone OpenChange server")
+parser.add_option("--additional", action="store_true", help="Provisioning an additional OpenChange server")
+parser.add_option("--primary-server", action="store_true", help="Set this OpenChange server as the primary server")
 parser.add_option("--openchangedb", action="store_true", help="Initialize OpenChange dispatcher database")
+parser.add_option("--openchangedb-uri", type="string", default="ldb://openchange.ldb",
+                  help="openchange database destination, by default a ldb file (openchange.ldb) "
+                       "inside samba private directory is used but you can use mysql as backend "
+                       "specifying a connection string like mysql://user:passwd@host/db_name")
 parser.add_option("--deprovision", action="store_true", help="Uninstall the Exchange schema and objects from AD")
-opts,args = parser.parse_args()
+parser.add_option("--migrate", action="store_true", help="Migrate MySQL schema of an existing OpenChange installation")
+parser.add_option("--check", action="store_true", help="Check whether the server can be provisioned")
+
+opts, args = parser.parse_args()
 if len(args) != 0:
-    parser.print_usage()
+    parser.print_help()
     sys.exit(1)
-    
+check_incompatible_options(parser, opts)
+
 lp = sambaopts.get_loadparm()
 creds = credopts.get_credentials(lp)
 
@@ -58,10 +89,35 @@ def setup_path(*args):
     global _setupdir
     return os.path.join(_setupdir, *args)
 
-if not opts.openchangedb:
-    if opts.deprovision:
-	openchange.deprovision(setup_path, lp, creds, firstorg=opts.firstorg, firstou=opts.firstou)
-    else:
-	openchange.provision(setup_path, lp, creds, firstorg=opts.firstorg, firstou=opts.firstou)
+provisionnames = openchange.guess_names_from_smbconf(
+    lp, creds, opts.firstorg, opts.firstou)
+
+if opts.deprovision:
+    try:
+        openchange.unregister(setup_path, provisionnames, lp, creds)
+        openchange.deprovision(setup_path, provisionnames, lp, creds)
+        openchange.openchangedb_deprovision(provisionnames, lp)
+    except openchange.ServerInUseError, e:
+        print >> sys.stderr, "[!] Unable to unregister this server, it's being used for: %s" % str(e)
+        sys.exit(1)
+elif opts.additional and opts.primary_server:
+    openchange.register(setup_path, provisionnames, lp, creds)
+    openchange.registerasmain(setup_path, provisionnames, lp, creds)
+elif opts.additional:
+    openchange.register(setup_path, provisionnames, lp, creds)
+elif opts.standalone:
+    openchange.provision(setup_path, provisionnames, lp, creds)
+    openchange.register(setup_path, provisionnames, lp, creds)
+    openchange.registerasmain(setup_path, provisionnames, lp, creds)
+elif opts.primary_server:
+    openchange.registerasmain(setup_path, provisionnames, lp, creds)
+elif opts.migrate:
+    openchange.openchangedb_migrate(lp)
+elif opts.check:
+    openchange.check_not_provisioned(provisionnames, lp, creds)
+elif opts.openchangedb:
+    openchange.openchangedb_provision(provisionnames, lp, opts.openchangedb_uri)
 else:
-	openchange.openchangedb_provision(lp, firstorg=opts.firstorg, firstou=opts.firstou)
+    parser.print_help()
+    sys.exit(1)
+

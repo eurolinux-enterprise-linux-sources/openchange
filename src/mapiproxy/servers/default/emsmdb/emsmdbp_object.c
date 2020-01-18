@@ -3,7 +3,8 @@
 
    EMSMDBP: EMSMDB Provider implementation
 
-   Copyright (C) Julien Kerihuel 2009-2013
+   Copyright (C) Julien Kerihuel 2009-2015
+   Copyright (C) Enrique J. Hernández 2015
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -30,6 +31,7 @@
 
 #include "mapiproxy/dcesrv_mapiproxy.h"
 #include "mapiproxy/libmapiproxy/libmapiproxy.h"
+#include "mapiproxy/libmapiproxy/fault_util.h"
 #include "mapiproxy/libmapiserver/libmapiserver.h"
 #include "mapiproxy/libmapistore/mapistore_nameid.h"
 #include "libmapi/property_tags.h"
@@ -193,7 +195,13 @@ _PUBLIC_ enum mapistore_error emsmdbp_object_get_fid_by_name(struct emsmdbp_cont
 		return MAPISTORE_SUCCESS;
 	}
 	else {
-		return openchangedb_get_fid_by_name(emsmdbp_ctx->oc_ctx, folderID, name, fidp);
+		struct emsmdbp_object *mailbox_object = emsmdbp_get_mailbox(parent_folder);
+		if (mailbox_object == NULL) {
+			OC_DEBUG(0, "Failed to find mailbox object for parent_folder.\n");
+			return MAPISTORE_ERR_INVALID_PARAMETER;
+		}
+
+		return openchangedb_get_fid_by_name(emsmdbp_ctx->oc_ctx, mailbox_object->object.mailbox->owner_username, folderID, name, fidp);
 	}
 }
 
@@ -243,7 +251,8 @@ static enum mapistore_error emsmdbp_object_folder_commit_creation(struct emsmdbp
 		return ret;
 	}
 
-	mem_ctx = talloc_zero(NULL, TALLOC_CTX);
+	mem_ctx = talloc_new(NULL);
+	MAPISTORE_RETVAL_IF(!mem_ctx, MAPISTORE_ERR_NO_MEMORY, NULL);
 
 	value = get_SPropValue_SRow(new_folder->object.folder->postponed_props, PR_CONTAINER_CLASS_UNICODE);
 	if (!value) {
@@ -254,17 +263,20 @@ static enum mapistore_error emsmdbp_object_folder_commit_creation(struct emsmdbp
 		role = emsmdbp_container_class_to_role(value->value.lpszW);
 	}
 	else if (force_container_class) {
-		DEBUG(5, (__location__": forcing folder backend role to 'fallback'\n"));
+		OC_DEBUG(5, "forcing folder backend role to 'fallback'\n");
 		role = MAPISTORE_FALLBACK_ROLE;
 	}
 	else {
-		DEBUG(5, (__location__": container class not set yet\n"));
+		OC_DEBUG(5, "container class not set yet\n");
 		goto end;
 	}
 
 	value = get_SPropValue_SRow(new_folder->object.folder->postponed_props, PR_DISPLAY_NAME_UNICODE);
 	if (!value) {
-		DEBUG(5, (__location__": display name not set yet\n"));
+		value = get_SPropValue_SRow(new_folder->object.folder->postponed_props, PR_DISPLAY_NAME);
+	}
+	if (!value) {
+		OC_DEBUG(5, "display name not set yet\n");
 		goto end;
 	}
 
@@ -278,7 +290,10 @@ static enum mapistore_error emsmdbp_object_folder_commit_creation(struct emsmdbp
 
 	ret = mapistore_add_context(emsmdbp_ctx->mstore_ctx, owner, mapistore_uri, fid, &context_id, &new_folder->backend_object);
 	if (ret != MAPISTORE_SUCCESS) {
-		abort();
+		OC_PANIC(false,
+			 ("mapistore_add_context() failed with 0x%.8x, mapistore_uri = [%s].\n",
+			  ret, mapistore_uri));
+		goto end;
 	}
 
 	new_folder->object.folder->contextID = context_id;
@@ -291,28 +306,29 @@ static enum mapistore_error emsmdbp_object_folder_commit_creation(struct emsmdbp
 	}
 
 	value = get_SPropValue_SRow(new_folder->object.folder->postponed_props, PidTagChangeNumber);
-	retval = openchangedb_create_folder(emsmdbp_ctx->oc_ctx, parent_fid, fid, value->value.d, mapistore_uri, -1);
+	retval = openchangedb_create_folder(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, parent_fid, fid, value->value.d, mapistore_uri, -1);
 	if (retval != MAPI_E_SUCCESS) {
-		if (retval == MAPI_E_COLLISION) {
-			ret = MAPISTORE_ERR_EXIST;
-		}
-		else {
-			ret = MAPISTORE_ERR_NOT_FOUND;
-		}
-		DEBUG(0, (__location__": openchangedb folder creation failed: 0x%.8x\n", retval));
+		OC_DEBUG(0, "OpenChangeDB folder creation failed: %s\n", mapi_get_errstr(retval));
+		ret = mapi_error_to_mapistore(retval);
 		goto end;
 	}
 
-	mapistore_indexing_record_add_fid(emsmdbp_ctx->mstore_ctx, context_id, owner, fid);
-	new_folder->object.folder->contextID = context_id;
+	retval = openchangedb_set_folder_properties(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, fid, new_folder->object.folder->postponed_props);
+	if (retval != MAPI_E_SUCCESS) {
+		OC_DEBUG(0, "OpenChangeDB folder set properties failed: %s", mapi_get_errstr(retval));
+		ret = mapi_error_to_mapistore(retval);
+		goto end;
+	}
 
-	openchangedb_set_folder_properties(emsmdbp_ctx->oc_ctx, fid, new_folder->object.folder->postponed_props);
+	mapistore_indexing_record_add_fmid_for_uri(emsmdbp_ctx->mstore_ctx, context_id, owner, fid,
+						   mapistore_uri);
+
 	mapistore_properties_set_properties(emsmdbp_ctx->mstore_ctx, context_id, new_folder->backend_object, new_folder->object.folder->postponed_props);
 
 	talloc_unlink(new_folder, new_folder->object.folder->postponed_props);
 	new_folder->object.folder->postponed_props = NULL;
 
-	DEBUG(5, ("new mapistore context created at uri: %s\n", mapistore_uri));
+	OC_DEBUG(5, "new mapistore context created at uri: %s\n", mapistore_uri);
 
 end:
 	talloc_free(mem_ctx);
@@ -320,18 +336,34 @@ end:
 	return ret;
 }
 
-_PUBLIC_ enum MAPISTATUS emsmdbp_object_create_folder(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *parent_folder, TALLOC_CTX *mem_ctx, uint64_t fid, struct SRow *rowp, struct emsmdbp_object **new_folderp)
+
+/**
+   \details Create a folder
+
+   \param emsmdbp_ctx pointer to the emsmdbp context
+   \param parent_folder pointer to parent folder where to create the new folder
+   \param mem_ctx pointer to the memory context
+   \param fid Folder Identifier to assign the new folder object
+   \param rowp the properties to set to the new folder
+   \param force_container_class force the usage of Fallback role if we are
+          creating a mapistore root folder and the container class is not
+          available at rowp parameter
+   \param [out] new_folderp location to store new emsmdbp object on success
+
+   \return MAPISTATUS error code
+ */
+_PUBLIC_ enum MAPISTATUS emsmdbp_object_create_folder(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *parent_folder, TALLOC_CTX *mem_ctx, uint64_t fid, struct SRow *rowp, bool force_container_class, struct emsmdbp_object **new_folderp)
 {
 	uint64_t			parentFolderID, testFolderID;
 	struct SPropValue		*value;
-	int				retval;
+	enum mapistore_error		retval;
 	struct emsmdbp_object		*new_folder;
 	struct SRow			*postponed_props;
 
 	/* Sanity checks */
-	if (!emsmdbp_ctx) return MAPISTORE_ERROR;
-	if (!parent_folder) return MAPISTORE_ERROR;
-	if (!rowp) return MAPISTORE_ERROR;
+	MAPI_RETVAL_IF(!emsmdbp_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+	MAPI_RETVAL_IF(!parent_folder, MAPI_E_INVALID_PARAMETER, NULL);
+	MAPI_RETVAL_IF(!rowp, MAPI_E_INVALID_PARAMETER, NULL);
 
 	new_folder = emsmdbp_object_folder_init(mem_ctx, emsmdbp_ctx, fid, parent_folder);
 	if (emsmdbp_is_mapistore(parent_folder)) {
@@ -340,6 +372,7 @@ _PUBLIC_ enum MAPISTATUS emsmdbp_object_create_folder(struct emsmdbp_context *em
 			talloc_free(new_folder);
 			return mapistore_error_to_mapi(retval);
 		}
+		/* FIXME: Add indexing entry */
 	}
 	else {
 		parentFolderID = parent_folder->object.folder->folderID;
@@ -351,10 +384,10 @@ _PUBLIC_ enum MAPISTATUS emsmdbp_object_create_folder(struct emsmdbp_context *em
 			talloc_free(new_folder);
 			return MAPI_E_INVALID_PARAMETER;
 		}
-		if (openchangedb_get_fid_by_name(emsmdbp_ctx->oc_ctx, parentFolderID,
+		if (openchangedb_get_fid_by_name(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, parentFolderID,
 						 value->value.lpszW, &testFolderID) == MAPI_E_SUCCESS) {
 			/* this folder already exists */
-			DEBUG(4, ("emsmdbp_object: CreateFolder Duplicate Folder error\n"));
+			OC_DEBUG(4, "emsmdbp_object: CreateFolder Duplicate Folder error\n");
 			talloc_free(new_folder);
 			return MAPI_E_COLLISION;
 		}
@@ -368,11 +401,14 @@ _PUBLIC_ enum MAPISTATUS emsmdbp_object_create_folder(struct emsmdbp_context *em
 			new_folder->object.folder->postponed_props = postponed_props;
 			new_folder->object.folder->mapistore_root = true;
 
-			emsmdbp_object_folder_commit_creation(emsmdbp_ctx, new_folder, false);
+			retval = emsmdbp_object_folder_commit_creation(emsmdbp_ctx, new_folder, force_container_class);
+			if (retval != MAPISTORE_SUCCESS) {
+				talloc_free(new_folder);
+				return mapistore_error_to_mapi(retval);
+			}
 		}
 		else {
-			DEBUG(0, (__location__": PidTagChangeNumber *must* be present\n"));
-			abort();
+			OC_PANIC(true, ("PidTagChangeNumber *must* be present\n"));
 		}
 	}
 	*new_folderp = new_folder;
@@ -393,7 +429,7 @@ _PUBLIC_ enum mapistore_error emsmdbp_object_open_folder(TALLOC_CTX *mem_ctx, st
 
 	folder_object = emsmdbp_object_folder_init(mem_ctx, emsmdbp_ctx, fid, parent);
 	if (emsmdbp_is_mapistore(parent)) {
-		DEBUG(0, ("%s: opening child mapistore folder\n", __FUNCTION__));
+		OC_DEBUG(5, "opening child mapistore folder\n");
 		retval = mapistore_folder_open_folder(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(parent), parent->backend_object, folder_object, fid, &folder_object->backend_object);
 		if (retval != MAPISTORE_SUCCESS) {
 			talloc_free(folder_object);
@@ -403,11 +439,17 @@ _PUBLIC_ enum mapistore_error emsmdbp_object_open_folder(TALLOC_CTX *mem_ctx, st
 	else {
 		local_ctx = talloc_zero(NULL, void);
 	
-		retval = openchangedb_get_mapistoreURI(local_ctx, emsmdbp_ctx->oc_ctx, fid, &path, true);
+		mailbox_object = emsmdbp_get_mailbox(parent);
+		if (mailbox_object == NULL) {
+			OC_DEBUG(0, "Failed to find mailbox object for parent passed.\n");
+			return MAPISTORE_ERR_INVALID_PARAMETER;
+		}
+
+		retval = openchangedb_get_mapistoreURI(local_ctx, emsmdbp_ctx->oc_ctx, mailbox_object->object.mailbox->owner_username, fid, &path, true);
 		if (retval == MAPISTORE_SUCCESS && path) {
 			folder_object->object.folder->mapistore_root = true;
 			/* system/special folder */
-			DEBUG(0, ("%s: opening base mapistore folder\n", __FUNCTION__));
+			OC_DEBUG(5, "opening base mapistore folder\n");
 
 			retval = mapistore_search_context_by_uri(emsmdbp_ctx->mstore_ctx, path, &contextID, &folder_object->backend_object);
 			if (retval == MAPISTORE_SUCCESS) {
@@ -434,24 +476,24 @@ _PUBLIC_ enum mapistore_error emsmdbp_object_open_folder(TALLOC_CTX *mem_ctx, st
 				parent_fid = parent->object.folder->folderID;
 				break;
 			default:
-				DEBUG(5, ("you should never get here\n"));
-				abort();
+				OC_PANIC(true, ("Trying to open folder with parent not a Mailbox or Folder. Parent type: %d\n",
+						parent->type));
+				break;
 			}
-			mailbox_object = emsmdbp_get_mailbox(parent);
-			ret = openchangedb_get_parent_fid(emsmdbp_ctx->oc_ctx, fid, &oc_parent_fid, mailbox_object->object.mailbox->mailboxstore);
+			ret = openchangedb_get_parent_fid(emsmdbp_ctx->oc_ctx, mailbox_object->object.mailbox->owner_username, fid, &oc_parent_fid, mailbox_object->object.mailbox->mailboxstore);
 			if (ret != MAPI_E_SUCCESS) {
-				DEBUG(0, ("folder %.16"PRIx64" or %.16"PRIx64" does not exist\n", parent_fid, fid));
+				OC_DEBUG(0, "folder %.16"PRIx64" or %.16"PRIx64" does not exist\n", parent_fid, fid);
 				talloc_free(local_ctx);
 				talloc_free(folder_object);
 				return MAPISTORE_ERR_NOT_FOUND;
 			}
 			if (oc_parent_fid != parent_fid) {
-				DEBUG(0, ("parent folder mismatch: expected %.16"PRIx64" but got %.16"PRIx64"\n", parent_fid, oc_parent_fid));
+				OC_DEBUG(0, "parent folder mismatch: expected %.16"PRIx64" but got %.16"PRIx64"\n", parent_fid, oc_parent_fid);
 				talloc_free(local_ctx);
 				talloc_free(folder_object);
 				return MAPISTORE_ERR_NOT_FOUND;
 			}
-			DEBUG(0, ("%s: opening openchangedb folder\n", __FUNCTION__));
+			OC_DEBUG(5, "opening openchangedb folder\n");
 		}
 		talloc_free(local_ctx);
 	}
@@ -466,7 +508,7 @@ _PUBLIC_ int emsmdbp_get_uri_from_fid(TALLOC_CTX *mem_ctx, struct emsmdbp_contex
 	enum MAPISTATUS	retval;
 	bool		soft_deleted;
 
-	retval = openchangedb_get_mapistoreURI(mem_ctx, emsmdbp_ctx->oc_ctx, fid, urip, true); /* FIXME: always mailboxstore */
+	retval = openchangedb_get_mapistoreURI(mem_ctx, emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, fid, urip, true); /* FIXME: always mailboxstore */
 	if (retval == MAPI_E_SUCCESS) {
 		return MAPISTORE_SUCCESS;
 	}
@@ -511,33 +553,41 @@ static char *emsmdbp_compute_parent_uri(TALLOC_CTX *mem_ctx, char *uri)
 	return parent_uri;
 }
 
-static int emsmdbp_get_parent_fid(struct emsmdbp_context *emsmdbp_ctx, uint64_t fid, uint64_t *parent_fidp)
+static enum MAPISTATUS emsmdbp_get_parent_fid(struct emsmdbp_context *emsmdbp_ctx,
+					      struct emsmdbp_object *mailbox_object,
+					      uint64_t fid, uint64_t *parent_fidp)
 {
-	TALLOC_CTX	*mem_ctx;
-	int		retval = MAPISTORE_SUCCESS;
-	bool		soft_deleted;
-	char		*uri, *parent_uri;
+	TALLOC_CTX			*mem_ctx;
+	enum mapistore_error		ret;
+	enum MAPISTATUS			retval;
+	bool				soft_deleted;
+	char				*uri, *parent_uri;
+	struct emsmdbp_object_mailbox	*mailbox;
+
+	OPENCHANGE_RETVAL_IF(!mailbox_object, MAPI_E_INVALID_PARAMETER, NULL);
+	mailbox = mailbox_object->object.mailbox;
 
 	mem_ctx = talloc_zero(NULL, void);
-	retval = openchangedb_get_parent_fid(emsmdbp_ctx->oc_ctx, fid, parent_fidp, true);
-	if (retval == MAPISTORE_SUCCESS) {
+	retval = openchangedb_get_parent_fid(emsmdbp_ctx->oc_ctx, mailbox->owner_username, fid, parent_fidp, true);
+	if (retval == MAPI_E_SUCCESS) {
 		goto end;
 	}
-	retval = openchangedb_get_parent_fid(emsmdbp_ctx->oc_ctx, fid, parent_fidp, false);
-	if (retval == MAPISTORE_SUCCESS) {
+	retval = openchangedb_get_parent_fid(emsmdbp_ctx->oc_ctx, mailbox->owner_username, fid, parent_fidp, false);
+	if (retval == MAPI_E_SUCCESS) {
 		goto end;
 	}
 
-	retval = mapistore_indexing_record_get_uri(emsmdbp_ctx->mstore_ctx, emsmdbp_ctx->username, mem_ctx, fid, &uri, &soft_deleted);
-	if (retval == MAPISTORE_SUCCESS) {
+	ret = mapistore_indexing_record_get_uri(emsmdbp_ctx->mstore_ctx, mailbox->owner_username, mem_ctx, fid, &uri, &soft_deleted);
+	if (ret == MAPISTORE_SUCCESS) {
 		parent_uri = emsmdbp_compute_parent_uri(mem_ctx, uri);
 		if (parent_uri) {
-			retval = emsmdbp_get_fid_from_uri(emsmdbp_ctx, parent_uri, parent_fidp);
+			ret = emsmdbp_get_fid_from_uri(emsmdbp_ctx, parent_uri, parent_fidp);
 		}
 		else {
-			retval = MAPISTORE_ERR_NOT_FOUND;
+			ret = MAPISTORE_ERR_NOT_FOUND;
 		}
 	}
+	retval = mapistore_error_to_mapi(ret);
 
 end:
 	talloc_free(mem_ctx);
@@ -552,46 +602,59 @@ end:
    \param emsmdbp_ctx pointer to the emsmdbp context
    \param context_object pointer to current context object
    \param fid pointer to the Folder Identifier to lookup
+   \param [out] folder_object_p location to store emsmdbp object on success
 
-   \return Valid emsmdbp object structure on success, otherwise NULL
+   \return MAPISTATUS error code
  */
-_PUBLIC_ enum mapistore_error emsmdbp_object_open_folder_by_fid(TALLOC_CTX *mem_ctx, struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *context_object, uint64_t fid, struct emsmdbp_object **folder_object_p)
+
+_PUBLIC_ enum MAPISTATUS emsmdbp_object_open_folder_by_fid(TALLOC_CTX *mem_ctx,
+							   struct emsmdbp_context *emsmdbp_ctx,
+							   struct emsmdbp_object *context_object,
+							   uint64_t fid,
+							   struct emsmdbp_object **folder_object_p)
 {
 	uint64_t		parent_fid;
-	int			retval;
-	struct emsmdbp_object	*parent_object;
-	
+	enum mapistore_error	ret;
+	enum MAPISTATUS		retval;
+	struct emsmdbp_object   *mailbox_object;
+
+	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!context_object, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!folder_object_p, MAPI_E_INVALID_PARAMETER, NULL);
+
 	if ((context_object->type == EMSMDBP_OBJECT_MAILBOX
 	     && fid == context_object->object.mailbox->folderID)
 	    || (context_object->type == EMSMDBP_OBJECT_FOLDER
 		&& fid == context_object->object.folder->folderID)) {
 		*folder_object_p = context_object;
-		return MAPISTORE_SUCCESS;
-	}
-	else {
-		parent_object = emsmdbp_get_mailbox(context_object);
-		if (fid == parent_object->object.mailbox->folderID) {
-			*folder_object_p = parent_object;
-			return MAPISTORE_SUCCESS;
-		}
+		return MAPI_E_SUCCESS;
 	}
 
-	retval = emsmdbp_get_parent_fid(emsmdbp_ctx, fid, &parent_fid);
-	if (retval == MAPISTORE_SUCCESS) {
+	mailbox_object = emsmdbp_get_mailbox(context_object);
+	if (fid == mailbox_object->object.mailbox->folderID) {
+		*folder_object_p = mailbox_object;
+		return MAPI_E_SUCCESS;
+	}
+
+	retval = emsmdbp_get_parent_fid(emsmdbp_ctx, mailbox_object, fid, &parent_fid);
+	if (retval == MAPI_E_SUCCESS) {
 		if (parent_fid) {
+			struct emsmdbp_object	*parent_object = NULL;
+
 			retval = emsmdbp_object_open_folder_by_fid(mem_ctx, emsmdbp_ctx, context_object, parent_fid, &parent_object);
-			if (retval != MAPISTORE_SUCCESS) {
+			if (retval != MAPI_E_SUCCESS) {
 				return retval;
 			}
-			return emsmdbp_object_open_folder(mem_ctx, emsmdbp_ctx, parent_object, fid, folder_object_p);
+			ret = emsmdbp_object_open_folder(mem_ctx, emsmdbp_ctx, parent_object, fid, folder_object_p);
+			return mapistore_error_to_mapi(ret);
 		}
 		else {
 			*folder_object_p = emsmdbp_object_folder_init(mem_ctx, emsmdbp_ctx, fid, NULL);
-			return MAPISTORE_SUCCESS;
+			return MAPI_E_SUCCESS;
 		}
 	}
 
-	return MAPISTORE_ERROR;
+	return retval;
 }
 
 _PUBLIC_ int emsmdbp_object_stream_commit(struct emsmdbp_object *stream_object)
@@ -653,6 +716,7 @@ _PUBLIC_ int emsmdbp_object_stream_commit(struct emsmdbp_object *stream_object)
 static int emsmdbp_object_destructor(void *data)
 {
 	struct emsmdbp_object	*object = (struct emsmdbp_object *) data;
+	enum mapistore_error	mretval;
 	int			ret = MAPISTORE_SUCCESS;
 	uint32_t		contextID;
 	unsigned int		missing_objects;
@@ -661,8 +725,7 @@ static int emsmdbp_object_destructor(void *data)
 	if (!data) return -1;
 	if (!emsmdbp_is_mapistore(object)) goto nomapistore;
 
-	DEBUG(4, ("[%s:%d]: emsmdbp %s object released\n", __FUNCTION__, __LINE__,
-		  emsmdbp_getstr_type(object)));
+	OC_DEBUG(4, "emsmdbp %s object released\n", emsmdbp_getstr_type(object));
 
 	contextID = emsmdbp_get_contextID(object);
 	switch (object->type) {
@@ -670,26 +733,34 @@ static int emsmdbp_object_destructor(void *data)
 		if (object->object.folder->mapistore_root) {
 			ret = mapistore_del_context(object->emsmdbp_ctx->mstore_ctx, contextID);
 		}
-		DEBUG(4, ("[%s:%d] mapistore folder context retval = %d\n", __FUNCTION__, __LINE__, ret));
+		OC_DEBUG(4, "mapistore folder context retval = %d\n", ret);
 		break;
 	case EMSMDBP_OBJECT_TABLE:
 		if (emsmdbp_is_mapistore(object) && object->backend_object && object->object.table->handle > 0) {
-			mapistore_table_handle_destructor(object->emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object), object->backend_object, object->object.table->handle);
+			mapistore_table_handle_destructor(object->emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object),
+							  object->backend_object, object->object.table->handle);
 		}
-                if (object->object.table->subscription_list) {
-                        DLIST_REMOVE(object->emsmdbp_ctx->mstore_ctx->subscriptions, object->object.table->subscription_list);
-			talloc_free(object->object.table->subscription_list);
-			/* talloc_unlink(object->emsmdbp_ctx, object->object.table->subscription_list); */
-                }
+		if (object->object.table->handle && (object->object.table->subscription == true)) {
+			mretval = mapistore_notification_subscription_delete_by_handle(object->emsmdbp_ctx->mstore_ctx,
+										       object->emsmdbp_ctx->session_uuid,
+										       object->object.table->handle);
+			if (mretval != MAPISTORE_SUCCESS) {
+				OC_DEBUG(0, "Unable to delete table notification subscription with handle=0x%x",
+					 object->object.table->handle);
+			}
+		}
 		break;
 	case EMSMDBP_OBJECT_STREAM:
 		emsmdbp_object_stream_commit(object);
 		break;
-        case EMSMDBP_OBJECT_SUBSCRIPTION:
-                if (object->object.subscription->subscription_list) {
-                        DLIST_REMOVE(object->emsmdbp_ctx->mstore_ctx->subscriptions, object->object.subscription->subscription_list);
-			talloc_free(object->object.subscription->subscription_list);
-                }
+	case EMSMDBP_OBJECT_SUBSCRIPTION:
+		mretval = mapistore_notification_subscription_delete_by_handle(object->emsmdbp_ctx->mstore_ctx,
+								     object->emsmdbp_ctx->session_uuid,
+								     object->object.subscription->handle);
+		if (mretval != MAPISTORE_SUCCESS) {
+			OC_DEBUG(0, "Unable to delete notification subscription with handle=0x%x",
+				 object->object.subscription->handle);
+		}
 		break;
 	case EMSMDBP_OBJECT_SYNCCONTEXT:
 		gettimeofday(&request_end, NULL);
@@ -702,8 +773,8 @@ static int emsmdbp_object_destructor(void *data)
 			request_delta.tv_usec = request_end.tv_usec - object->object.synccontext->request_start.tv_usec;
 		}
 		missing_objects = (object->object.synccontext->total_objects - object->object.synccontext->skipped_objects - object->object.synccontext->sent_objects);
-		DEBUG(5, ("free synccontext: sent: %u, skipped: %u, total: %u -> missing: %u\n", object->object.synccontext->sent_objects, object->object.synccontext->skipped_objects, object->object.synccontext->total_objects, missing_objects));
-		DEBUG(5, ("  time taken for transmitting entire data: %lu.%.6lu\n", request_delta.tv_sec, request_delta.tv_usec));
+		OC_DEBUG(5, "free synccontext: sent: %u, skipped: %u, total: %u -> missing: %u\n", object->object.synccontext->sent_objects, object->object.synccontext->skipped_objects, object->object.synccontext->total_objects, missing_objects);
+		OC_DEBUG(5, "  time taken for transmitting entire data: %lu.%.6lu\n", request_delta.tv_sec, request_delta.tv_usec);
 		break;
 	case EMSMDBP_OBJECT_UNDEF:
 	case EMSMDBP_OBJECT_MAILBOX:
@@ -742,6 +813,7 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_object_init(TALLOC_CTX *mem_ctx, struct 
 	object->object.folder = NULL;
 	object->object.message = NULL;
 	object->object.stream = NULL;
+	object->object.subscription = NULL;
 	object->backend_object = NULL;
 	object->parent_object = parent_object;
 	(void) talloc_reference(object, parent_object);
@@ -762,9 +834,11 @@ static int emsmdbp_copy_properties(struct emsmdbp_context *emsmdbp_ctx, struct e
 	struct SPropValue	newValue;
 	uint32_t		i;
 
-	mem_ctx = talloc_zero(NULL, TALLOC_CTX);
+	mem_ctx = talloc_new(NULL);
+	OPENCHANGE_RETVAL_IF(!mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+
 	if (emsmdbp_object_get_available_properties(mem_ctx, emsmdbp_ctx, source_object, &properties) == MAPISTORE_ERROR) {
-		DEBUG(0, ("["__location__"] - mapistore support not implemented yet - shouldn't occur\n"));
+		OC_DEBUG(0, "mapistore support not implemented yet - shouldn't occur\n");
 		talloc_free(mem_ctx);
 		return MAPI_E_NO_SUPPORT;
 	}
@@ -826,31 +900,13 @@ static int emsmdbp_copy_properties(struct emsmdbp_context *emsmdbp_ctx, struct e
 	return MAPI_E_SUCCESS;
 }
 
-/* FIXME: this function is already present in oxcmsg... */
-struct emsmdbp_prop_index {
-	uint32_t display_name; /* PR_DISPLAY_NAME_UNICODE or PR_7BIT_DISPLAY_NAME_UNICODE or PR_RECIPIENT_DISPLAY_NAME_UNICODE */
-	uint32_t email_address; /* PR_EMAIL_ADDRESS_UNICODE or PR_SMTP_ADDRESS_UNICODE */
-};
-
-static inline void emsmdbp_fill_prop_index(struct emsmdbp_prop_index *prop_index, struct SPropTagArray *properties)
-{
-	if (SPropTagArray_find(*properties, PR_DISPLAY_NAME_UNICODE, &prop_index->display_name) == MAPI_E_NOT_FOUND
-	    && SPropTagArray_find(*properties, PR_7BIT_DISPLAY_NAME_UNICODE, &prop_index->display_name) == MAPI_E_NOT_FOUND
-	    && SPropTagArray_find(*properties, PR_RECIPIENT_DISPLAY_NAME_UNICODE, &prop_index->display_name) == MAPI_E_NOT_FOUND) {
-		prop_index->display_name = (uint32_t) -1;
-	}
-	if (SPropTagArray_find(*properties, PR_EMAIL_ADDRESS_UNICODE, &prop_index->email_address) == MAPI_E_NOT_FOUND
-	    && SPropTagArray_find(*properties, PR_SMTP_ADDRESS_UNICODE, &prop_index->email_address) == MAPI_E_NOT_FOUND) {
-		prop_index->email_address = (uint32_t) -1;
-	}
-}
-
 static inline int emsmdbp_copy_message_recipients_mapistore(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *source_object, struct emsmdbp_object *dest_object)
 {
 	TALLOC_CTX			*mem_ctx;
+	enum mapistore_error		ret;
 	struct mapistore_message	*msg_data;
 	uint32_t			contextID, i;
-	struct emsmdbp_prop_index	prop_index;
+	int				email_address_idx, display_name_idx;
 	struct SPropTagArray		*new_columns;
 	void				**new_data;
 
@@ -860,33 +916,40 @@ static inline int emsmdbp_copy_message_recipients_mapistore(struct emsmdbp_conte
 	}
 
 	/* Fetch data from source message */
-	mem_ctx = talloc_zero(NULL, TALLOC_CTX);
+	mem_ctx = talloc_new(NULL);
+	OPENCHANGE_RETVAL_IF(!mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+
 	contextID = emsmdbp_get_contextID(source_object);
-	mapistore_message_get_message_data(emsmdbp_ctx->mstore_ctx, contextID, source_object->backend_object, mem_ctx, &msg_data);
+	ret = mapistore_message_get_message_data(emsmdbp_ctx->mstore_ctx, contextID, source_object->backend_object, mem_ctx, &msg_data);
+	OPENCHANGE_RETVAL_IF(ret != MAPISTORE_SUCCESS, mapistore_error_to_mapi(ret), mem_ctx);
 
 	/* By convention, we pass PR_DISPLAY_NAME_UNICODE and PR_EMAIL_ADDRESS_UNICODE to the backend, so we prepend them to each values array */
 	if (msg_data->recipients_count > 0
 	    && (msg_data->columns->cValues < 2 || msg_data->columns->aulPropTag[0] != PR_DISPLAY_NAME_UNICODE || msg_data->columns->aulPropTag[1] != PR_EMAIL_ADDRESS_UNICODE)) {
-		emsmdbp_fill_prop_index(&prop_index, msg_data->columns);
-
 		new_columns = talloc_zero(mem_ctx, struct SPropTagArray);
+		OPENCHANGE_RETVAL_IF(!new_columns, MAPI_E_NOT_ENOUGH_MEMORY, mem_ctx);
 		new_columns->cValues = msg_data->columns->cValues + 2;
 		new_columns->aulPropTag = talloc_array(new_columns, enum MAPITAGS, new_columns->cValues);
+		OPENCHANGE_RETVAL_IF(!new_columns->aulPropTag, MAPI_E_NOT_ENOUGH_MEMORY, mem_ctx);
 		memcpy(new_columns->aulPropTag + 2, msg_data->columns->aulPropTag, sizeof(enum MAPITAGS) * msg_data->columns->cValues);
 		new_columns->aulPropTag[0] = PR_DISPLAY_NAME_UNICODE;
 		new_columns->aulPropTag[1] = PR_EMAIL_ADDRESS_UNICODE;
 
+		email_address_idx = get_email_address_index_SPropTagArray(msg_data->columns);
+		display_name_idx = get_display_name_index_SPropTagArray(msg_data->columns);
+
 		for (i = 0; i < msg_data->recipients_count; i++) {
 			new_data = talloc_array(mem_ctx, void *, new_columns->cValues);
+			OPENCHANGE_RETVAL_IF(!new_data, MAPI_E_NOT_ENOUGH_MEMORY, mem_ctx);
 			memcpy(new_data + 2, msg_data->recipients[i].data, sizeof(void *) * msg_data->columns->cValues);
-			if (prop_index.display_name != (uint32_t) -1) {
-				new_data[0] = msg_data->recipients[i].data[prop_index.display_name];
+			if (display_name_idx != -1) {
+				new_data[0] = msg_data->recipients[i].data[display_name_idx];
 			}
 			else {
 				new_data[0] = NULL;
 			}
-			if (prop_index.email_address != (uint32_t) -1) {
-				new_data[1] = msg_data->recipients[i].data[prop_index.email_address];
+			if (email_address_idx != -1) {
+				new_data[1] = msg_data->recipients[i].data[email_address_idx];
 			}
 			else {
 				new_data[1] = NULL;
@@ -896,7 +959,8 @@ static inline int emsmdbp_copy_message_recipients_mapistore(struct emsmdbp_conte
 		msg_data->columns = new_columns;
 
 		/* Copy data into dest message */
-		mapistore_message_modify_recipients(emsmdbp_ctx->mstore_ctx, contextID, dest_object->backend_object, msg_data->columns, msg_data->recipients_count, msg_data->recipients);
+		ret = mapistore_message_modify_recipients(emsmdbp_ctx->mstore_ctx, contextID, dest_object->backend_object, msg_data->columns, msg_data->recipients_count, msg_data->recipients);
+		OPENCHANGE_RETVAL_IF(ret != MAPISTORE_SUCCESS, mapistore_error_to_mapi(ret), mem_ctx);
 	}
 
 	talloc_free(mem_ctx);
@@ -920,7 +984,8 @@ static inline int emsmdbp_copy_message_attachments_mapistore(struct emsmdbp_cont
 		return MAPI_E_SUCCESS;
 	}
 
-	mem_ctx = talloc_zero(NULL, TALLOC_CTX);
+	mem_ctx = talloc_new(NULL);
+	OPENCHANGE_RETVAL_IF(!mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
 
 	/* we fetch the attachment nums */
 	table_object = emsmdbp_object_message_open_attachment_table(mem_ctx, emsmdbp_ctx, source_object);
@@ -946,7 +1011,7 @@ static inline int emsmdbp_copy_message_attachments_mapistore(struct emsmdbp_cont
 		}
 		if (retvals[0] != MAPI_E_SUCCESS) {
 			talloc_free(mem_ctx);
-			DEBUG(5, ("cannot copy attachments without PR_ATTACH_NUM\n"));
+			OC_DEBUG(5, "cannot copy attachments without PR_ATTACH_NUM\n");
 			return MAPISTORE_ERROR;
 		}
 		attach_nums[i] = *(uint32_t *) data_pointers[0];
@@ -999,15 +1064,15 @@ _PUBLIC_ int emsmdbp_object_copy_properties(struct emsmdbp_context *emsmdbp_ctx,
 	      || source_object->type == EMSMDBP_OBJECT_MAILBOX
 	      || source_object->type == EMSMDBP_OBJECT_MESSAGE
 	      || source_object->type == EMSMDBP_OBJECT_ATTACHMENT)) {
-		DEBUG(0, (__location__": object must be EMSMDBP_OBJECT_FOLDER, EMSMDBP_OBJECT_MAILBOX, EMSMDBP_OBJECT_MESSAGE or EMSMDBP_OBJECT_ATTACHMENT (type =  %d)\n", source_object->type));
+		OC_DEBUG(0, "object must be EMSMDBP_OBJECT_FOLDER, EMSMDBP_OBJECT_MAILBOX, EMSMDBP_OBJECT_MESSAGE or EMSMDBP_OBJECT_ATTACHMENT (type =  %d)\n", source_object->type);
 		ret = MAPI_E_NO_SUPPORT;
-                goto end;
-        }
+		goto end;
+	}
 	if (target_object->type != source_object->type) {
-		DEBUG(0, ("source and destination objects type must match (type =  %d)\n", target_object->type));
+		OC_DEBUG(0, "source and destination objects type must match (type =  %d)\n", target_object->type);
 		ret = MAPI_E_NO_SUPPORT;
-                goto end;
-        }
+		goto end;
+	}
 
 	/* copy properties (common to all object types) */
 	ret = emsmdbp_copy_properties(emsmdbp_ctx, source_object, target_object, excluded_properties);
@@ -1031,12 +1096,12 @@ _PUBLIC_ int emsmdbp_object_copy_properties(struct emsmdbp_context *emsmdbp_ctx,
 			}
 		}
 		else {
-			DEBUG(0, ("Cannot copy recipients or attachments to or from non-mapistore messages\n"));
+			OC_DEBUG(0, "Cannot copy recipients or attachments to or from non-mapistore messages\n");
 		}
 		break;
 	default:
 		if (deep_copy) {
-			DEBUG(0, ("Cannot deep copy non-message objects\n"));
+			OC_DEBUG(0, "Cannot deep copy non-message objects\n");
 		}
 	}
 
@@ -1088,30 +1153,31 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_object_mailbox_init(TALLOC_CTX *mem_ctx,
 	object->object.mailbox->folderID = 0x0;
 	object->object.mailbox->mailboxstore = mailboxstore;
 
-	if (mailboxstore == true) {
-		object->object.mailbox->owner_EssDN = talloc_strdup(object->object.mailbox, essDN);
-		ret = ldb_search(emsmdbp_ctx->samdb_ctx, mem_ctx, &res,
-				 ldb_get_default_basedn(emsmdbp_ctx->samdb_ctx),
-				 LDB_SCOPE_SUBTREE, recipient_attrs, "legacyExchangeDN=%s", 
-				 object->object.mailbox->owner_EssDN);
-		if (!ret && res->count == 1) {
-			accountName = ldb_msg_find_attr_as_string(res->msgs[0], "sAMAccountName", NULL);
-			if (accountName) {
-				object->object.mailbox->owner_username = talloc_strdup(object->object.mailbox, accountName);
+	object->object.mailbox->owner_EssDN = talloc_strdup(object->object.mailbox, essDN);
+	ret = ldb_search(emsmdbp_ctx->samdb_ctx, mem_ctx, &res,
+			 ldb_get_default_basedn(emsmdbp_ctx->samdb_ctx),
+			 LDB_SCOPE_SUBTREE, recipient_attrs, "legacyExchangeDN=%s",
+			 ldb_binary_encode_string(mem_ctx, object->object.mailbox->owner_EssDN));
+	if (!ret && res->count == 1) {
+		accountName = ldb_msg_find_attr_as_string(res->msgs[0], "sAMAccountName", NULL);
+		if (accountName) {
+			object->object.mailbox->owner_username = talloc_strdup(object->object.mailbox, accountName);
 
-				/* Retrieve Mailbox folder identifier */
-				openchangedb_get_SystemFolderID(emsmdbp_ctx->oc_ctx, object->object.mailbox->owner_username,
-								0x1, &object->object.mailbox->folderID);
-			}
-			displayName = ldb_msg_find_attr_as_string(res->msgs[0], "displayName", NULL);
-			if (displayName) {
-				object->object.mailbox->owner_Name = talloc_strdup(object->object.mailbox, 
-										   displayName);
-			}
 		}
+		displayName = ldb_msg_find_attr_as_string(res->msgs[0], "displayName", NULL);
+		if (displayName) {
+			object->object.mailbox->owner_Name = talloc_strdup(object->object.mailbox,
+									   displayName);
+		}
+	}
+
+	if (mailboxstore == true) {
+		/* Retrieve Mailbox folder identifier */
+		openchangedb_get_SystemFolderID(emsmdbp_ctx->oc_ctx, object->object.mailbox->owner_username,
+						0x1, &object->object.mailbox->folderID);
 	} else {
 		/* Retrieve Public folder identifier */
-		openchangedb_get_PublicFolderID(emsmdbp_ctx->oc_ctx, EMSMDBP_PF_ROOT, &object->object.mailbox->folderID);
+		openchangedb_get_PublicFolderID(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, EMSMDBP_PF_ROOT, &object->object.mailbox->folderID);
 	}
 
 	object->object.mailbox->szUserDN = talloc_strdup(object->object.mailbox, emsmdbp_ctx->szUserDN);
@@ -1159,16 +1225,18 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_object_folder_init(TALLOC_CTX *mem_ctx,
 	return object;
 }
 
-int emsmdbp_folder_get_folder_count(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *folder, uint32_t *row_countp)
+enum MAPISTATUS emsmdbp_folder_get_folder_count(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *folder, uint32_t *row_countp)
 {
-	int		retval;
-	uint64_t	folderID;
+	uint64_t		folderID;
+	enum MAPISTATUS		retval;
+	enum mapistore_error	ret;
 
 	if (emsmdbp_is_mapistore(folder)) {
-		retval = (int) mapistore_folder_get_child_count(emsmdbp_ctx->mstore_ctx, 
+		ret = mapistore_folder_get_child_count(emsmdbp_ctx->mstore_ctx,
 								emsmdbp_get_contextID(folder),
-								folder->backend_object, 
+								folder->backend_object,
 								MAPISTORE_FOLDER_TABLE, row_countp);
+		retval = mapistore_error_to_mapi(ret);
 	}
 	else {
 		if (folder->type == EMSMDBP_OBJECT_FOLDER) {
@@ -1178,13 +1246,163 @@ int emsmdbp_folder_get_folder_count(struct emsmdbp_context *emsmdbp_ctx, struct 
 			folderID = folder->object.folder->folderID;
 		}
 		else {
-			DEBUG(5, ("unsupported object type\n"));
-			return MAPISTORE_ERROR;
+			OC_DEBUG(5, "unsupported object type\n");
+			return MAPI_E_INVALID_OBJECT;
 		}
 		printf("emsmdbp_folder_get_folder_count: folderID = %"PRIu64"\n", folderID);
-		retval = (int) openchangedb_get_folder_count(emsmdbp_ctx->oc_ctx, folderID, row_countp);
+		retval = openchangedb_get_folder_count(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, folderID, row_countp);
 	}
 
+	return retval;
+}
+
+
+/**
+   \details Return the full number of folders within specified
+   folder's hierarchy
+
+   \param emsmdbp_ctx pointer to the emsmdbp context
+   \param folder pointer to the emsmdb folder to start the count from
+   \param row_countp pointer on the number of folders to return
+
+   \return MAPI_E_SUCCESS on success, otherwise MAPI_ERROR
+ */
+enum MAPISTATUS emsmdbp_folder_get_recursive_folder_count(struct emsmdbp_context *emsmdbp_ctx,
+							  struct emsmdbp_object *folder,
+							  uint32_t *row_countp)
+{
+	enum MAPISTATUS		retval = MAPI_E_SUCCESS;
+	struct emsmdbp_object	*table_object;
+	uint32_t		count = 0;
+	struct mapi_handles	*rec = NULL;
+	uint32_t		i;
+	struct SPropTagArray	*SPropTagArray = NULL;
+	uint32_t		handle = 0;
+
+	retval = emsmdbp_folder_get_folder_count(emsmdbp_ctx, folder, &count);
+	if ((retval == MAPI_E_SUCCESS) && count) {
+		*row_countp += count;
+
+		retval = mapi_handles_add(emsmdbp_ctx->handles_ctx, handle, &rec);
+		OPENCHANGE_RETVAL_IF(retval, retval, NULL);
+		table_object = emsmdbp_folder_open_table(rec, folder, MAPISTORE_FOLDER_TABLE, rec->handle);
+		if (!table_object) {
+			mapi_handles_delete(emsmdbp_ctx->handles_ctx, rec->handle);
+			retval = MAPI_E_INVALID_OBJECT;
+			goto end;
+		}
+
+		table_object->object.table->prop_count = 1;
+		table_object->object.table->properties = talloc_array(table_object, enum MAPITAGS, 1);
+		if (!table_object->object.table->properties) {
+			mapi_handles_delete(emsmdbp_ctx->handles_ctx, rec->handle);
+			talloc_free(table_object);
+			retval = MAPI_E_INVALID_OBJECT;
+			goto end;
+		}
+		table_object->object.table->properties[0] = PidTagFolderId;
+
+		SPropTagArray = set_SPropTagArray(table_object, 1, PidTagFolderId);
+		mapistore_table_set_columns(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(table_object),
+					    table_object->backend_object, SPropTagArray->cValues,
+					    SPropTagArray->aulPropTag);
+		for (i = 0; i < count; i++) {
+			void		**data_pointers = NULL;
+			enum MAPISTATUS	*retvals = NULL;
+
+			data_pointers = emsmdbp_object_table_get_row_props(table_object, emsmdbp_ctx, table_object,
+									   i, MAPISTORE_PREFILTERED_QUERY, &retvals);
+
+			if (data_pointers) {
+				struct emsmdbp_object	*sfolder = NULL;
+
+				retval = emsmdbp_object_open_folder_by_fid(table_object, emsmdbp_ctx, folder,
+									   *((uint64_t *)data_pointers[0]), &sfolder);
+				if (retval == MAPI_E_SUCCESS) {
+					uint32_t scount = 0;
+
+					retval = emsmdbp_folder_get_recursive_folder_count(emsmdbp_ctx, sfolder, &scount);
+					*row_countp += scount;
+					talloc_free(sfolder);
+				}
+				talloc_free(data_pointers);
+				talloc_free(retvals);
+			}
+		}
+		talloc_free(table_object->object.table->properties);
+		talloc_free(SPropTagArray);
+		talloc_free(table_object);
+		mapi_handles_delete(emsmdbp_ctx->handles_ctx, rec->handle);
+	}
+end:
+	return retval;
+}
+
+
+static inline enum MAPISTATUS emsmdbp_object_move_folder_to_mapistore_root(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *folder, struct emsmdbp_object *parent_folder, const char *new_name)
+{
+	uint64_t		parent_fid, fid, test_folder_id, change_number;
+	enum MAPISTATUS		retval;
+	char			*mapistore_uri;
+	TALLOC_CTX		*mem_ctx;
+
+
+	/* Sanity checks */
+	MAPI_RETVAL_IF(!emsmdbp_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+	MAPI_RETVAL_IF(!folder, MAPI_E_INVALID_PARAMETER, NULL);
+	MAPI_RETVAL_IF(!parent_folder, MAPI_E_INVALID_PARAMETER, NULL);
+	MAPI_RETVAL_IF(!new_name, MAPI_E_INVALID_PARAMETER, NULL);
+
+	mem_ctx = talloc_new(NULL);
+	MAPI_RETVAL_IF(!mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+
+	if (parent_folder->type == EMSMDBP_OBJECT_MAILBOX) {
+		parent_fid = parent_folder->object.mailbox->folderID;
+	} else { /* EMSMDBP_OBJECT_FOLDER */
+		parent_fid = parent_folder->object.folder->folderID;
+	}
+
+	if (openchangedb_get_fid_by_name(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, parent_fid,
+					 new_name, &test_folder_id) == MAPI_E_SUCCESS) {
+		OC_DEBUG(4, "emsmdbp_object: move_folder_to_mapistore_root duplicate folder error\n");
+		retval = MAPI_E_COLLISION;
+		goto end;
+	}
+
+	fid = folder->object.folder->folderID;
+
+	retval = emsmdbp_get_uri_from_fid(mem_ctx, emsmdbp_ctx, fid, &mapistore_uri);
+	if (retval != MAPI_E_SUCCESS) {
+		OC_DEBUG(0, "Cannot locate folder id: %"PRIu64" on indexing database\n", fid);
+		goto end;
+	}
+
+	retval = openchangedb_get_new_changeNumber(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, &change_number);
+	if (retval != MAPI_E_SUCCESS) {
+		OC_DEBUG(0, "Cannot get a new change number: %s\n", mapi_get_errstr(retval));
+		goto end;
+	}
+
+	retval = openchangedb_create_folder(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username,
+					    parent_fid, fid, change_number,
+					    mapistore_uri, -1);
+	if (retval != MAPI_E_SUCCESS) {
+		OC_DEBUG(0, "OpenChangeDB folder creation failed: 0x%.8x\n", retval);
+		goto end;
+	}
+
+	/* Set folder properties is done in the upper layer by
+	   oxcfxics in cached mode. This is a temporary hack until we
+	   implement copy properties from MAPIStore to OpenChange
+	   DB. */
+
+	folder->object.folder->mapistore_root = true;
+
+	OC_DEBUG(5, "New MAPIStore root folder moved at URI: %s\n", mapistore_uri);
+	retval = MAPI_E_SUCCESS;
+
+end:
+	talloc_free(mem_ctx);
 	return retval;
 }
 
@@ -1202,11 +1420,8 @@ _PUBLIC_ enum mapistore_error emsmdbp_folder_move_folder(struct emsmdbp_context 
 	}
 
 	if (!emsmdbp_is_mapistore(target_folder)) {
-		/* TODO: converting a non-mapistore root object to one is not trivial but should be implemented one day. */
-		return MAPISTORE_ERR_DENIED;
-
 		/* target is the "Top of Information Store" ? */
-		retval = openchangedb_get_system_idx(emsmdbp_ctx->oc_ctx, target_folder->object.folder->folderID, &system_idx);
+		retval = openchangedb_get_system_idx(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, target_folder->object.folder->folderID, &system_idx);
 		if (retval != MAPI_E_SUCCESS) {
 			return MAPISTORE_ERROR;
 		}
@@ -1221,7 +1436,7 @@ _PUBLIC_ enum mapistore_error emsmdbp_folder_move_folder(struct emsmdbp_context 
 
 	/* we check whether the folder is a special folder that cannot be moved */
 	if (move_folder->object.folder->mapistore_root) {
-		retval = openchangedb_get_system_idx(emsmdbp_ctx->oc_ctx, move_folder->object.folder->folderID, &system_idx);
+		retval = openchangedb_get_system_idx(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, move_folder->object.folder->folderID, &system_idx);
 		if (retval != MAPI_E_SUCCESS) {
 			return MAPISTORE_ERROR;
 		}
@@ -1232,36 +1447,103 @@ _PUBLIC_ enum mapistore_error emsmdbp_folder_move_folder(struct emsmdbp_context 
 	}
 
 	contextID = emsmdbp_get_contextID(move_folder);
-	ret = mapistore_folder_move_folder(emsmdbp_ctx->mstore_ctx, contextID, move_folder->backend_object, target_folder->backend_object, mem_ctx, new_name);
-	if (move_folder->object.folder->mapistore_root) {
-		retval = openchangedb_delete_folder(emsmdbp_ctx->oc_ctx, move_folder->object.folder->folderID);
-		if (retval) {
-			DEBUG(0, ("an error occurred during the deletion of the folder entry in the openchange db: %d", retval));
-		}
-	}
-
 	if (is_top_of_IS) {
-		/* pass */
+		/* We move it in MAPIStore backend and then we create
+		   the required properties for a MAPIStore root
+		   folder. This is required as indexing database is
+		   updated in mapistore layer */
+		ret = mapistore_folder_move_folder(emsmdbp_ctx->mstore_ctx, contextID, move_folder->backend_object, NULL, mem_ctx, new_name);
+		if (ret == MAPISTORE_SUCCESS) {
+			retval = emsmdbp_object_move_folder_to_mapistore_root(emsmdbp_ctx, move_folder, target_folder, new_name);
+			if (retval != MAPI_E_SUCCESS) {
+				OC_DEBUG(5, "Move folder to MAPIStore root failed: %s\n", mapi_get_errstr(retval));
+				return MAPISTORE_ERROR;
+			}
+		}
+	} else {
+		ret = mapistore_folder_move_folder(emsmdbp_ctx->mstore_ctx, contextID, move_folder->backend_object, target_folder->backend_object, mem_ctx, new_name);
+		if (move_folder->object.folder->mapistore_root) {
+			retval = openchangedb_delete_folder(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, move_folder->object.folder->folderID);
+			if (retval != MAPI_E_SUCCESS) {
+				OC_DEBUG(0, "an error occurred during the deletion of the folder entry in the openchange db: %d\n", retval);
+			}
+		}
 	}
 
 	return ret;
 }
 
+/**
+   \details  Delete the fmids from a folder in the indexing database.
+
+   \param mstore_ctx pointer to the mapistore context
+   \param context_id the context identifier
+   \param username the owner of the folder to delete its entries
+   \param fid the folder identifier
+   \param deleted_fmid the array of child fmids from the folder
+   \param deleted_fmid_count the number of deleted_fmids
+   \param flags the delete flags. See emsmdbp_folder_delete for details.
+
+   \return MAPISTORE_SUCCESS on success, otherwise MAPISTORE error.
+*/
+_PUBLIC_ enum mapistore_error emsmdbp_folder_delete_indexing_records(struct mapistore_context *mstore_ctx, uint32_t context_id, char *username, uint64_t fid, uint64_t *deleted_fmids, uint32_t deleted_fmids_count, uint8_t flags)
+{
+        enum mapistore_error    ret;
+        uint8_t                 delete_type_flag;
+        uint32_t                i;
+
+        delete_type_flag = (flags & DELETE_HARD_DELETE) ? MAPISTORE_PERMANENT_DELETE : MAPISTORE_SOFT_DELETE;
+        ret = mapistore_indexing_record_del_fid(mstore_ctx, context_id, username, fid, delete_type_flag);
+        MAPISTORE_RETVAL_IF(ret != MAPISTORE_SUCCESS, ret, NULL);
+
+        for (i = 0; i < deleted_fmids_count; i++) {
+                ret = mapistore_indexing_record_del_fid(mstore_ctx, context_id, username,
+                                                        deleted_fmids[i], delete_type_flag);
+                MAPISTORE_RETVAL_IF(ret != MAPISTORE_SUCCESS, ret, NULL);
+        }
+
+        return MAPISTORE_SUCCESS;
+}
+
+/**
+   \details Delete a folder.
+
+   \param emsmdbp_ctx pointer to the emsmdbp context
+   \param parent_folder the parent folder
+   \param fid the folder identifier to delete from parent_folder
+   \param flags the delete flags.
+
+   Possible values for flags are:
+   -# DEL_MESSAGES Delete all the messages in the folder
+   -# DEL_FOLDERS Delete the subfolder and all of its subfolders
+   -# DELETE_HARD_DELETE Hard delete the folder
+
+   \return MAPISTORE_SUCCESS on success, otherwise MAPISTORE error.
+*/
 _PUBLIC_ enum mapistore_error emsmdbp_folder_delete(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *parent_folder, uint64_t fid, uint8_t flags)
 {
 	enum mapistore_error	ret;
-	enum MAPISTATUS		mapiret;
+	enum MAPISTATUS		retval;
 	TALLOC_CTX		*mem_ctx;
 	bool			mailboxstore;
-	uint32_t		context_id;
+	uint32_t		context_id, deleted_fmids_count;
 	void			*subfolder;
 	char			*mapistoreURL;
+	uint64_t		*deleted_fmids;
 
-	mem_ctx = talloc_zero(NULL, TALLOC_CTX);
+	mem_ctx = talloc_new(NULL);
+	MAPISTORE_RETVAL_IF(!mem_ctx, MAPISTORE_ERR_NO_MEMORY, NULL);
+
+	/* Check if it is a special folder */
+	if (oxosfld_is_special_folder(emsmdbp_ctx, fid)) {
+		OC_DEBUG(1, "Attempt to delete special folder: 0x%"PRIx64, fid);
+		ret = MAPISTORE_ERR_DENIED;
+		goto end;
+	}
 
 	mailboxstore = emsmdbp_is_mailboxstore(parent_folder);
 	if (emsmdbp_is_mapistore(parent_folder)) {	/* fid is not a mapistore root */
-		DEBUG(0, ("Deleting mapistore folder\n"));
+		OC_DEBUG(3, "Deleting mapistore folder\n");
 		/* handled by mapistore */
 		context_id = emsmdbp_get_contextID(parent_folder);
 
@@ -1270,20 +1552,23 @@ _PUBLIC_ enum mapistore_error emsmdbp_folder_delete(struct emsmdbp_context *emsm
 			goto end;
 		}
 
-		ret = mapistore_folder_delete(emsmdbp_ctx->mstore_ctx, context_id, subfolder, flags);
+		ret = mapistore_folder_delete(emsmdbp_ctx->mstore_ctx, context_id, subfolder, flags, mem_ctx, &deleted_fmids, &deleted_fmids_count);
+		if (ret != MAPISTORE_SUCCESS) {
+			goto end;
+		}
+
+		/* Update indexing entries */
+		ret = emsmdbp_folder_delete_indexing_records(emsmdbp_ctx->mstore_ctx, context_id,
+							     emsmdbp_get_owner(parent_folder),
+							     fid, deleted_fmids, deleted_fmids_count,
+							     flags);
 		if (ret != MAPISTORE_SUCCESS) {
 			goto end;
 		}
 	}
 	else {
-		mapiret = openchangedb_get_mapistoreURI(mem_ctx, emsmdbp_ctx->oc_ctx, fid, &mapistoreURL, mailboxstore);
-		if (mapiret != MAPI_E_SUCCESS) {
-			ret = MAPISTORE_ERR_NOT_FOUND;
-			goto end;
-		}
-
-		mapiret = openchangedb_delete_folder(emsmdbp_ctx->oc_ctx, fid);
-		if (mapiret != MAPI_E_SUCCESS) {
+		retval = openchangedb_get_mapistoreURI(mem_ctx, emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, fid, &mapistoreURL, mailboxstore);
+		if (retval != MAPI_E_SUCCESS) {
 			ret = MAPISTORE_ERR_NOT_FOUND;
 			goto end;
 		}
@@ -1299,12 +1584,29 @@ _PUBLIC_ enum mapistore_error emsmdbp_folder_delete(struct emsmdbp_context *emsm
 				}
 			}
 
-			ret = mapistore_folder_delete(emsmdbp_ctx->mstore_ctx, context_id, subfolder, flags);
+			ret = mapistore_folder_delete(emsmdbp_ctx->mstore_ctx, context_id,
+						      subfolder, flags, mem_ctx, &deleted_fmids,
+						      &deleted_fmids_count);
 			if (ret != MAPISTORE_SUCCESS) {
 				goto end;
 			}
 
-			 mapistore_del_context(emsmdbp_ctx->mstore_ctx, context_id);
+			mapistore_del_context(emsmdbp_ctx->mstore_ctx, context_id);
+
+			/* Update indexing entries */
+			ret = emsmdbp_folder_delete_indexing_records(emsmdbp_ctx->mstore_ctx, context_id,
+								     emsmdbp_get_owner(parent_folder),
+								     fid, deleted_fmids, deleted_fmids_count,
+								     flags);
+			if (ret != MAPISTORE_SUCCESS) {
+				goto end;
+			}
+		}
+
+		retval = openchangedb_delete_folder(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, fid);
+		if (retval != MAPI_E_SUCCESS) {
+			ret = MAPISTORE_ERR_NOT_FOUND;
+			goto end;
 		}
 	}
 
@@ -1326,12 +1628,16 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_folder_open_table(TALLOC_CTX *mem_ctx,
 	int			ret;
 
 	if (!(parent_object->type != EMSMDBP_OBJECT_FOLDER || parent_object->type != EMSMDBP_OBJECT_MAILBOX)) {
-		DEBUG(0, (__location__": parent_object must be EMSMDBP_OBJECT_FOLDER or EMSMDBP_OBJECT_MAILBOX (type =  %d)\n", parent_object->type));
+		OC_DEBUG(0, "parent_object must be EMSMDBP_OBJECT_FOLDER or EMSMDBP_OBJECT_MAILBOX (type =  %d)\n", parent_object->type);
 		return NULL;
 	}
 
 	if (parent_object->type == EMSMDBP_OBJECT_FOLDER && parent_object->object.folder->postponed_props) {
-		emsmdbp_object_folder_commit_creation(parent_object->emsmdbp_ctx, parent_object, true);
+		ret = emsmdbp_object_folder_commit_creation(parent_object->emsmdbp_ctx, parent_object, true);
+		if (ret != MAPISTORE_SUCCESS) {
+			OC_DEBUG(0, "folder_commit_creation failed with error: 0x%.8X", ret);
+			return NULL;
+		}
 	}
 
 	table_object = emsmdbp_object_table_init(mem_ctx, parent_object->emsmdbp_ctx, parent_object);
@@ -1353,8 +1659,9 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_folder_open_table(TALLOC_CTX *mem_ctx,
 				mstore_type = MAPISTORE_PERMISSIONS_TABLE;
 				break;
 			default:
-				DEBUG(5, ("Unhandled table type for folders: %d\n", table_type));
-				abort();
+				OC_PANIC(false, ("Unhandled table type for folders: %d\n", table_type));
+				talloc_free(table_object);
+				return NULL;
 			}
 
 			ret = mapistore_folder_open_table(parent_object->emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(parent_object), parent_object->backend_object, table_object, mstore_type, handle_id, &table_object->backend_object, &table_object->object.table->denominator);
@@ -1378,7 +1685,7 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_folder_open_table(TALLOC_CTX *mem_ctx,
 					folderID = parent_object->object.mailbox->folderID;
 					break;
 				default:
-					DEBUG(5, ("Unsupported object type"));
+					OC_DEBUG(5, "Unsupported object type");
 					table_object->object.table->denominator = 0;
 					return table_object;
 				}
@@ -1386,21 +1693,23 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_folder_open_table(TALLOC_CTX *mem_ctx,
 				/* Non-mapistore message tables */
 				switch (table_type) {
 				case MAPISTORE_MESSAGE_TABLE:
-					openchangedb_get_message_count(parent_object->emsmdbp_ctx->oc_ctx, 
-								       folderID, 
+					openchangedb_get_message_count(parent_object->emsmdbp_ctx->oc_ctx,
+								       parent_object->emsmdbp_ctx->username,
+								       folderID,
 								       &table_object->object.table->denominator,
 								       false);
 					break;
 				case MAPISTORE_FAI_TABLE:
-					openchangedb_get_message_count(parent_object->emsmdbp_ctx->oc_ctx, 
-								       folderID, 
+					openchangedb_get_message_count(parent_object->emsmdbp_ctx->oc_ctx,
+								       parent_object->emsmdbp_ctx->username,
+								       folderID,
 								       &table_object->object.table->denominator,
 								       true);
 					break;
 				default:
-					DEBUG(0, ("Unhandled openchangedb table type for folders: %d\n", table_type));
 					table_object->object.table->denominator = 0;
-					abort();
+					OC_PANIC(false, ("Unhandled openchangedb table type for folders: %d\n", table_type));
+					return table_object;
 				}
 			}
 			if (!emsmdbp_is_mapistore(parent_object)) {
@@ -1413,12 +1722,12 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_folder_open_table(TALLOC_CTX *mem_ctx,
 					folderID = parent_object->object.mailbox->folderID;
 					break;
 				default:
-					DEBUG(5, ("Unsupported object type"));
+					OC_DEBUG(5, "Unsupported object type");
 					table_object->object.table->denominator = 0;
 					return table_object;
 				}
-				DEBUG(0, ("Initializaing openchangedb table\n"));
-				openchangedb_table_init((TALLOC_CTX *)table_object, table_type, folderID, &table_object->backend_object);
+				OC_DEBUG(5, "Initializing openchangedb table\n");
+				openchangedb_table_init((TALLOC_CTX *)table_object, parent_object->emsmdbp_ctx->oc_ctx, parent_object->emsmdbp_ctx->username, table_type, folderID, &table_object->backend_object);
 			}
 		}
 	}
@@ -1463,7 +1772,8 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_object_table_init(TALLOC_CTX *mem_ctx,
 	object->object.table->denominator = 0;
 	object->object.table->ulType = 0;
 	object->object.table->restricted = false;
-	object->object.table->subscription_list = NULL;
+	object->object.table->flags = 0;
+	object->object.table->subscription = false;
 
 	return object;
 }
@@ -1506,7 +1816,7 @@ _PUBLIC_ int emsmdbp_object_table_get_available_properties(TALLOC_CTX *mem_ctx, 
 		SPropTagArray_add(properties, properties, PR_LAST_MODIFIER_SID);
 		SPropTagArray_add(properties, properties, PR_LAST_MODIFIER_ENTRYID);
 		SPropTagArray_add(properties, properties, PR_ATTR_HIDDEN);
-		SPropTagArray_add(properties, properties, PR_ATTR_SYSTEM);
+		SPropTagArray_add(properties, properties, PidTagAttributeSystem);
 		SPropTagArray_add(properties, properties, PR_ATTR_READONLY);
 		SPropTagArray_add(properties, properties, PR_EXTENDED_ACL_DATA);
 		SPropTagArray_add(properties, properties, PR_CONTAINER_CLASS_UNICODE);
@@ -1557,21 +1867,28 @@ _PUBLIC_ void **emsmdbp_object_table_get_row_props(TALLOC_CTX *mem_ctx, struct e
         table = table_object->object.table;
         num_props = table_object->object.table->prop_count;
 
-        data_pointers = talloc_array(mem_ctx, void *, num_props);
-        memset(data_pointers, 0, sizeof(void *) * num_props);
-        retvals = talloc_array(mem_ctx, enum MAPISTATUS, num_props);
-        memset(retvals, 0, sizeof(uint32_t) * num_props);
+	data_pointers = talloc_zero_array(mem_ctx, void *, num_props);
+	if (!data_pointers) {
+		OC_DEBUG(0, "No more memory");
+		return NULL;
+	}
+	retvals = talloc_zero_array(mem_ctx, enum MAPISTATUS, num_props);
+	if (!retvals) {
+		OC_DEBUG(0, "No more memory");
+		talloc_free(data_pointers);
+		return NULL;
+	}
 
 	if (emsmdbp_is_mapistore(table_object)) {
 		contextID = emsmdbp_get_contextID(table_object);
-		retval = mapistore_table_get_row(emsmdbp_ctx->mstore_ctx, contextID,
-						 table_object->backend_object, data_pointers,
-						 query_type, row_id, &properties);
-		if (retval == MAPI_E_SUCCESS) {
+		ret = mapistore_table_get_row(emsmdbp_ctx->mstore_ctx, contextID,
+					      table_object->backend_object, data_pointers,
+					      query_type, row_id, &properties);
+		if (ret == MAPISTORE_SUCCESS) {
 			for (i = 0; i < num_props; i++) {
 				data_pointers[i] = properties[i].data;
                                         
-				if (properties[i].error) {
+				if (properties[i].error != MAPISTORE_SUCCESS) {
 					retvals[i] = mapistore_error_to_mapi(properties[i].error);
 				}
 				else {
@@ -1582,7 +1899,7 @@ _PUBLIC_ void **emsmdbp_object_table_get_row_props(TALLOC_CTX *mem_ctx, struct e
 			}
 		}
 		else {
-			DEBUG(5, ("%s: invalid object (likely due to a restriction)\n", __location__));
+			OC_DEBUG(5, "invalid object (likely due to a restriction)\n");
 			talloc_free(retvals);
 			talloc_free(data_pointers);
 			return NULL;
@@ -1595,44 +1912,34 @@ _PUBLIC_ void **emsmdbp_object_table_get_row_props(TALLOC_CTX *mem_ctx, struct e
 			parentFolderId = table_object->parent_object->object.mailbox->folderID;
 		}
 		else {
-			DEBUG(5, ("%s: non-mapistore tables can only be client of folder objects\n", __location__));
+			OC_DEBUG(5, "non-mapistore tables can only be client of folder objects\n");
 			talloc_free(retvals);
 			talloc_free(data_pointers);
 			return NULL;
 		}
 
 		odb_ctx = talloc_zero(NULL, void);
-
-		/* Setup table_filter for openchangedb */
-		/* switch (table_object->object.table->ulType) { */
-		/* case MAPISTORE_MESSAGE_TABLE: */
-		/* 	table_filter = talloc_asprintf(odb_ctx, "(&(PidTagParentFolderId=%"PRIu64")(PidTagMessageId=*))", folderID); */
-		/* 	break; */
-		/* case MAPISTORE_FOLDER_TABLE: */
-		/* 	table_filter = talloc_asprintf(odb_ctx, "(&(PidTagParentFolderId=%"PRIu64")(PidTagFolderId=*))", folderID); */
-		/* 	break; */
-		/* default: */
-		/* 	DEBUG(5, ("[%s:%d]: Unsupported table type for openchangedb: %d\n", __FUNCTION__, __LINE__,  */
-		/* 		      table_object->object.table->ulType)); */
-		/* 	talloc_free(retvals); */
-		/* 	talloc_free(data_pointers); */
-		/* 	return NULL; */
-		/* } */
+		if (!odb_ctx) {
+			OC_DEBUG(0, "No more memory");
+			talloc_free(retvals);
+			talloc_free(data_pointers);
+			return NULL;
+		}
 
 		/* 1. retrieve the object id from odb */
 		switch (table_object->object.table->ulType) {
 		case MAPISTORE_FOLDER_TABLE:
-			retval = openchangedb_table_get_property(odb_ctx, table_object->backend_object, emsmdbp_ctx->oc_ctx, PR_FID, row_id, (query_type == MAPISTORE_LIVEFILTERED_QUERY), (void **) &rowFMId);
+			retval = openchangedb_table_get_property(odb_ctx, emsmdbp_ctx->oc_ctx, table_object->backend_object, PR_FID, row_id, (query_type == MAPISTORE_LIVEFILTERED_QUERY), (void **) &rowFMId);
 			break;
 		case MAPISTORE_MESSAGE_TABLE:
-			retval = openchangedb_table_get_property(odb_ctx, table_object->backend_object, emsmdbp_ctx->oc_ctx, PR_MID, row_id, (query_type == MAPISTORE_LIVEFILTERED_QUERY), (void **) &rowFMId);
+			retval = openchangedb_table_get_property(odb_ctx, emsmdbp_ctx->oc_ctx, table_object->backend_object, PR_MID, row_id, (query_type == MAPISTORE_LIVEFILTERED_QUERY), (void **) &rowFMId);
 			break;
 			/* case MAPISTORE_FAI_TABLE: 
 			   retval = openchangedb_table_get_property(odb_ctx, table_object->backend_object, emsmdbp_ctx->oc_ctx,
 			   PR_MID, row_id, (query_type == MAPISTORE_LIVEFILTERED_QUERY), (void **) &rowFMId);
 			   break; */
 		default:
-			DEBUG(5, ("table type %d not supported for non-mapistore table\n", table_object->object.table->ulType));
+			OC_DEBUG(5, "table type %d not supported for non-mapistore table\n", table_object->object.table->ulType);
 			retval = MAPI_E_INVALID_OBJECT;
 		}
 		/* printf("openchangedb_table_get_property retval = 0x%.8x\n", retval); */
@@ -1659,8 +1966,8 @@ _PUBLIC_ void **emsmdbp_object_table_get_row_props(TALLOC_CTX *mem_ctx, struct e
 			mapistore_folder = false;
 			break;
 		default:
-			DEBUG(5, ("you should never get here\n"));
-			abort();
+			OC_PANIC(true, ("Trying open row in unsupported type of table. Table type: %d\n", table_object->object.table->ulType));
+			return NULL;
 		}
 		if (ret != MAPISTORE_SUCCESS) {
 			talloc_free(retvals);
@@ -1675,6 +1982,7 @@ _PUBLIC_ void **emsmdbp_object_table_get_row_props(TALLOC_CTX *mem_ctx, struct e
 			if (mapistore_folder) {
 				/* a hack to avoid fetching dynamic fields from openchange.ldb */
 				switch (table->properties[i]) {
+				case PidTagParentFolderId:
 				case PR_CONTENT_COUNT:
 				case PidTagAssociatedContentCount:
 				case PR_CONTENT_UNREAD:
@@ -1683,6 +1991,9 @@ _PUBLIC_ void **emsmdbp_object_table_get_row_props(TALLOC_CTX *mem_ctx, struct e
 				case PidTagDeletedCountTotal:
 				case PidTagAccess:
 				case PidTagAccessLevel:
+				case PidTagFolderFlags:
+				case PidTagHierRev:
+				case PidTagLocalCommitTimeMax:
 				case PidTagRights: {
 					struct SPropTagArray props;
 					void **local_data_pointers;
@@ -1693,7 +2004,7 @@ _PUBLIC_ void **emsmdbp_object_table_get_row_props(TALLOC_CTX *mem_ctx, struct e
 
 					local_data_pointers = emsmdbp_object_get_properties(data_pointers, emsmdbp_ctx, rowobject, &props, &local_retvals);
 					data_pointers[i] = local_data_pointers[0];
-					retvals[i] = local_retvals[0];
+					retval = local_retvals[0];
 				}
 					break;
 				case PidTagSourceKey:
@@ -1703,30 +2014,25 @@ _PUBLIC_ void **emsmdbp_object_table_get_row_props(TALLOC_CTX *mem_ctx, struct e
 					retval = MAPI_E_SUCCESS;
 					break;
 				default:
-					retval = openchangedb_table_get_property(data_pointers, table_object->backend_object, 
-										 emsmdbp_ctx->oc_ctx,
+					retval = openchangedb_table_get_property(data_pointers, emsmdbp_ctx->oc_ctx,
+										 table_object->backend_object,
 										 table->properties[i], 
 										 row_id,
 										 (query_type == MAPISTORE_LIVEFILTERED_QUERY),
 										 data_pointers + i);
-					/* retval = openchangedb_get_table_property(data_pointers, emsmdbp_ctx->oc_ctx,  */
-					/* 					 emsmdbp_ctx->username, */
-					/* 					 table_filter, table->properties[i],  */
-					/* 					 row_id, data_pointers + i); */
 				}
 			}
 			else {
-				retval = openchangedb_table_get_property(data_pointers, table_object->backend_object, 
-									 emsmdbp_ctx->oc_ctx,
+				retval = openchangedb_table_get_property(data_pointers, emsmdbp_ctx->oc_ctx,
+									 table_object->backend_object,
 									 table->properties[i], 
 									 row_id,
 									 (query_type == MAPISTORE_LIVEFILTERED_QUERY),
 									 data_pointers + i);
 			}
 
-			/* DEBUG(5, ("  %.8x: %d", table->properties[j], retval)); */
 			if (retval == MAPI_E_INVALID_OBJECT) {
-				DEBUG(5, ("%s: invalid object in non-mapistore folder, count set to 0\n", __location__));
+				OC_DEBUG(5, "invalid object in non-mapistore folder, count set to 0\n");
 				talloc_free(retvals);
 				talloc_free(data_pointers);
 				talloc_free(odb_ctx);
@@ -1746,6 +2052,119 @@ _PUBLIC_ void **emsmdbp_object_table_get_row_props(TALLOC_CTX *mem_ctx, struct e
 
         return data_pointers;
 }
+
+
+
+/**
+   \details This function process the hierarchy of folders recursively
+   and fill requested rows.
+
+   \param mem_ctx pointer to the memory context
+   \param emsmdbp_ctx pointer to the emsmdb context
+   \param context_object pointer to the context object
+   \param datablob pointer to the DATA blob to fill
+   \param properties pointer to the array of properties used to fill a
+   row of the table
+   \param current_fid the FolderID of the folder to open and process
+   \param remaining pointer on the remaining rows to process
+   \param count pointer on the number of rows processed to return
+
+   \note This implementation is very preliminary and lacks several use cases:
+   1. It does not handle backward read
+   2. It does not handle positioning of the folder object and rewind
+   of the hierarchy when position != 0
+
+   We currently rely on Outlook asking for 4096 rows to fill this
+   buffer in one operation.
+
+   \return MAPI_E_SUCCESS on success, otherwise MAPI error.
+*/
+_PUBLIC_ enum MAPISTATUS emsmdbp_object_table_get_recursive_row_props(TALLOC_CTX *mem_ctx, struct emsmdbp_context *emsmdbp_ctx,
+								      struct emsmdbp_object *context_object,
+								      DATA_BLOB *datablob, struct SPropTagArray *properties,
+								      uint64_t current_fid, int64_t *remaining, uint32_t *count)
+{
+	enum MAPISTATUS		retval;
+	struct emsmdbp_object	*folder = NULL;
+	struct emsmdbp_object	*table = NULL;
+	struct mapi_handles	*rec = NULL;
+	enum MAPISTATUS		*retvals;
+	void			**data_pointers = NULL;
+	uint32_t		handle = 0;
+	uint32_t		i = 0;
+	uint32_t		j;
+
+	/* Sanity checks */
+	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!context_object, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!remaining, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!*remaining, MAPI_E_SUCCESS, NULL);
+	OPENCHANGE_RETVAL_IF(!count, MAPI_E_INVALID_PARAMETER, NULL);
+
+	/* open current folder */
+	if (current_fid) {
+		retval = emsmdbp_object_open_folder_by_fid(mem_ctx, emsmdbp_ctx, context_object, current_fid, &folder);
+		OPENCHANGE_RETVAL_IF(retval, MAPI_E_INVALID_OBJECT, NULL);
+
+		retval = mapi_handles_add(emsmdbp_ctx->handles_ctx, handle, &rec);
+		OPENCHANGE_RETVAL_IF(retval, MAPI_E_INVALID_OBJECT, folder);
+
+		table = emsmdbp_folder_open_table(rec, folder, MAPISTORE_FOLDER_TABLE, rec->handle);
+		table->object.table->prop_count = properties->cValues;
+		table->object.table->properties = properties->aulPropTag;
+		mapistore_table_set_columns(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(table),
+					    table->backend_object, properties->cValues,
+					    properties->aulPropTag);
+		if (!table) {
+			retval = MAPI_E_INVALID_OBJECT;
+			goto end;
+		}
+	} else {
+		/* otherwise reuse existing context object */
+		table = context_object;
+		folder = table->parent_object;
+	}
+
+	if (!table->object.table->denominator) {
+		retval = MAPI_E_SUCCESS;
+		goto end;
+	}
+
+	mapidump_SPropTagArray(properties);
+	for (i = 0; i < table->object.table->denominator && *remaining > 0; i++) {
+		data_pointers = emsmdbp_object_table_get_row_props(mem_ctx, emsmdbp_ctx, table, i, MAPISTORE_PREFILTERED_QUERY, &retvals);
+		if (data_pointers) {
+			uint64_t	fid = 0;
+
+			emsmdbp_fill_table_row_blob(mem_ctx, emsmdbp_ctx, datablob, properties->cValues,
+						    properties->aulPropTag, data_pointers, retvals);
+			*remaining = *remaining - 1;
+			*count = *count + 1;
+
+			for (j = 0; j < properties->cValues; j++) {
+				if ((properties->aulPropTag[j] == PidTagFolderId) && (retvals[j] == MAPI_E_SUCCESS)) {
+					fid = *(uint64_t *)data_pointers[j];
+					retval = emsmdbp_object_table_get_recursive_row_props(mem_ctx, emsmdbp_ctx,
+											      folder, datablob, properties,
+											      fid, remaining, count);
+					break;
+				}
+			}
+
+			talloc_free(data_pointers);
+			talloc_free(retvals);
+		}
+	}
+end:
+	if (current_fid) {
+		talloc_free(table);
+		mapi_handles_delete(emsmdbp_ctx->handles_ctx, rec->handle);
+		talloc_free(folder);
+	}
+	return retval;
+}
+
+
 
 _PUBLIC_ void emsmdbp_fill_table_row_blob(TALLOC_CTX *mem_ctx, struct emsmdbp_context *emsmdbp_ctx,
 					  DATA_BLOB *table_row, uint16_t num_props,
@@ -1815,7 +2234,7 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_object_message_init(TALLOC_CTX *mem_ctx,
 	if (!emsmdbp_ctx) return NULL;
 	if (!parent) return NULL;
         if (parent->type != EMSMDBP_OBJECT_FOLDER && parent->type != EMSMDBP_OBJECT_MAILBOX && parent->type != EMSMDBP_OBJECT_ATTACHMENT) {
-		DEBUG(5, ("expecting EMSMDBP_OBJECT_FOLDER/_MAILBOX/_ATTACHMENT as type of parent object\n"));
+		OC_DEBUG(5, "expecting EMSMDBP_OBJECT_FOLDER/_MAILBOX/_ATTACHMENT as type of parent object\n");
 		return NULL;
 	}
 
@@ -1836,53 +2255,102 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_object_message_init(TALLOC_CTX *mem_ctx,
 	return object;
 }
 
-static struct mapistore_freebusy_properties *emsmdbp_fetch_freebusy(TALLOC_CTX *mem_ctx, struct emsmdbp_context *emsmdbp_ctx, const char *username, struct tm *start_tm, struct tm *end_tm)
+/* Get the legacyExchangeDN for the administrative group . */
+static enum MAPISTATUS mapiserver_get_administrative_group_legacyexchangedn(TALLOC_CTX *mem_ctx,
+									    struct emsmdbp_context *emsmdbp_ctx,
+									    char **legacyexchangedn)
 {
-	TALLOC_CTX				*local_mem_ctx;
-	struct mapistore_freebusy_properties	*fb_props;
-	char					*email, *tmp;
-	struct SPropTagArray			*props;
-        void					**data_pointers;
-        enum MAPISTATUS				*retvals = NULL;
-	struct emsmdbp_object			*mailbox, *inbox, *calendar;
-	uint64_t				inboxFID, calendarFID;
-	uint32_t				contextID;
-	int					i;
+	int			ret;
+	enum MAPISTATUS		retval;
+	struct  ldb_result	*res = NULL;
+	const char * const	attrs[] = { "legacyExchangeDN", NULL };
+	struct ldb_dn		*basedn = 0;
+	char			*group_name = NULL;
 
-	fb_props = NULL;
+	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!legacyexchangedn, MAPI_E_INVALID_PARAMETER, NULL);
 
-	local_mem_ctx = talloc_zero(NULL, TALLOC_CTX);
+	retval = emsmdbp_get_org_dn(emsmdbp_ctx, &basedn);
+	OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, NULL);
+	retval = emsmdbp_fetch_organizational_units(mem_ctx, emsmdbp_ctx, NULL, &group_name);
+	OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, NULL);
+
+	ret = ldb_search(emsmdbp_ctx->samdb_ctx, emsmdbp_ctx, &res,
+			 basedn, LDB_SCOPE_SUBTREE, attrs,
+			 "(&(objectClass=msExchAdminGroup)(msExchDefaultAdminGroup=TRUE)(cn=%s))",
+			 ldb_binary_encode_string(mem_ctx, group_name));
+
+	/* If the search failed */
+	if (ret != LDB_SUCCESS) {
+		OC_DEBUG(1, "[emsmdbp_object]: ldb_search failure.\n");
+		return MAPI_E_NOT_FOUND;
+	}
+
+	*legacyexchangedn = talloc_strdup(mem_ctx, ldb_msg_find_attr_as_string(res->msgs[0], "legacyExchangeDN", NULL));
+	OPENCHANGE_RETVAL_IF(!*legacyexchangedn, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+
+	return MAPI_E_SUCCESS;
+}
+
+
+static enum MAPISTATUS emsmdbp_fetch_freebusy(TALLOC_CTX *mem_ctx,
+					      struct emsmdbp_context *emsmdbp_ctx,
+					      const char *username,
+					      struct tm *start_tm,
+					      struct tm *end_tm,
+					      struct mapistore_freebusy_properties **fb_props_p)
+{
+	TALLOC_CTX		*local_mem_ctx;
+	char			*email, *tmp, *administrativegroup;
+	struct SPropTagArray	*props;
+	void			**data_pointers;
+	enum MAPISTATUS		*retvals = NULL;
+	enum MAPISTATUS		retval;
+	enum mapistore_error	retval_mapistore;
+	struct emsmdbp_object	*mailbox, *inbox, *calendar;
+	uint64_t		inboxFID, calendarFID;
+	uint32_t		contextID;
+	int			i;
+
+	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!username, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!fb_props_p, MAPI_E_INVALID_PARAMETER, NULL);
+
+	local_mem_ctx = talloc_new(NULL);
+	OPENCHANGE_RETVAL_IF(!local_mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+
+	retval = mapiserver_get_administrative_group_legacyexchangedn(local_mem_ctx, emsmdbp_ctx, &administrativegroup);
+	OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, local_mem_ctx);
 
 	// WARNING: the mechanism here will fail if username is not all lower-case, as LDB does not support case-insensitive queries
 	tmp = talloc_strdup(local_mem_ctx, username);
+	OPENCHANGE_RETVAL_IF(!tmp, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
 	while (*tmp) {
 		*tmp = tolower(*tmp);
 		tmp++;
 	}
-	email = talloc_asprintf(fb_props, "/o=First Organization/ou=First Administrative Group/cn=Recipients/cn=%s", username);
-
+	email = talloc_asprintf(local_mem_ctx, "%s/cn=Recipients/cn=%s", administrativegroup, username);
+	OPENCHANGE_RETVAL_IF(!email, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
 	/* open user mailbox */
 	mailbox = emsmdbp_object_mailbox_init(local_mem_ctx, emsmdbp_ctx, email, true);
-	if (!mailbox) {
-		goto end;
-	}
+	OPENCHANGE_RETVAL_IF(!mailbox, MAPI_E_NOT_FOUND, local_mem_ctx);
 
 	/* open Inbox */
-	openchangedb_get_SystemFolderID(emsmdbp_ctx->oc_ctx, username, EMSMDBP_INBOX, &inboxFID);
-	if (emsmdbp_object_open_folder_by_fid(local_mem_ctx, emsmdbp_ctx, mailbox, inboxFID, &inbox) != MAPISTORE_SUCCESS) {
-		goto end;
-	}
+	retval = openchangedb_get_SystemFolderID(emsmdbp_ctx->oc_ctx, username, EMSMDBP_INBOX, &inboxFID);
+	OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, local_mem_ctx);
+	retval = emsmdbp_object_open_folder_by_fid(local_mem_ctx, emsmdbp_ctx, mailbox, inboxFID, &inbox);
+	OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, local_mem_ctx);
 
 	/* retrieve Calendar entry id */
 	props = talloc_zero(mem_ctx, struct SPropTagArray);
+	OPENCHANGE_RETVAL_IF(!props, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
 	props->cValues = 1;
 	props->aulPropTag = talloc_zero(props, enum MAPITAGS);
 	props->aulPropTag[0] = PR_IPM_APPOINTMENT_ENTRYID;
-	
+
 	data_pointers = emsmdbp_object_get_properties(local_mem_ctx, emsmdbp_ctx, inbox, props, &retvals);
-	if (!data_pointers || retvals[0] != MAPI_E_SUCCESS) {
-		goto end;
-	}
+	OPENCHANGE_RETVAL_IF(!data_pointers || retvals[0] != MAPI_E_SUCCESS, MAPI_E_NOT_FOUND, local_mem_ctx);
+
 	calendarFID = 0;
 	for (i = 0; i < 6; i++) {
 		calendarFID <<= 8;
@@ -1892,24 +2360,24 @@ static struct mapistore_freebusy_properties *emsmdbp_fetch_freebusy(TALLOC_CTX *
 	calendarFID |= 1;
 
 	/* open user calendar */
-	if (emsmdbp_object_open_folder_by_fid(local_mem_ctx, emsmdbp_ctx, mailbox, calendarFID, &calendar) != MAPISTORE_SUCCESS) {
-		goto end;
-	}
+	retval = emsmdbp_object_open_folder_by_fid(local_mem_ctx, emsmdbp_ctx, mailbox, calendarFID, &calendar);
+	OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, local_mem_ctx);
+
 	if (!emsmdbp_is_mapistore(calendar)) {
-		DEBUG(5, ("non-mapistore calendars are not supported for freebusy\n"));
-		goto end;
+		OC_DEBUG(5, "[emsmdbp_object]: non-mapistore calendars are not supported for freebusy\n");
+		OPENCHANGE_RETVAL_ERR(MAPI_E_NOT_IMPLEMENTED, local_mem_ctx);
 	}
 
 	contextID = emsmdbp_get_contextID(calendar);
-	mapistore_folder_fetch_freebusy_properties(emsmdbp_ctx->mstore_ctx, contextID, calendar->backend_object, start_tm, end_tm, mem_ctx, &fb_props);
+	retval_mapistore = mapistore_folder_fetch_freebusy_properties(emsmdbp_ctx->mstore_ctx, contextID, calendar->backend_object, start_tm, end_tm, mem_ctx, fb_props_p);
+	OPENCHANGE_RETVAL_IF(retval_mapistore != MAPISTORE_SUCCESS, MAPI_E_NOT_FOUND, local_mem_ctx);
 
-end:
 	talloc_free(local_mem_ctx);
 
-	return fb_props;
+	return MAPI_E_SUCCESS;
 }
 
-static void emsmdbp_object_message_fill_freebusy_properties(struct emsmdbp_object *message_object)
+static enum MAPISTATUS emsmdbp_object_message_fill_freebusy_properties(struct emsmdbp_object *message_object)
 {
 	/* freebusy mechanism:
 	   - lookup events in range now + 3 months, requesting end date, start date and PidLidBusyStatus
@@ -1929,37 +2397,39 @@ static void emsmdbp_object_message_fill_freebusy_properties(struct emsmdbp_objec
 	struct mapistore_freebusy_properties	*fb_props;
 	char					*subject, *username;
 	struct SPropTagArray			*props;
-        void					**data_pointers;
-        enum MAPISTATUS				*retvals = NULL;
+	void					**data_pointers;
+	enum MAPISTATUS				*retvals = NULL;
+	enum MAPISTATUS				retval;
 
-	mem_ctx = talloc_zero(NULL, TALLOC_CTX);
+	mem_ctx = talloc_new(NULL);
+	OPENCHANGE_RETVAL_IF(!mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
 
 	/* 1. retrieve subject and deduce username */
 	props = talloc_zero(mem_ctx, struct SPropTagArray);
+	OPENCHANGE_RETVAL_IF(!props, MAPI_E_NOT_ENOUGH_MEMORY, mem_ctx);
 	props->cValues = 1;
 	props->aulPropTag = talloc_zero(props, enum MAPITAGS);
+	OPENCHANGE_RETVAL_IF(!props->aulPropTag, MAPI_E_NOT_ENOUGH_MEMORY, mem_ctx);
 	props->aulPropTag[0] = PR_NORMALIZED_SUBJECT_UNICODE;
 	data_pointers = emsmdbp_object_get_properties(mem_ctx, message_object->emsmdbp_ctx, message_object, props, &retvals);
-	if (!data_pointers || retvals[0] != MAPI_E_SUCCESS) {
-		goto end;
-	}
+	OPENCHANGE_RETVAL_IF(!data_pointers || retvals[0] != MAPI_E_SUCCESS, MAPI_E_NOT_FOUND, mem_ctx);
+
 	subject = data_pointers[0];
 	/* FIXME: this is wrong, as the CN attribute may differ from the user's username (sAMAccountName) */
 	// format is "..../CN="
 	username = strrchr(subject, '/');
-	if (!username) {
-		goto end;
-	}
-	username += 4;
+	OPENCHANGE_RETVAL_IF(!username, MAPI_E_BAD_VALUE, mem_ctx);
+	username += 4;  /* strlen("/CN=") == 4 */
 	username = talloc_strdup(mem_ctx, username);
+	OPENCHANGE_RETVAL_IF(!username, MAPI_E_NOT_ENOUGH_MEMORY, mem_ctx);
 
-	fb_props = emsmdbp_fetch_freebusy(mem_ctx, message_object->emsmdbp_ctx, username, NULL, NULL);
+	retval = emsmdbp_fetch_freebusy(mem_ctx, message_object->emsmdbp_ctx, username, NULL, NULL, &fb_props);
+	OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, mem_ctx);
 	message_object->object.message->fb_properties = fb_props;
 
-end:
 	talloc_free(mem_ctx);
 
-	return;
+	return MAPI_E_SUCCESS;
 }
 
 _PUBLIC_ enum mapistore_error emsmdbp_object_message_open(TALLOC_CTX *mem_ctx, struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *parent_object, uint64_t folderID, uint64_t messageID, bool read_write, struct emsmdbp_object **messageP, struct mapistore_message **msgp)
@@ -1969,29 +2439,37 @@ _PUBLIC_ enum mapistore_error emsmdbp_object_message_open(TALLOC_CTX *mem_ctx, s
 	bool mapistore;
 	TALLOC_CTX *local_mem_ctx;
 	enum mapistore_error ret = MAPISTORE_SUCCESS;
+	enum MAPISTATUS retval;
 
 	if (!messageP) return MAPISTORE_ERROR;
 	if (!parent_object) return MAPISTORE_ERROR;
 
-	local_mem_ctx = talloc_zero(NULL, TALLOC_CTX);
-	ret = emsmdbp_object_open_folder_by_fid(local_mem_ctx, emsmdbp_ctx, parent_object, folderID, &folder_object);
-	if (ret != MAPISTORE_SUCCESS)  {
+	local_mem_ctx = talloc_new(NULL);
+	MAPISTORE_RETVAL_IF(!local_mem_ctx, MAPISTORE_ERR_NO_MEMORY, NULL);
+
+	retval = emsmdbp_object_open_folder_by_fid(local_mem_ctx, emsmdbp_ctx, parent_object, folderID, &folder_object);
+	if (retval != MAPI_E_SUCCESS)  {
+		ret = mapi_error_to_mapistore(retval);
 		goto end;
 	}
 
 	mapistore = emsmdbp_is_mapistore(folder_object);
-	switch (mapistore) {
+	switch ((int)mapistore) {
 	case false:
 		/* system/special folder */
 		message_object = emsmdbp_object_message_init(mem_ctx, emsmdbp_ctx, messageID, folder_object);
-		ret = openchangedb_message_open(mem_ctx, emsmdbp_ctx->oc_ctx, messageID, folderID, &message_object->backend_object, (void **)msgp);
+		ret = openchangedb_message_open(mem_ctx, emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, messageID, folderID, &message_object->backend_object, (void **)msgp);
 		if (ret != MAPISTORE_SUCCESS) {
 			printf("Invalid openchangedb message\n");
 			talloc_free(message_object);
 			goto end;
 		}
 
-		emsmdbp_object_message_fill_freebusy_properties(message_object);
+		retval = emsmdbp_object_message_fill_freebusy_properties(message_object);
+		if (retval != MAPI_E_SUCCESS) {
+			OC_DEBUG(5, "[emsmdbp_object]: Error filling freebusy properties on %"PRIu64"\n", messageID);
+			ret = MAPISTORE_ERROR;
+		}
 		break;
 	case true:
 		/* mapistore implementation goes here */
@@ -2028,10 +2506,10 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_object_message_open_attachment_table(TAL
 	if (!emsmdbp_ctx) return NULL;
         if (!message_object || message_object->type != EMSMDBP_OBJECT_MESSAGE) return NULL;
 
-	switch (emsmdbp_is_mapistore(message_object)) {
+	switch ((int)emsmdbp_is_mapistore(message_object)) {
 	case false:
 		/* system/special folder */
-		DEBUG(0, ("[%s] not implemented yet - shouldn't occur\n", __location__));
+		OC_DEBUG(0, "not implemented yet - shouldn't occur\n");
 		table_object = NULL;
 		break;
 	case true:
@@ -2123,19 +2601,10 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_object_attachment_init(TALLOC_CTX *mem_c
 	return object;
 }
 
-/**
-   \details Initialize a notification subscription object
 
-   \param mem_ctx pointer to the memory context
-   \param emsmdbp_ctx pointer to the emsmdb provider cotnext
-   \param whole_store whether the subscription applies to the specified change on the entire store or stricly on the specified folder/message
-   \param folderID the folder identifier
-   \param messageID the message identifier
-   \param parent emsmdbp object of the parent
- */
 _PUBLIC_ struct emsmdbp_object *emsmdbp_object_subscription_init(TALLOC_CTX *mem_ctx,
-                                                                 struct emsmdbp_context *emsmdbp_ctx,
-                                                                 struct emsmdbp_object *parent)
+								 struct emsmdbp_context *emsmdbp_ctx,
+								 struct emsmdbp_object *parent)
 {
 	struct emsmdbp_object	*object;
 
@@ -2153,7 +2622,7 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_object_subscription_init(TALLOC_CTX *mem
 	}
 
 	object->type = EMSMDBP_OBJECT_SUBSCRIPTION;
-        object->object.subscription->subscription_list = NULL;
+	object->object.subscription->handle = 0;
 
 	return object;
 }
@@ -2166,12 +2635,12 @@ _PUBLIC_ int emsmdbp_object_get_available_properties(TALLOC_CTX *mem_ctx, struct
 	      || object->type == EMSMDBP_OBJECT_MAILBOX
 	      || object->type == EMSMDBP_OBJECT_MESSAGE
 	      || object->type == EMSMDBP_OBJECT_ATTACHMENT)) {
-		DEBUG(0, (__location__": object must be EMSMDBP_OBJECT_FOLDER, EMSMDBP_OBJECT_MAILBOX, EMSMDBP_OBJECT_MESSAGE or EMSMDBP_OBJECT_ATTACHMENT (type =  %d)\n", object->type));
+		OC_DEBUG(0, "object must be EMSMDBP_OBJECT_FOLDER, EMSMDBP_OBJECT_MAILBOX, EMSMDBP_OBJECT_MESSAGE or EMSMDBP_OBJECT_ATTACHMENT (type =  %d)\n", object->type);
 		return MAPISTORE_ERROR;
 	}
 	
 	if (!emsmdbp_is_mapistore(object)) {
-		DEBUG(5, (__location__": only mapistore is supported at this time\n"));
+		OC_DEBUG(5, "only mapistore is supported at this time\n");
 		return MAPISTORE_ERROR;
 	}
 
@@ -2197,12 +2666,12 @@ static int emsmdbp_object_get_properties_systemspecialfolder(TALLOC_CTX *mem_ctx
         for (i = 0; i < properties->cValues; i++) {
                 if (properties->aulPropTag[i] == PR_FOLDER_CHILD_COUNT) {
                         obj_count = talloc_zero(data_pointers, uint32_t);
-			retval = openchangedb_get_folder_count(emsmdbp_ctx->oc_ctx, object->object.folder->folderID, obj_count);
+			retval = openchangedb_get_folder_count(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, object->object.folder->folderID, obj_count);
 			data_pointers[i] = obj_count;
                 }
 		else if (properties->aulPropTag[i] == PR_SUBFOLDERS) {
 			obj_count = talloc_zero(NULL, uint32_t);
-			retval = openchangedb_get_folder_count(emsmdbp_ctx->oc_ctx, object->object.folder->folderID, obj_count);
+			retval = openchangedb_get_folder_count(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, object->object.folder->folderID, obj_count);
 			has_subobj = talloc_zero(data_pointers, uint8_t);
 			*has_subobj = (*obj_count > 0) ? 1 : 0;
 			data_pointers[i] = has_subobj;
@@ -2225,7 +2694,7 @@ static int emsmdbp_object_get_properties_systemspecialfolder(TALLOC_CTX *mem_ctx
                 }
 		else if (properties->aulPropTag[i] == PidTagLocalCommitTimeMax) {
 			/* TODO: temporary hack */
-			unix_time = time(NULL) & 0xffffff00;
+			unix_time = time(NULL);
 			unix_to_nt_time(&nt_time, unix_time);
 			ft = talloc_zero(data_pointers, struct FILETIME);
 			ft->dwLowDateTime = (nt_time & 0xffffffff);
@@ -2234,7 +2703,7 @@ static int emsmdbp_object_get_properties_systemspecialfolder(TALLOC_CTX *mem_ctx
 			retval = MAPI_E_SUCCESS;
 		}
                 else {
-			retval = openchangedb_get_folder_property(data_pointers, emsmdbp_ctx->oc_ctx, properties->aulPropTag[i], folder->folderID, data_pointers + i);
+			retval = openchangedb_get_folder_property(data_pointers, emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, properties->aulPropTag[i], folder->folderID, data_pointers + i);
                 }
 		retvals[i] = retval;
         }
@@ -2248,7 +2717,7 @@ static int emsmdbp_object_get_properties_message(TALLOC_CTX *mem_ctx, struct ems
 {
 	enum MAPISTATUS				retval;
 	int					i;
-	char					*owner, *email_address;
+	char					*owner, *email_address, *administrativegroup;
 	struct Binary_r				*binr;
 	struct mapistore_freebusy_properties	*fb_props;
 	struct LongArray_r			*long_array;
@@ -2257,13 +2726,17 @@ static int emsmdbp_object_get_properties_message(TALLOC_CTX *mem_ctx, struct ems
 	fb_props = object->object.message->fb_properties;
 
 	owner = emsmdbp_get_owner(object);
+	retval = mapiserver_get_administrative_group_legacyexchangedn(mem_ctx, emsmdbp_ctx, &administrativegroup);
+	OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, NULL);
+
 	/* FIXME: this is wrong, as the CN attribute may differ from the user's username (sAMAccountName) */
-	email_address = talloc_asprintf(data_pointers, "/o=First Organization/ou=First Administrative Group/cn=Recipients/cn=%s", owner);
+	email_address = talloc_asprintf(data_pointers, "%s/cn=Recipients/cn=%s",
+                                    administrativegroup, owner);
 
 	/* Look over properties */
 	for (i = 0; i < properties->cValues; i++) {
 		if (properties->aulPropTag[i] == PR_SOURCE_KEY) {
-			emsmdbp_source_key_from_fmid(data_pointers, emsmdbp_ctx, owner, object->object.message->folderID,
+			emsmdbp_source_key_from_fmid(data_pointers, emsmdbp_ctx, owner, object->object.message->messageID,
 						     &binr);
 			data_pointers[i] = binr;
 			retval = MAPI_E_SUCCESS;
@@ -2325,11 +2798,11 @@ static int emsmdbp_object_get_properties_message(TALLOC_CTX *mem_ctx, struct ems
 					retval = MAPI_E_SUCCESS;
 					break;
 				default:
-					retval = openchangedb_message_get_property(data_pointers, object->backend_object, properties->aulPropTag[i], data_pointers + i);
+					retval = openchangedb_message_get_property(data_pointers, emsmdbp_ctx->oc_ctx, object->backend_object, properties->aulPropTag[i], data_pointers + i);
 				}
 			}
 			else {
-				retval = openchangedb_message_get_property(data_pointers, object->backend_object, properties->aulPropTag[i], data_pointers + i);
+				retval = openchangedb_message_get_property(data_pointers, emsmdbp_ctx->oc_ctx, object->backend_object, properties->aulPropTag[i], data_pointers + i);
 			}
 		}
 		retvals[i] = retval;
@@ -2341,6 +2814,7 @@ static int emsmdbp_object_get_properties_message(TALLOC_CTX *mem_ctx, struct ems
 static int emsmdbp_object_get_properties_mapistore_root(TALLOC_CTX *mem_ctx, struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *object, struct SPropTagArray *properties, void **data_pointers, enum MAPISTATUS *retvals)
 {
 	enum MAPISTATUS			retval = MAPI_E_SUCCESS;
+	enum mapistore_error		mretval;
 	struct emsmdbp_object_folder	*folder;
 	char				*owner;
 	struct Binary_r			*binr;
@@ -2348,41 +2822,70 @@ static int emsmdbp_object_get_properties_mapistore_root(TALLOC_CTX *mem_ctx, str
 	uint32_t			contextID;
         uint32_t                        *obj_count;
 	uint8_t				*has_subobj;
-	/* time_t				unix_time; */
-	/* NTTIME				nt_time; */
-	/* struct FILETIME			*ft; */
+	uint32_t			*folder_flags;
+	uint64_t			*fid;
 
 	contextID = emsmdbp_get_contextID(object);
 
 	folder = (struct emsmdbp_object_folder *) object->object.folder;
         for (i = 0; i < properties->cValues; i++) {
-                if (properties->aulPropTag[i] == PR_CONTENT_COUNT) {
+		if (properties->aulPropTag[i] == PidTagFolderFlags) {
+			folder_flags = talloc_zero(data_pointers, uint32_t);
+			*folder_flags = FolderFlags_IPM|FolderFlags_Normal;
+			data_pointers[i] = folder_flags;
+		} else if (properties->aulPropTag[i] == PidTagParentFolderId) {
+			switch (object->parent_object->type) {
+			case EMSMDBP_OBJECT_MAILBOX:
+				fid = talloc_zero(data_pointers, uint64_t);
+				OPENCHANGE_RETVAL_IF(!fid, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+				*fid = object->parent_object->object.mailbox->folderID;
+				retval = MAPI_E_SUCCESS;
+				data_pointers[i] = fid;
+				break;
+			case EMSMDBP_OBJECT_FOLDER:
+				fid = talloc_zero(data_pointers, uint64_t);
+				OPENCHANGE_RETVAL_IF(!fid, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+				*fid = object->parent_object->object.folder->folderID;
+				data_pointers[i] = fid;
+				retval = MAPI_E_SUCCESS;
+				break;
+			default:
+				retval = MAPI_E_NOT_FOUND;
+				break;
+			}
+		}
+		else if (properties->aulPropTag[i] == PR_CONTENT_COUNT) {
                         /* a hack to avoid fetching dynamic fields from openchange.ldb */
                         obj_count = talloc_zero(data_pointers, uint32_t);
-                        retval = mapistore_folder_get_child_count(emsmdbp_ctx->mstore_ctx, contextID, object->backend_object, MAPISTORE_MESSAGE_TABLE, obj_count);
-			if (!retval) {
+			OPENCHANGE_RETVAL_IF(!obj_count, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+                        mretval = mapistore_folder_get_child_count(emsmdbp_ctx->mstore_ctx, contextID, object->backend_object, MAPISTORE_MESSAGE_TABLE, obj_count);
+			if (mretval == MAPISTORE_SUCCESS) {
 				data_pointers[i] = obj_count;
 			}
                 }
                 else if (properties->aulPropTag[i] == PidTagAssociatedContentCount) {
                         obj_count = talloc_zero(data_pointers, uint32_t);
-                        retval = mapistore_folder_get_child_count(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object), object->backend_object, MAPISTORE_FAI_TABLE, obj_count);
-			if (!retval) {
+			OPENCHANGE_RETVAL_IF(!obj_count, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+                        mretval = mapistore_folder_get_child_count(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object), object->backend_object, MAPISTORE_FAI_TABLE, obj_count);
+			if (mretval == MAPISTORE_SUCCESS) {
 				data_pointers[i] = obj_count;
 			}
                 }
                 else if (properties->aulPropTag[i] == PR_FOLDER_CHILD_COUNT) {
                         obj_count = talloc_zero(data_pointers, uint32_t);
+			OPENCHANGE_RETVAL_IF(!obj_count, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
                         retval = emsmdbp_folder_get_folder_count(emsmdbp_ctx, object, obj_count);
-			if (!retval) {
+			if (retval == MAPI_E_SUCCESS) {
 				data_pointers[i] = obj_count;
 			}
                 }
 		else if (properties->aulPropTag[i] == PR_SUBFOLDERS) {
-			obj_count = talloc_zero(NULL, uint32_t);
+			obj_count = talloc_zero(data_pointers, uint32_t);
+			OPENCHANGE_RETVAL_IF(!obj_count, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
 			retval = emsmdbp_folder_get_folder_count(emsmdbp_ctx, object, obj_count);
-			if (!retval) {
+			if (retval == MAPI_E_SUCCESS) {
 				has_subobj = talloc_zero(data_pointers, uint8_t);
+				OPENCHANGE_RETVAL_IF(!has_subobj, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
 				*has_subobj = (*obj_count > 0) ? 1 : 0;
 				data_pointers[i] = has_subobj;
 			}
@@ -2396,6 +2899,7 @@ static int emsmdbp_object_get_properties_mapistore_root(TALLOC_CTX *mem_ctx, str
 		}
 		else if (properties->aulPropTag[i] == PR_FOLDER_TYPE) {
 			obj_count = talloc_zero(data_pointers, uint32_t);
+			OPENCHANGE_RETVAL_IF(!obj_count, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
 			*obj_count = FOLDER_GENERIC;
 			data_pointers[i] = obj_count;
 			retval = MAPI_E_SUCCESS;
@@ -2403,6 +2907,7 @@ static int emsmdbp_object_get_properties_mapistore_root(TALLOC_CTX *mem_ctx, str
 		else if (properties->aulPropTag[i] == PR_CONTENT_UNREAD || properties->aulPropTag[i] == PR_DELETED_COUNT_TOTAL) {
 			/* TODO: temporary hack */
 			obj_count = talloc_zero(data_pointers, uint32_t);
+			OPENCHANGE_RETVAL_IF(!obj_count, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
 			*obj_count = 0;
 			data_pointers[i] = obj_count;
 			retval = MAPI_E_SUCCESS;
@@ -2430,7 +2935,17 @@ static int emsmdbp_object_get_properties_mapistore_root(TALLOC_CTX *mem_ctx, str
 			}
 		}
                 else {
-			retval = openchangedb_get_folder_property(data_pointers, emsmdbp_ctx->oc_ctx, properties->aulPropTag[i], folder->folderID, data_pointers + i);
+                        /* We are not using emsmdbp_ctx->username because we want to impersonate to get the properties
+                           on shared folders */
+			owner = emsmdbp_get_owner(object);
+			if (!owner) {
+				/* Public folder? Then, use logged user */
+				owner = emsmdbp_ctx->username;
+			}
+			if (properties->aulPropTag[i] == PidTagHierRev) {
+				properties->aulPropTag[i] = PidTagCreationTime;
+			}
+			retval = openchangedb_get_folder_property(data_pointers, emsmdbp_ctx->oc_ctx, owner, properties->aulPropTag[i], folder->folderID, data_pointers + i);
                 }
 		retvals[i] = retval;
         }
@@ -2473,7 +2988,7 @@ static int emsmdbp_object_get_properties_mailbox(TALLOC_CTX *mem_ctx, struct ems
 			}
 			break;
 		default:
-			retvals[i] = openchangedb_get_folder_property(data_pointers, emsmdbp_ctx->oc_ctx, properties->aulPropTag[i], object->object.mailbox->folderID, data_pointers + i);
+			retvals[i] = openchangedb_get_folder_property(data_pointers, emsmdbp_ctx->oc_ctx, object->object.mailbox->owner_username, properties->aulPropTag[i], object->object.mailbox->folderID, data_pointers + i);
 		}
 	}
 
@@ -2537,7 +3052,11 @@ _PUBLIC_ void **emsmdbp_object_get_properties(TALLOC_CTX *mem_ctx, struct emsmdb
 	if (object && object->type == EMSMDBP_OBJECT_FOLDER &&
 	    object->object.folder->mapistore_root == true) {
 		if (object->object.folder->postponed_props) {
-			emsmdbp_object_folder_commit_creation(emsmdbp_ctx, object, true);
+			retval = emsmdbp_object_folder_commit_creation(emsmdbp_ctx, object, true);
+			if (retval != MAPISTORE_SUCCESS) {
+				OC_DEBUG(0, "folder_commit_creation() failed with 0x%.8X", retval);
+				goto end;
+			}
 		}
 
 		retval = emsmdbp_object_get_properties_mapistore_root(mem_ctx, emsmdbp_ctx, object, properties, data_pointers, retvals);
@@ -2545,11 +3064,11 @@ _PUBLIC_ void **emsmdbp_object_get_properties(TALLOC_CTX *mem_ctx, struct emsmdb
 		mapistore = emsmdbp_is_mapistore(object);
 		/* Nasty hack */
 		if (!object) {
-			DEBUG(5, ("[%s] what's that hack!??\n", __location__));
+			OC_DEBUG(5, "what's that hack!??\n");
 			mapistore = true;
 		}
 
-		switch (mapistore) {
+		switch ((int)mapistore) {
 		case false:
 			switch (object->type) {
 			case EMSMDBP_OBJECT_MAILBOX:
@@ -2573,16 +3092,94 @@ _PUBLIC_ void **emsmdbp_object_get_properties(TALLOC_CTX *mem_ctx, struct emsmdb
 		}
 	}
 
+end:
+	if (retval != MAPISTORE_SUCCESS) {
+		talloc_free(data_pointers);
+		data_pointers = NULL;
+		talloc_free(retvals);
+		retvals = NULL;
+	}
+
 	if (retvalsp) {
 		*retvalsp = retvals;
 	}
 
-	if (retval) {
-		talloc_free(data_pointers);
-		data_pointers = NULL;
-	}
-
         return data_pointers;
+}
+
+/* Delete a mapistore root folder, create again with new role and
+   update the mapistoreURI in OpenChange DB */
+static enum mapistore_error emsmdbp_object_root_mapistore_folder_set(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *folder, struct SRow *rowp, const char *container_class)
+{
+	char				*mapistore_uri;
+	char				*folder_name, *owner;
+	enum MAPISTATUS			retval;
+	enum mapistore_context_role	role;
+	enum mapistore_error		ret;
+	TALLOC_CTX			*local_mem_ctx;
+	uint32_t			context_id, deleted_fmids_count;
+	uint64_t			fid, *deleted_fmids;
+
+	/* Sanity checks */
+	MAPISTORE_RETVAL_IF(!emsmdbp_ctx, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
+	MAPISTORE_RETVAL_IF(!folder, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
+	MAPISTORE_RETVAL_IF(!rowp, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
+	MAPISTORE_RETVAL_IF(!container_class, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
+
+	local_mem_ctx = talloc_new(NULL);
+	MAPISTORE_RETVAL_IF(!local_mem_ctx, MAPISTORE_ERR_NO_MEMORY, NULL);
+
+	/* 1. Delete current mapistore folder */
+	context_id = emsmdbp_get_contextID(folder);
+	owner = emsmdbp_get_owner(folder);
+	ret = mapistore_folder_delete(emsmdbp_ctx->mstore_ctx, context_id,
+				      folder->backend_object, DELETE_HARD_DELETE,
+				      local_mem_ctx, &deleted_fmids, &deleted_fmids_count);
+	if (ret == MAPISTORE_ERR_EXIST) {
+		/* Known limitation */
+		OC_DEBUG(1, "There are messages or subfolders while changing the role of a mapistore root folder which is unsupported");
+	}
+	MAPISTORE_RETVAL_IF(ret != MAPISTORE_SUCCESS, ret, local_mem_ctx);
+
+	ret = mapistore_indexing_record_del_fid(emsmdbp_ctx->mstore_ctx, context_id,
+						owner, folder->object.folder->folderID,
+						MAPISTORE_PERMANENT_DELETE);
+	MAPISTORE_RETVAL_IF(ret != MAPISTORE_SUCCESS, ret, local_mem_ctx);
+
+	/* 2. Create the mapistore folder with the new role */
+	role = emsmdbp_container_class_to_role(container_class);
+
+	fid = folder->object.folder->folderID;
+
+	retval = openchangedb_get_folder_property(local_mem_ctx, emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username,
+						  PR_DISPLAY_NAME, fid, (void **)&folder_name);
+	MAPISTORE_RETVAL_IF(retval != MAPI_E_SUCCESS, MAPISTORE_ERROR, local_mem_ctx);
+
+	/* 3. Create mapistore root folder */
+	ret = mapistore_create_root_folder(owner, role, fid, folder_name, local_mem_ctx, &mapistore_uri);
+	MAPISTORE_RETVAL_IF(ret != MAPISTORE_SUCCESS, ret, local_mem_ctx);
+
+	ret = mapistore_add_context(emsmdbp_ctx->mstore_ctx, owner, mapistore_uri, fid, &context_id, &folder->backend_object);
+	if (ret != MAPISTORE_SUCCESS) {
+		OC_PANIC(false,
+			 ("mapistore_add_context() failed with 0x%.8x, mapistore_uri = [%s].\n",
+			  ret, mapistore_uri));
+		goto end;
+	}
+	folder->object.folder->contextID = context_id;
+
+	/* 4. Set the new MAPIStore URI in OpenChangeDB */
+	retval = openchangedb_set_mapistoreURI(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, fid, mapistore_uri);
+	MAPISTORE_RETVAL_IF(retval != MAPI_E_SUCCESS, MAPISTORE_ERROR, local_mem_ctx);
+
+	/* 5. Set indexing */
+	ret = mapistore_indexing_record_add_fmid_for_uri(emsmdbp_ctx->mstore_ctx, context_id, owner, fid,
+							 mapistore_uri);
+	MAPISTORE_RETVAL_IF(ret != MAPISTORE_SUCCESS, ret, local_mem_ctx);
+
+end:
+	talloc_free(local_mem_ctx);
+	return ret;
 }
 
 /* TODO: handling of "property problems" */
@@ -2590,10 +3187,13 @@ _PUBLIC_ int emsmdbp_object_set_properties(struct emsmdbp_context *emsmdbp_ctx, 
 {
 	TALLOC_CTX		*mem_ctx;
 	uint32_t		contextID, new_cvalues;
+	char			*db_container_class;
 	char			*mapistore_uri, *new_uri;
 	size_t			mapistore_uri_len, new_uri_len;
 	bool			mapistore;
+	enum MAPISTATUS		retval;
 	enum mapistore_error	ret;
+	struct SPropValue	*container_class;
 	struct SRow		*postponed_props;
 	bool			soft_deleted;
 
@@ -2605,7 +3205,7 @@ _PUBLIC_ int emsmdbp_object_set_properties(struct emsmdbp_context *emsmdbp_ctx, 
 	      || object->type == EMSMDBP_OBJECT_MAILBOX
 	      || object->type == EMSMDBP_OBJECT_MESSAGE
 	      || object->type == EMSMDBP_OBJECT_ATTACHMENT)) {
-		DEBUG(0, (__location__": object must be EMSMDBP_OBJECT_FOLDER, EMSMDBP_OBJECT_MAILBOX, EMSMDBP_OBJECT_MESSAGE or EMSMDBP_OBJECT_ATTACHMENT (type = %d)\n", object->type));
+		OC_DEBUG(0, "object must be EMSMDBP_OBJECT_FOLDER, EMSMDBP_OBJECT_MAILBOX, EMSMDBP_OBJECT_MESSAGE or EMSMDBP_OBJECT_ATTACHMENT (type = %d)\n", object->type);
 		return MAPI_E_NO_SUPPORT;
 	}
 
@@ -2633,10 +3233,43 @@ _PUBLIC_ int emsmdbp_object_set_properties(struct emsmdbp_context *emsmdbp_ctx, 
 	 * dispatcher db, not mapistore */
 	if (object->type == EMSMDBP_OBJECT_FOLDER
 	    && object->object.folder->mapistore_root == true) {
-		mem_ctx = talloc_zero(NULL, TALLOC_CTX);
+		mem_ctx = talloc_new(NULL);
+		OPENCHANGE_RETVAL_IF(!mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+
+		/* Check if we have to change the type of MAPIStore folder
+		   as now we have a container class or it has changed.
+		   This is happening when CreateFolder + SetProps ROPs are done */
+		retval = openchangedb_get_folder_property(mem_ctx, emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username,
+							  PR_CONTAINER_CLASS_UNICODE, object->object.folder->folderID,
+							  (void **)&db_container_class);
+		if (retval == MAPI_E_NOT_FOUND) {
+			retval = openchangedb_get_folder_property(mem_ctx, emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username,
+								  PR_CONTAINER_CLASS, object->object.folder->folderID,
+								  (void **)&db_container_class);
+		}
+		container_class = get_SPropValue_SRow(rowp, PR_CONTAINER_CLASS_UNICODE);
+		if (!container_class) {
+			/* Sometimes Outlook does pass non-unicode values. */
+			container_class = get_SPropValue_SRow(rowp, PR_CONTAINER_CLASS);
+		}
+
+		if (container_class
+		    && (retval == MAPI_E_NOT_FOUND
+                        || strncmp(db_container_class, container_class->value.lpszW, strlen(db_container_class)) != 0)) {
+			/* Replace the MAPIStore folder now we have a role to set for it */
+			ret = emsmdbp_object_root_mapistore_folder_set(emsmdbp_ctx, object, rowp, container_class->value.lpszW);
+			/* MAPISTORE_ERR_EXIST happens when the folder was set with the right role in the
+			   provisioning code so we have to let the current flow work. This happens with
+			   special folders such as INBOX, Sent, Personal Calendar, RSS Feeds, Conversation
+			   Action Settings, etc... */
+			OPENCHANGE_RETVAL_IF(ret != MAPISTORE_SUCCESS && ret != MAPISTORE_ERR_EXIST,
+					     mapistore_error_to_mapi(ret), mem_ctx);
+		}
+
 		mapistore_uri = NULL;
-		openchangedb_get_mapistoreURI(mem_ctx, emsmdbp_ctx->oc_ctx, object->object.folder->folderID, &mapistore_uri, true);
-		openchangedb_set_folder_properties(emsmdbp_ctx->oc_ctx, object->object.folder->folderID, rowp);
+		openchangedb_get_mapistoreURI(mem_ctx, emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, object->object.folder->folderID, &mapistore_uri, true);
+
+		openchangedb_set_folder_properties(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, object->object.folder->folderID, rowp);
 		contextID = emsmdbp_get_contextID(object);
 		mapistore_properties_set_properties(emsmdbp_ctx->mstore_ctx, contextID, object->backend_object, rowp);
 		/* if the display name of a resource has changed, some backends may have modified the folder uri and we need to update the openchangedb record accordingly */
@@ -2660,7 +3293,7 @@ _PUBLIC_ int emsmdbp_object_set_properties(struct emsmdbp_context *emsmdbp_ctx, 
 					}
 				}
 				if (strcmp(mapistore_uri, new_uri) != 0) {
-					openchangedb_set_mapistoreURI(emsmdbp_ctx->oc_ctx, object->object.folder->folderID, new_uri, true);
+					openchangedb_set_mapistoreURI(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, object->object.folder->folderID, new_uri);
 				}
 			}
 		}
@@ -2669,20 +3302,21 @@ _PUBLIC_ int emsmdbp_object_set_properties(struct emsmdbp_context *emsmdbp_ctx, 
 	else {
 		contextID = emsmdbp_get_contextID(object);
 		mapistore = emsmdbp_is_mapistore(object);
-		switch (mapistore) {
+		switch ((int)mapistore) {
 		case false:
 			if (object->type == EMSMDBP_OBJECT_FOLDER) {
-				openchangedb_set_folder_properties(emsmdbp_ctx->oc_ctx, object->object.folder->folderID, rowp);
+				openchangedb_set_folder_properties(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, object->object.folder->folderID, rowp);
 			}
 			else if (object->type == EMSMDBP_OBJECT_MAILBOX) {
-				openchangedb_set_folder_properties(emsmdbp_ctx->oc_ctx, object->object.mailbox->folderID, rowp);
+				openchangedb_set_folder_properties(emsmdbp_ctx->oc_ctx, emsmdbp_ctx->username, object->object.mailbox->folderID, rowp);
 			}
 			else if (object->type == EMSMDBP_OBJECT_MESSAGE) {
-				openchangedb_message_set_properties((TALLOC_CTX *)object->object.message, 
+				openchangedb_message_set_properties((TALLOC_CTX *)object->object.message,
+								    emsmdbp_ctx->oc_ctx,
 								    object->backend_object, rowp);
 			}
 			else {
-				DEBUG(0, ("Setting properties on openchangedb not implemented yet for non-folder object type\n"));
+				OC_DEBUG(0, "Setting properties on openchangedb not implemented yet for non-folder object type\n");
 				return MAPI_E_NO_SUPPORT;
 			}
 			break;
@@ -2759,12 +3393,7 @@ _PUBLIC_ struct emsmdbp_stream_data *emsmdbp_stream_data_from_value(TALLOC_CTX *
 	}
 	else if (prop_type == PT_BINARY) {
 		stream_data->data.length = ((struct Binary_r *) value)->cb;
-		if (read_write) {
-			stream_data->data.data = talloc_memdup(stream_data, ((struct Binary_r *) value)->lpb, stream_data->data.length);
-		}
-		else {
-			stream_data->data.data = ((struct Binary_r *) value)->lpb;
-		}
+		stream_data->data.data = talloc_memdup(stream_data, ((struct Binary_r *) value)->lpb, stream_data->data.length);
                 (void) talloc_reference(stream_data, value);
 	}
 	else {
@@ -2805,7 +3434,7 @@ _PUBLIC_ void emsmdbp_stream_write_buffer(TALLOC_CTX *mem_ctx, struct emsmdbp_st
 			old_data = stream->buffer.data;
 			stream->buffer.data = talloc_realloc(mem_ctx, stream->buffer.data, uint8_t, stream->buffer.length);
 			if (!stream->buffer.data) {
-				DEBUG(5, ("WARNING: [bug] lost buffer pointer (data = NULL)\n"));
+				OC_DEBUG(5, "WARNING: [bug] lost buffer pointer (data = NULL)\n");
 				stream->buffer.data = talloc_array(mem_ctx, uint8_t, stream->buffer.length);
 				memcpy(stream->buffer.data, old_data, old_length);
 			}
@@ -2825,7 +3454,7 @@ _PUBLIC_ struct emsmdbp_stream_data *emsmdbp_object_get_stream_data(struct emsmd
 
 	for (current_data = object->stream_data; current_data; current_data = current_data->next) {
 		if (current_data->prop_tag == prop_tag) {
-			DEBUG(5, ("[%s]: found data for tag %.8x\n", __FUNCTION__, prop_tag));
+			OC_DEBUG(5, "found data for tag %.8x\n", prop_tag);
 			return current_data;
 		}
 	}
@@ -2853,7 +3482,7 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_object_synccontext_init(TALLOC_CTX *mem_
 	if (!emsmdbp_ctx) return NULL;
 	if (!parent_object) return NULL;
 	if (!(parent_object->type == EMSMDBP_OBJECT_FOLDER || parent_object->type == EMSMDBP_OBJECT_MAILBOX)) {
-		DEBUG(0, (__location__": parent_object must be EMSMDBP_OBJECT_FOLDER or EMSMDBP_OBJECT_MAILBOX (type = %d)\n", parent_object->type));
+		OC_DEBUG(0, "parent_object must be EMSMDBP_OBJECT_FOLDER or EMSMDBP_OBJECT_MAILBOX (type = %d)\n", parent_object->type);
 		return NULL;
 	}
 
@@ -2922,4 +3551,447 @@ _PUBLIC_ struct emsmdbp_object *emsmdbp_object_ftcontext_init(TALLOC_CTX *mem_ct
 	object->type = EMSMDBP_OBJECT_FTCONTEXT;
 
 	return object;
+}
+
+/**
+   \details Convenience function to extract values from data_pointers safely.
+
+   \param ulPropTag MAPI property tag
+   \param SPropTagArray array of property tags
+   \param data_pointers array with the property values that matches the previous SPropTagArray
+   \param retvals array of returned value result of getting the property
+
+   \return pointer to the property value, NULL otherwise
+*/
+static void *get_emsmdbp_data(enum MAPITAGS ul_prop_tag, struct SPropTagArray *s_prop_tag_array, void **data_pointers, enum MAPISTATUS *retvals)
+{
+        uint32_t        i;
+
+        for (i = 0; i < s_prop_tag_array->cValues; i++) {
+                if (ul_prop_tag == s_prop_tag_array->aulPropTag[i]) {
+                        return (retvals[i] == MAPI_E_SUCCESS) ? data_pointers[i] : NULL;
+                }
+        }
+        return NULL;
+}
+
+/**
+   \details Store the target recipients attribute in out parameter.
+
+   \param emsmdbp_ctx pointer to the emsmdb provider cotnext
+   \param sharing_object the sharing message object to get the XML data from
+   \param [out] pointer to string where the TargetRecipients XML attribute is stored
+   \param mem_ctx pointer to memory context where the target_recipients_attr is created
+
+   \note On success target_recipients_attr string is allocated in
+   mem_ctx. It is up to the developer to free that memory context when
+   it is not needed anymore.
+
+   \return MAPI_E_SUCCESS on success, a mapi error code otherwise
+ */
+static enum MAPISTATUS emsmdbp_object_sharing_metadata_recipients_attr(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *sharing_object, char **target_recipients_attr, TALLOC_CTX *mem_ctx)
+{
+	char			       *xml = NULL;
+	int			       i;
+	enum mapistore_error	       ret;
+	struct mapistore_message       *msg_data = NULL;
+	TALLOC_CTX		       *local_mem_ctx;
+	uint32_t		       contextID;
+
+	/* Sanity checks */
+	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!sharing_object, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!mem_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+
+	local_mem_ctx = talloc_new(NULL);
+	OPENCHANGE_RETVAL_IF(!local_mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+
+	contextID = emsmdbp_get_contextID(sharing_object);
+	ret = mapistore_message_get_message_data(emsmdbp_ctx->mstore_ctx, contextID, sharing_object->backend_object, local_mem_ctx, &msg_data);
+	OPENCHANGE_RETVAL_IF(ret != MAPISTORE_SUCCESS, mapistore_error_to_mapi(ret), local_mem_ctx);
+
+	if (msg_data && msg_data->recipients_count > 0) {
+		int	 email_address_idx;
+
+		xml = talloc_asprintf(local_mem_ctx, "TargetRecipients=\"");
+		OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+		email_address_idx = get_email_address_index_SPropTagArray(msg_data->columns);
+		for (i = 0; i < msg_data->recipients_count; i++) {
+			if (email_address_idx != -1) {
+				xml = talloc_asprintf_append(xml, "%s", (char *)msg_data->recipients[i].data[email_address_idx]);
+				OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+				if (i + 1 < msg_data->recipients_count) {
+					/* ; separated */
+					xml = talloc_asprintf_append(xml, ";");
+					OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+				}
+			}
+		}
+		xml = talloc_asprintf_append(xml, "\"");
+		OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+	} else {
+		/* This shouldn't happen, but just in case */
+		xml = "";
+	}
+
+	*target_recipients_attr = talloc_strdup(mem_ctx, xml);
+	OPENCHANGE_RETVAL_IF(!*target_recipients_attr, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+	talloc_free(local_mem_ctx);
+
+	return MAPI_E_SUCCESS;
+}
+
+/**
+   \details Store the Providers node into providers_node out parameter.
+
+   \param emsmdbp_ctx pointer to the emsmdb provider cotnext
+   \param sharing_object the sharing message object to get the XML data from
+   \param remote_uid string with the folder id to share, NULL when no required
+   \param remote_store_uid string with the mailbox id where the folder belongs to, NULL when non-required
+   \param target_recipients the string where the recipients' email addresses separated by semi colons are stored
+   \param [out] providers_node pointer to string where the Providers XML node is stored
+   \param mem_ctx pointer to memory context where the providers_node is created
+
+   \note On success providers_node string is allocated in mem_ctx. It is up to the developer
+   to free that memory context when it is not needed anymore.
+
+   \return MAPI_E_SUCCESS on success, a mapi error code otherwise
+ */
+static enum MAPISTATUS emsmdbp_object_sharing_metadata_providers_node(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *sharing_object, char *remote_uid, char *remote_store_uid, char *target_recipients, char **providers_node, TALLOC_CTX *mem_ctx)
+{
+	char	       *xml;
+	TALLOC_CTX     *local_mem_ctx;
+
+	/* Sanity checks */
+	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!sharing_object, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!providers_node, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!mem_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+
+	local_mem_ctx = talloc_new(NULL);
+	OPENCHANGE_RETVAL_IF(!local_mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+
+	xml = talloc_asprintf(local_mem_ctx, "<Providers><Provider Type=\"ms-exchange-internal\" %s >", target_recipients);
+	OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+	if (remote_uid && remote_store_uid) {
+		xml = talloc_asprintf_append(xml,
+					     "<FolderId xmlns=\"http://schemas.microsoft.com/exchange/sharing/2008\">%s</FolderId>",
+					     remote_uid);  /* PidLidSharingRemoteUid */
+		OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+		xml = talloc_asprintf_append(xml,
+					     "<MailboxId xmlns=\"http://schemas.microsoft.com/exchange/sharing/2008\">%s</MailboxId>",
+					     remote_store_uid);	 /* PidLidSharingRemoteStoreUid */
+		OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+	}
+
+	xml = talloc_asprintf_append(xml, "</Provider></Providers>");
+	OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+	*providers_node = talloc_strdup(mem_ctx, xml);
+	OPENCHANGE_RETVAL_IF(!*providers_node, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+	talloc_free(local_mem_ctx);
+	return MAPI_E_SUCCESS;
+}
+
+/**
+   \details Create the XML file from the sharing message object and store it as
+            binary property in attach_bin out parameter.
+
+   \param emsmdbp_ctx pointer to the emsmdb provider cotnext
+   \param sharing_object the sharing message object to get the XML data from
+   \param [out] attach_bin pointer to Binary_r property value pointer where the XML data is stored
+   \param mem_ctx pointer to memory context where the attach_bin is created
+
+   \note On success attach_bin is allocated in mem_ctx. It is up to the developer
+   to free that memory context when it is not needed anymore.
+
+   \return MAPI_E_SUCCESS on success, a mapi error code otherwise
+ */
+static enum MAPISTATUS emsmdbp_object_sharing_metadata_property(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *sharing_object, struct Binary_r **attach_bin, TALLOC_CTX *mem_ctx)
+{
+	struct Binary_r		       *bin;
+	const char		       *data_type;
+	char			       *providers_node;
+	char			       *prop_value;
+	char			       *recipients_attr;
+	char			       *remote_uid;
+	char			       *remote_store_uid;
+	const char                     *sharing_type;
+	char			       *xml;
+	int			       i;
+	enum MAPISTATUS		       *retvals = NULL, retval;
+	const enum MAPITAGS	       sharing_prop_tags[] = {PidLidSharingLocalType, PidLidSharingInitiatorName, PidLidSharingInitiatorSmtp, PidLidSharingInitiatorEntryId, PidLidSharingFlavor, PidNameXSharingFlavor, PidLidSharingRemoteName, PidLidSharingRemoteUid, PidLidSharingRemoteStoreUid};
+	struct SBinary_short	       *entryId;
+	struct SPropTagArray	       *sharing_properties;
+	struct SPropValue	       *attach_bin_property;
+	TALLOC_CTX		       *local_mem_ctx;
+	const uint32_t		       SHARING_PROPS_COUNT = sizeof(sharing_prop_tags) / sizeof(enum MAPITAGS);
+	const uint32_t		       COMMON_SHARING_PROPS_COUNT = 3;
+	uint32_t		       sharing_flavour, *sharing_flavour_ptr;
+	void			       **data_pointers;
+
+	/* Sanity checks */
+	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!sharing_object, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!mem_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+
+	attach_bin_property = talloc_zero(mem_ctx, struct SPropValue);
+	OPENCHANGE_RETVAL_IF(!attach_bin_property, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+
+	local_mem_ctx = talloc_named(NULL, 0, "sharing_metadata_property");
+	OPENCHANGE_RETVAL_IF(!local_mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+
+	/* We get the required properties from the mapistore */
+	sharing_properties = talloc_zero(mem_ctx, struct SPropTagArray);
+	OPENCHANGE_RETVAL_IF(!sharing_properties, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+	sharing_properties->cValues = SHARING_PROPS_COUNT;
+	sharing_properties->aulPropTag = talloc_array(local_mem_ctx, enum MAPITAGS, SHARING_PROPS_COUNT);
+	memcpy(sharing_properties->aulPropTag, sharing_prop_tags, sizeof(sharing_prop_tags));
+
+	data_pointers = emsmdbp_object_get_properties(local_mem_ctx, emsmdbp_ctx, sharing_object,
+						      sharing_properties, &retvals);
+	OPENCHANGE_RETVAL_IF(!data_pointers, MAPI_E_NOT_FOUND, local_mem_ctx);
+
+	/* Check every retval from shared properties is SUCCESS to build up the XML */
+	for (i = 0; i < COMMON_SHARING_PROPS_COUNT; i++) {
+		OPENCHANGE_RETVAL_IF(retvals[i] != MAPI_E_SUCCESS, MAPI_E_NOT_FOUND, local_mem_ctx);
+	}
+
+	/* Check data_type on PidLidSharingLocalType */
+	sharing_type = (const char *)get_emsmdbp_data(PidLidSharingLocalType, sharing_properties, data_pointers, retvals);
+	if (strncmp(sharing_type, "IPF.Appointment", strlen("IPF.Appointment")) == 0) {
+		data_type = "calendar";
+	} else if (strncmp(sharing_type, "IPF.Contact", strlen("IPF.Contact")) == 0) {
+		data_type = "contacts";
+	} else if (strncmp(sharing_type, "IPF.Task", strlen("IPF.Task")) == 0) {
+		data_type = "tasks";
+	} else if (strncmp(sharing_type, "IPF.StickyNote", strlen("IPF.StickyNote")) == 0) {
+		data_type = "notes";
+	} else if (strncmp(sharing_type, "IPF.Journal", strlen("IPF.Journal")) == 0) {
+		data_type = "journals";
+	} else {
+		OC_DEBUG(1, "Sharing type %s not supported", sharing_type);
+		talloc_free(local_mem_ctx);
+		return MAPI_E_NO_SUPPORT;
+	}
+
+	/* Check we have flavour to know the kind of sharing message */
+	sharing_flavour_ptr = (uint32_t *)get_emsmdbp_data(PidLidSharingFlavor, sharing_properties, data_pointers, retvals);
+	if (sharing_flavour_ptr) {
+		sharing_flavour = *sharing_flavour_ptr;
+	} else {
+		prop_value = (char *)get_emsmdbp_data(PidNameXSharingFlavor, sharing_properties, data_pointers, retvals);
+		if (prop_value) {
+			char	  *error = NULL;
+
+			sharing_flavour = strtoul(prop_value, &error, 16);
+			if (error && *error != '\0') {
+				OC_DEBUG(1, "Impossible to convert to integer: %s", prop_value);
+				talloc_free(local_mem_ctx);
+				return MAPI_E_INVALID_PARAMETER;
+			}
+		} else {
+			OC_DEBUG(1, "Sharing flavour not available. Impossible to create XML metadata");
+			talloc_free(local_mem_ctx);
+			return MAPI_E_NO_SUPPORT;
+		}
+	}
+
+	xml = talloc_asprintf(local_mem_ctx,
+			      "<?xml version=\"1.0\"?> "
+			      "<SharingMessage xmlns=\"http://schemas.microsoft.com/sharing/2008\">"
+			      "<DataType>%s</DataType>"
+			      "<Initiator>", data_type);
+	OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+	/*** Initiator ***/
+	xml = talloc_asprintf_append(xml, "<Name>%s</Name>",
+				     (char *)get_emsmdbp_data(PidLidSharingInitiatorName, sharing_properties, data_pointers, retvals));
+	OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+	xml = talloc_asprintf_append(xml, "<SmtpAddress>%s</SmtpAddress>",
+				     (char *)get_emsmdbp_data(PidLidSharingInitiatorSmtp, sharing_properties, data_pointers, retvals));
+	OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+	/* Take the binary EntryId and transform to Hex encoded field */
+	xml = talloc_asprintf_append(xml, "<EntryId>");
+	OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+	entryId = get_emsmdbp_data(PidLidSharingInitiatorEntryId, sharing_properties, data_pointers, retvals);
+	for (i = 0; i < entryId->cb; i++) {
+		xml = talloc_asprintf_append(xml, "%.2X", *(entryId->lpb + i));
+		OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+	}
+	xml = talloc_asprintf_append(xml, "</EntryId>");
+	OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+	xml = talloc_asprintf_append(xml, "</Initiator>");
+	OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+	/* Get recipients */
+	retval = emsmdbp_object_sharing_metadata_recipients_attr(emsmdbp_ctx, sharing_object, &recipients_attr, local_mem_ctx);
+	OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, local_mem_ctx);
+
+	remote_uid = (char *)get_emsmdbp_data(PidLidSharingRemoteUid, sharing_properties, data_pointers, retvals);
+	remote_store_uid = (char *)get_emsmdbp_data(PidLidSharingRemoteStoreUid, sharing_properties, data_pointers, retvals);
+
+	/* See [MS-OXSHARE] Section 2.2.2.5 */
+	if (sharing_flavour == SHARING_ACCEPT_REQUEST) {
+		/*** Accept Of Request */
+		retval = emsmdbp_object_sharing_metadata_providers_node(emsmdbp_ctx, sharing_object,
+									remote_uid, remote_store_uid,
+									recipients_attr,
+									&providers_node, local_mem_ctx);
+		OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, local_mem_ctx);
+
+		xml = talloc_asprintf_append(xml, "<AcceptOfRequest>%s</AcceptOfRequest>", providers_node);
+		OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+	} else if (sharing_flavour == SHARING_DENY_REQUEST) {
+		/*** Deny of Request ***/
+		retval = emsmdbp_object_sharing_metadata_providers_node(emsmdbp_ctx, sharing_object,
+									NULL, NULL,
+									recipients_attr,
+									&providers_node, local_mem_ctx);
+		OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, local_mem_ctx);
+
+		xml = talloc_asprintf_append(xml, "<DenyOfRequest>%s</DenyOfRequest>", providers_node);
+		OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+	} else {
+		if ((sharing_flavour & SHARING_REQUEST) == SHARING_REQUEST) {
+			/*** Request ***/
+			retval = emsmdbp_object_sharing_metadata_providers_node(emsmdbp_ctx, sharing_object,
+										NULL, NULL,
+										recipients_attr,
+										&providers_node, local_mem_ctx);
+			OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, local_mem_ctx);
+
+			xml = talloc_asprintf_append(xml, "<Request>%s</Request>", providers_node);
+			OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+		}
+		if ((sharing_flavour & SHARING_INVITATION_FOLDER) == SHARING_INVITATION_FOLDER) {
+			/*** Invitation ***/
+			xml = talloc_asprintf_append(xml, "<Invitation>");
+			OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+			/* PidLidSharingRemoteName */
+			prop_value = (char *)get_emsmdbp_data(PidLidSharingRemoteName, sharing_properties, data_pointers, retvals);
+			if (prop_value) {
+				/* This seems to be included when the calendar is not a default one */
+				xml = talloc_asprintf_append(xml, "<Title>%s</Title>", prop_value);
+				OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+			}
+
+			retval = emsmdbp_object_sharing_metadata_providers_node(emsmdbp_ctx, sharing_object,
+										remote_uid, remote_store_uid,
+										recipients_attr,
+										&providers_node, local_mem_ctx);
+			OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, local_mem_ctx);
+
+			xml = talloc_asprintf_append(xml, "%s</Invitation>", providers_node);
+			OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+		}
+		if ((sharing_flavour & SHARING_REQUEST) != SHARING_REQUEST
+		    && (sharing_flavour & SHARING_INVITATION_FOLDER) != SHARING_INVITATION_FOLDER) {
+			OC_DEBUG(1, "Unknown sharing flavour 0x%X\n", sharing_flavour);
+			talloc_free(local_mem_ctx);
+			return MAPI_E_NO_SUPPORT;
+		}
+	}
+
+	xml = talloc_asprintf_append(xml, "</SharingMessage>");
+	OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+
+	bin = talloc_zero(mem_ctx, struct Binary_r);
+	OPENCHANGE_RETVAL_IF(!xml, MAPI_E_NOT_ENOUGH_MEMORY, local_mem_ctx);
+	bin->lpb = (uint8_t *) talloc_strdup(mem_ctx, xml);
+	bin->cb = strlen(xml);
+
+	*attach_bin = bin;
+
+	talloc_free(local_mem_ctx);
+
+	return MAPI_E_SUCCESS;
+}
+
+/**
+   \details Create a sharing metadata XML file for folder sharing invitation, request and response
+            and store it as attachment in the sharing object.
+            See [MS-OXSHARE] for this kind of messages and [MS-OXSHRMSG] for the XML format.
+
+   \param emsmdbp_ctx pointer to the emsmdb provider context
+   \param sharing_object the original sharing message object to dump the XML data from
+
+   \return MAPI_E_SUCCESS on success, a MAPI error code otherwise
+ */
+_PUBLIC_ enum MAPISTATUS emsmdbp_object_attach_sharing_metadata_XML_file(struct emsmdbp_context *emsmdbp_ctx, struct emsmdbp_object *sharing_object)
+{
+	struct Binary_r		*attach_bin;
+	struct emsmdbp_object	*attach;
+	enum MAPISTATUS		*retvals = NULL;
+	enum MAPISTATUS		retval;
+	enum mapistore_error	ret;
+	struct SPropTagArray	*props;
+	struct SRow		aRow;
+	TALLOC_CTX		*mem_ctx;
+	uint32_t		contextID, aid;
+	void			**data_pointers;
+
+	/* Sanity checks */
+	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_INVALID_PARAMETER, NULL);
+	OPENCHANGE_RETVAL_IF(!sharing_object, MAPI_E_INVALID_PARAMETER, NULL);
+
+	OPENCHANGE_RETVAL_IF(!emsmdbp_is_mapistore(sharing_object), MAPI_E_NO_SUPPORT, NULL);
+
+	mem_ctx = talloc_named(NULL, 0, "attach_sharing_metadata");
+	OPENCHANGE_RETVAL_IF(!mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
+
+	/* 1. Check if the message is a IPM.Sharing message */
+	props = talloc_zero(mem_ctx, struct SPropTagArray);
+	OPENCHANGE_RETVAL_IF(!props, MAPI_E_NOT_ENOUGH_MEMORY, mem_ctx);
+	props->cValues = 1;
+	props->aulPropTag = talloc_zero(props, enum MAPITAGS);
+	OPENCHANGE_RETVAL_IF(!props->aulPropTag, MAPI_E_NOT_ENOUGH_MEMORY, mem_ctx);
+	props->aulPropTag[0] = PidTagMessageClass;
+
+	data_pointers = emsmdbp_object_get_properties(mem_ctx, emsmdbp_ctx, sharing_object, props, &retvals);
+	OPENCHANGE_RETVAL_IF(!data_pointers || retvals[0] != MAPI_E_SUCCESS, MAPI_E_NOT_FOUND, mem_ctx);
+
+	if (strncmp((char *)data_pointers[0], "IPM.Sharing", strlen("IPM.Sharing")) != 0) {
+		talloc_free(mem_ctx);
+		/* No sharing object, then no problems */
+		return MAPI_E_SUCCESS;
+	}
+
+	/* 2. Create the attachment */
+	attach = emsmdbp_object_attachment_init(mem_ctx, emsmdbp_ctx, sharing_object->object.message->messageID, sharing_object);
+	OPENCHANGE_RETVAL_IF(!attach, MAPI_E_NOT_ENOUGH_MEMORY, mem_ctx);
+
+	contextID = emsmdbp_get_contextID(sharing_object);
+
+	ret = mapistore_message_create_attachment(emsmdbp_ctx->mstore_ctx, contextID, sharing_object->backend_object, attach, &attach->backend_object, &aid);
+	OPENCHANGE_RETVAL_IF((ret != MAPISTORE_SUCCESS), mapistore_error_to_mapi(ret), mem_ctx);
+
+	/* 3. Set properties to the attachment */
+	retval = emsmdbp_object_sharing_metadata_property(emsmdbp_ctx, sharing_object, &attach_bin, mem_ctx);
+	OPENCHANGE_RETVAL_IF((retval != MAPI_E_SUCCESS), retval, mem_ctx);
+
+	aRow.cValues = 3;
+	aRow.lpProps = talloc_array(mem_ctx, struct SPropValue, 3);
+	set_SPropValue_proptag(aRow.lpProps, PidTagAttachLongFilename, "sharing_metadata.xml");
+	set_SPropValue_proptag(aRow.lpProps + 1, PidTagAttachDataBinary, attach_bin);
+	set_SPropValue_proptag(aRow.lpProps + 2, PidTagAttachMimeTag, "application/x-sharing-metadata-xml");
+
+	ret = emsmdbp_object_set_properties(emsmdbp_ctx, attach, &aRow);
+	OPENCHANGE_RETVAL_IF(ret != MAPISTORE_SUCCESS, mapistore_error_to_mapi(ret), mem_ctx);
+
+	/* 4. Save the attachment */
+	/* TODO: Include this code once all available backends implement for attachment save */
+	/* ret = mapistore_attachment_save(emsmdbp_ctx->mstore_ctx, contextID, attach->backend_object, mem_ctx); */
+
+	talloc_free(mem_ctx);
+
+	return MAPI_E_SUCCESS;
 }

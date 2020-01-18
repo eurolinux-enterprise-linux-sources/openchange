@@ -20,9 +20,11 @@
 #ifndef	__OCPF_PRIVATE_H_
 #define	__OCPF_PRIVATE_H_
 
+#include "libocpf/ocpf.h"
 #include "config.h"
 #include <stdlib.h>
 #include <libocpf/ocpf.tab.h>
+#include "utils/dlinklist.h"
 
 #ifndef HAVE_COMPARISON_FN_T
 #define HAVE_COMPARISON_FN_T
