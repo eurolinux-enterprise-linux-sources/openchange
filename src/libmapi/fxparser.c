@@ -20,7 +20,6 @@
 #include "libmapi/libmapi.h"
 #include "libmapi/libmapi_private.h"
 #include "libmapi/fxparser.h"
-#include "libmapi/fxics.h"
 
 #ifdef ENABLE_ASSERTS
 #include <assert.h>
@@ -600,24 +599,24 @@ _PUBLIC_ enum MAPISTATUS fxparser_parse(struct fx_parser_context *parser, DATA_B
 			case ParserState_HaveTag:
 			{
 				switch (parser->tag) {
-					case StartTopFld:
-					case StartSubFld:
-					case EndFolder:
-					case StartMessage:
-					case StartFAIMsg:
-					case EndMessage:
-					case StartRecip:
-					case EndToRecip:
-					case NewAttach:
-					case EndAttach:
-					case StartEmbed:
-					case EndEmbed:
+					case PidTagStartTopFld:
+					case PidTagStartSubFld:
+					case PidTagEndFolder:
+					case PidTagStartMessage:
+					case PidTagStartFAIMsg:
+					case PidTagEndMessage:
+					case PidTagStartRecip:
+					case PidTagEndToRecip:
+					case PidTagNewAttach:
+					case PidTagEndAttach:
+					case PidTagStartEmbed:
+					case PidTagEndEmbed:
 						if (parser->op_marker) {
 							ms = parser->op_marker(parser->tag, parser->priv);
 						}
 						parser->state = ParserState_Entry;
 						break;
-					case MetaTagFXDelProp:
+					case PidTagFXDelProp:
 					{
 						uint32_t tag;
 						if (pull_uint32_t(parser, &tag)) {

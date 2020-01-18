@@ -1,0 +1,367 @@
+diff -up openchange-2.0-QUADRANT/config.mk.in.samba-4.2 openchange-2.0-QUADRANT/config.mk.in
+--- openchange-2.0-QUADRANT/config.mk.in.samba-4.2	2013-01-24 19:55:36.000000000 +0100
++++ openchange-2.0-QUADRANT/config.mk.in	2015-07-02 10:15:20.556693691 +0200
+@@ -47,6 +47,9 @@ PACKAGE_VERSION=@PACKAGE_VERSION@
+ SAMBA_CFLAGS=@SAMBA_CFLAGS@
+ SAMBA_LIBS=@SAMBA_LIBS@
+ 
++SAMBA_DEBUG_LDFLAGS=@SAMBA_DEBUG_LDFLAGS@
++SAMBA_DEBUG_LIBS=@SAMBA_DEBUG_LIBS@
++
+ LDB_CFLAGS=@LDB_CFLAGS@
+ LDB_LIBS=@LDB_LIBS@
+ 
+diff -up openchange-2.0-QUADRANT/configure.ac.samba-4.2 openchange-2.0-QUADRANT/configure.ac
+--- openchange-2.0-QUADRANT/configure.ac.samba-4.2	2015-07-02 10:15:20.551693691 +0200
++++ openchange-2.0-QUADRANT/configure.ac	2015-07-02 10:15:20.557693691 +0200
+@@ -365,6 +365,12 @@ PKG_CHECK_MODULES(SAMBASERVER, dcerpc_se
+ PKG_CHECK_MODULES(TDB, tdb)
+ PKG_CHECK_MODULES(LDB, ldb)
+ 
++SAMBA_DEBUG_LIBS="-lsamba-debug-samba4"
++AC_SUBST(SAMBA_DEBUG_LIBS)
++
++SAMBA_DEBUG_LDFLAGS="-L`pkg-config --variable=libdir samba-util`/samba -Wl,-rpath -Wl,`pkg-config --variable=libdir samba-util`/samba"
++AC_SUBST(SAMBA_DEBUG_LDFLAGS)
++
+ dnl ---------------------------------------------------------------------------
+ dnl Check a particular Samba4 git revision
+ dnl ---------------------------------------------------------------------------
+@@ -580,12 +586,14 @@ if test x"$enable_libpopt" = x"yes"; the
+ 	    exchange2ical=1
+ 	fi
+ 
+-	MAPISTORE_TEST=mapistore_test
++	if test x"$enable_mapiproxy" = x"yes"; then
++		MAPISTORE_TEST=mapistore_test
++		check_fasttransfer=1
++		test_asyncnotif=1
++	fi
+ 	mapiprofile=1
+ 	openchangemapidump=1
+ 	schemaIDGUID=1
+-	check_fasttransfer=1
+-	test_asyncnotif=1
+ fi
+ AC_SUBST(MAPISTORE_TEST)
+ OC_RULE_ADD(openchangeclient, TOOLS)
+diff -up openchange-2.0-QUADRANT/libmapi.pc.in.samba-4.2 openchange-2.0-QUADRANT/libmapi.pc.in
+--- openchange-2.0-QUADRANT/libmapi.pc.in.samba-4.2	2015-07-02 10:15:20.547693691 +0200
++++ openchange-2.0-QUADRANT/libmapi.pc.in	2015-07-02 10:15:20.557693691 +0200
+@@ -8,7 +8,7 @@ datadir=@datadir@
+ Name: MAPI
+ Description: MAPI Protocol Implementation
+ Version: @PACKAGE_VERSION@
+-Libs: -L${libdir} -lmapi-openchange
++Libs: -L${libdir} -lmapi-openchange @SAMBA_DEBUG_LDFLAGS@ @SAMBA_DEBUG_LIBS@
+ Libs.private: @LIBS@
+ Cflags: -I${includedir}
+ Requires: talloc dcerpc ndr tevent
+diff -up openchange-2.0-QUADRANT/Makefile.samba-4.2 openchange-2.0-QUADRANT/Makefile
+--- openchange-2.0-QUADRANT/Makefile.samba-4.2	2015-07-02 10:15:20.550693691 +0200
++++ openchange-2.0-QUADRANT/Makefile	2015-07-02 10:15:20.557693691 +0200
+@@ -309,7 +309,7 @@ libmapi-openchange.$(SHLIBEXT).$(PACKAGE
+ 	libmapi/socket/interface.po			\
+ 	libmapi/socket/netif.po				
+ 	@echo "Linking $@"
+-	@$(CC) $(DSOOPT) $(CFLAGS) $(LDFLAGS) -Wl,-soname,libmapi-openchange.$(SHLIBEXT).$(LIBMAPI_SO_VERSION) -o $@ $^ $(LIBS)
++	@$(CC) $(DSOOPT) $(CFLAGS) $(LDFLAGS) -Wl,-soname,libmapi-openchange.$(SHLIBEXT).$(LIBMAPI_SO_VERSION) -o $@ $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ 
+ libmapi-openchange.$(SHLIBEXT).$(LIBMAPI_SO_VERSION): libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+@@ -349,7 +349,7 @@ libmapipp.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	libmapi++/src/session.po \
+ 	libmapi-openchange.$(SHLIBEXT).$(LIBMAPI_SO_VERSION)
+ 	@echo "Linking $@"
+-	@$(CXX) $(DSOOPT) $(CXXFLAGS) $(LDFLAGS) -Wl,-soname,libmapipp.$(SHLIBEXT).$(LIBMAPIPP_SO_VERSION) -o $@ $^ $(LIBS) 
++	@$(CXX) $(DSOOPT) $(CXXFLAGS) $(LDFLAGS) -Wl,-soname,libmapipp.$(SHLIBEXT).$(LIBMAPIPP_SO_VERSION) -o $@ $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ libmapixx-installpc:
+ 	@echo "[*] install: libmapi++ pc files"
+@@ -430,7 +430,7 @@ bin/libmapixx-test:	libmapi++/tests/test
+ 		libmapipp.$(SHLIBEXT).$(PACKAGE_VERSION) \
+ 		libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking sample application $@"
+-	@$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS) 
++	@$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ clean:: libmapixx-test-clean
+ 
+@@ -445,7 +445,7 @@ bin/libmapixx-attach: libmapi++/tests/at
+ 		libmapipp.$(SHLIBEXT).$(PACKAGE_VERSION) \
+ 		libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking sample application $@"
+-	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
++	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ clean:: libmapixx-attach-clean
+ 
+@@ -455,7 +455,7 @@ bin/libmapixx-exception: libmapi++/tests
+ 		libmapipp.$(SHLIBEXT).$(PACKAGE_VERSION) \
+ 		libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking exception test application $@"
+-	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
++	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ libmapixx-exception-clean:
+ 	rm -f bin/libmapixx-exception
+@@ -475,7 +475,7 @@ bin/libmapixx-profiletest: libmapi++/tes
+ 		libmapipp.$(SHLIBEXT).$(PACKAGE_VERSION) \
+ 		libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking profile test application $@"
+-	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
++	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ clean:: libmapixx-profiletest-clean
+ 
+@@ -496,7 +496,7 @@ libmapi++/examples/foldertree: libmapi++
+ 		libmapipp.$(SHLIBEXT).$(PACKAGE_VERSION) \
+ 		libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking foldertree example application $@"
+-	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
++	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ clean:: libmapixx-foldertree-clean
+ 
+@@ -504,7 +504,7 @@ libmapi++/examples/messages: libmapi++/e
+ 		libmapipp.$(SHLIBEXT).$(PACKAGE_VERSION) \
+ 		libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking messages example application $@"
+-	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
++	@$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ clean:: libmapixx-messages-clean
+ 
+@@ -571,7 +571,7 @@ libmapiadmin.$(SHLIBEXT).$(PACKAGE_VERSI
+ 	libmapiadmin/mapiadmin.po 		\
+ 	libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) $(DSOOPT) $(LDFLAGS) -Wl,-soname,libmapiadmin.$(SHLIBEXT).$(LIBMAPIADMIN_SO_VERSION) -o $@ $^ $(LIBS) $(LIBMAPIADMIN_LIBS) 
++	@$(CC) $(DSOOPT) $(LDFLAGS) -Wl,-soname,libmapiadmin.$(SHLIBEXT).$(LIBMAPIADMIN_SO_VERSION) -o $@ $^ $(LIBS) $(LIBMAPIADMIN_LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ 
+ 
+@@ -648,7 +648,7 @@ libocpf.$(SHLIBEXT).$(PACKAGE_VERSION):
+ 	libocpf/ocpf_write.po			\
+ 	libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) $(DSOOPT) $(LDFLAGS) -Wl,-soname,libocpf.$(SHLIBEXT).$(LIBOCPF_SO_VERSION) -o $@ $^ $(LIBS)
++	@$(CC) $(DSOOPT) $(LDFLAGS) -Wl,-soname,libocpf.$(SHLIBEXT).$(LIBOCPF_SO_VERSION) -o $@ $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ libocpf.$(SHLIBEXT).$(LIBOCPF_SO_VERSION): libocpf.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	ln -fs $< $@
+@@ -720,7 +720,7 @@ mapiproxy/dcesrv_mapiproxy.$(SHLIBEXT):
+ 						gen_ndr/ndr_exchange.po				
+ 
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $(DSOOPT) $^ -L. $(LDFLAGS) $(LIBS) $(SAMBASERVER_LIBS) $(SAMDB_LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION) libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
++	@$(CC) -o $@ $(DSOOPT) $^ -L. $(LDFLAGS) $(LIBS) $(SAMBASERVER_LIBS) $(SAMDB_LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION) libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ mapiproxy/dcesrv_mapiproxy.c: gen_ndr/ndr_exchange_s.c gen_ndr/ndr_exchange.c
+ 
+@@ -769,7 +769,7 @@ mapiproxy/libmapiproxy.$(SHLIBEXT).$(PAC
+ 							mapiproxy/libmapiproxy/modules.po			\
+ 							libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) -Wl,-soname,libmapiproxy.$(SHLIBEXT).$(LIBMAPIPROXY_SO_VERSION) $^ -L. $(LIBS) $(TDB_LIBS) $(DL_LIBS)
++	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) -Wl,-soname,libmapiproxy.$(SHLIBEXT).$(LIBMAPIPROXY_SO_VERSION) $^ -L. $(LIBS) $(TDB_LIBS) $(DL_LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ mapiproxy/libmapiproxy.$(SHLIBEXT).$(LIBMAPIPROXY_SO_VERSION): libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	ln -fs $< $@
+@@ -820,7 +820,7 @@ mapiproxy/libmapiserver.$(SHLIBEXT).$(PA
+ 							ndr_mapi.po				\
+ 							gen_ndr/ndr_exchange.po
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) -Wl,-soname,libmapiserver.$(SHLIBEXT).$(LIBMAPIPROXY_SO_VERSION) $^ $(LIBS)
++	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) -Wl,-soname,libmapiserver.$(SHLIBEXT).$(LIBMAPIPROXY_SO_VERSION) $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ mapiproxy/libmapiserver.$(SHLIBEXT).$(LIBMAPISERVER_SO_VERSION): libmapiserver.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	ln -fs $< $@
+@@ -914,7 +914,7 @@ mapiproxy/libmapistore.$(SHLIBEXT).$(PAC
+ 							mapiproxy/libmapistore/mapistore_notification.po 		\
+ 							libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $(DSOOPT) $^ -L. $(LDFLAGS) $(LIBS) $(TDB_LIBS) $(DL_LIBS) -Wl,-soname,libmapistore.$(SHLIBEXT).$(LIBMAPISTORE_SO_VERSION)
++	@$(CC) -o $@ $(DSOOPT) $^ -L. $(LDFLAGS) $(LIBS) $(TDB_LIBS) $(DL_LIBS) -Wl,-soname,libmapistore.$(SHLIBEXT).$(LIBMAPISTORE_SO_VERSION) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ mapiproxy/libmapistore/mapistore_interface.po: mapiproxy/libmapistore/mapistore_nameid.h
+ 
+@@ -934,7 +934,7 @@ mapistore_test: bin/mapistore_test
+ bin/mapistore_test: 	mapiproxy/libmapistore/tests/mapistore_test.o		\
+ 			mapiproxy/libmapistore.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $^ $(LDFLAGS) $(LIBS) -lpopt -L. libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
++	@$(CC) -o $@ $^ $(LDFLAGS) $(LIBS) -lpopt -L. libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ mapistore_clean:
+ 	rm -f mapiproxy/libmapistore/tests/*.o
+@@ -972,13 +972,13 @@ clean:: mapiproxy-modules-clean
+ 
+ mapiproxy/modules/mpm_downgrade.$(SHLIBEXT): mapiproxy/modules/mpm_downgrade.po
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION)
++	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ mapiproxy/modules/mpm_pack.$(SHLIBEXT):	mapiproxy/modules/mpm_pack.po	\
+ 					ndr_mapi.po			\
+ 					gen_ndr/ndr_exchange.po
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION)
++	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ mapiproxy/modules/mpm_cache.$(SHLIBEXT): mapiproxy/modules/mpm_cache.po		\
+ 					 mapiproxy/modules/mpm_cache_ldb.po	\
+@@ -986,11 +986,11 @@ mapiproxy/modules/mpm_cache.$(SHLIBEXT):
+ 					 ndr_mapi.po				\
+ 					 gen_ndr/ndr_exchange.po
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION)
++	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ mapiproxy/modules/mpm_dummy.$(SHLIBEXT): mapiproxy/modules/mpm_dummy.po
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION)
++	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ 
+ samba_setupdir = $(shell $(PYTHON) -c 'import samba; print samba.param.setup_dir();')
+@@ -1048,7 +1048,7 @@ mapiproxy/servers/exchange_nsp.$(SHLIBEX
+ 						mapiproxy/servers/default/nspi/emsabp_tdb.po		\
+ 						mapiproxy/servers/default/nspi/emsabp_property.po	
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) $(TDB_LIBS) $(SAMBASERVER_LIBS) $(SAMDB_LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION)
++	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) $(TDB_LIBS) $(SAMBASERVER_LIBS) $(SAMDB_LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ mapiproxy/servers/exchange_emsmdb.$(SHLIBEXT):	mapiproxy/servers/default/emsmdb/dcesrv_exchange_emsmdb.po	\
+ 						mapiproxy/servers/default/emsmdb/emsmdbp.po			\
+@@ -1067,11 +1067,11 @@ mapiproxy/servers/exchange_emsmdb.$(SHLI
+ 	@echo "Linking $@"
+ 	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) $(SAMBASERVER_LIBS) $(SAMDB_LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION) \
+ 						mapiproxy/libmapiserver.$(SHLIBEXT).$(PACKAGE_VERSION)		\
+-						mapiproxy/libmapistore.$(SHLIBEXT).$(PACKAGE_VERSION)
++						mapiproxy/libmapistore.$(SHLIBEXT).$(PACKAGE_VERSION) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ mapiproxy/servers/exchange_ds_rfr.$(SHLIBEXT):	mapiproxy/servers/default/rfr/dcesrv_exchange_ds_rfr.po
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) $(SAMBASERVER_LIBS) $(SAMDB_LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION)
++	@$(CC) -o $@ $(DSOOPT) $(LDFLAGS) $^ -L. $(LIBS) $(SAMBASERVER_LIBS) $(SAMDB_LIBS) -Lmapiproxy mapiproxy/libmapiproxy.$(SHLIBEXT).$(PACKAGE_VERSION) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ #################################################################
+ # Tools compilation rules
+@@ -1106,7 +1106,7 @@ bin/openchangeclient: 	utils/openchangec
+ 			libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)		\
+ 			libocpf.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) -lpopt
++	@$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS) $(LIBS) -lpopt $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ 
+ ##############
+@@ -1134,7 +1134,7 @@ bin/mapiprofile: 	utils/mapiprofile.o
+ 			utils/openchange-tools.o 		\
+ 			libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) -lpopt
++	@$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) -lpopt $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ 
+ ###################
+@@ -1163,7 +1163,7 @@ bin/openchangepfadmin:	utils/openchangep
+ 			libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION) 		\
+ 			libmapiadmin.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $^ $(LDFLAGS) $(LIBS) $(LIBMAPIADMIN_LIBS) -lpopt			
++	@$(CC) -o $@ $^ $(LDFLAGS) $(LIBS) $(LIBMAPIADMIN_LIBS) -lpopt $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ 
+ ###################
+@@ -1194,7 +1194,7 @@ bin/exchange2mbox:	utils/exchange2mbox.o
+ 			utils/openchange-tools.o			\
+ 			libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $^ $(LIBS) $(LDFLAGS) -lpopt  $(MAGIC_LIBS)
++	@$(CC) -o $@ $^ $(LIBS) $(LDFLAGS) -lpopt $(MAGIC_LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ 
+ ###################
+@@ -1258,7 +1258,7 @@ bin/exchange2ical:	utils/exchange2ical_t
+ 			utils/openchange-tools.o			\
+ 			libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) $(LDFLAGS) -o $@ $^ $(LIBS) $(ICAL_LIBS) -lpopt
++	@$(CC) $(LDFLAGS) -o $@ $^ $(LIBS) $(ICAL_LIBS) -lpopt $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ 
+ ###################
+@@ -1322,7 +1322,7 @@ bin/mapitest:	utils/mapitest/mapitest.o
+ 		utils/mapitest/modules/module_lzxpress.o	\
+ 		libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)		
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $^ $(LDFLAGS) $(LIBS) -lpopt $(SUBUNIT_LIBS)
++	@$(CC) -o $@ $^ $(LDFLAGS) $(LIBS) -lpopt $(SUBUNIT_LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ utils/mapitest/proto.h:					\
+ 	utils/mapitest/mapitest_suite.c			\
+@@ -1380,7 +1380,7 @@ bin/openchangemapidump:	utils/backup/ope
+ 			utils/openchange-tools.o			\
+ 			libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $^ $(LDFLAGS) $(LIBS) -lpopt
++	@$(CC) -o $@ $^ $(LDFLAGS) $(LIBS) -lpopt $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ 
+ ###############
+@@ -1405,7 +1405,7 @@ clean:: schemaIDGUID-clean
+ 
+ bin/schemaIDGUID: utils/schemaIDGUID.o
+ 	@echo "Linking $@"
+-	@$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
++	@$(CC) $(CFLAGS) -o $@ $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ ###################
+ # check_fasttransfer test app.
+@@ -1432,7 +1432,7 @@ bin/check_fasttransfer:	testprogs/check_
+ 			libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)		\
+ 			mapiproxy/libmapistore.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $^ $(LIBS) $(LDFLAGS) -lpopt
++	@$(CC) -o $@ $^ $(LIBS) $(LDFLAGS) -lpopt $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ ###################
+ # test_asyncnotif test app.
+@@ -1458,7 +1458,7 @@ clean:: test_asyncnotif-clean
+ bin/test_asyncnotif:	testprogs/test_asyncnotif.o			\
+ 			libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) -o $@ $^ $(LIBS) $(LDFLAGS) -lpopt
++	@$(CC) -o $@ $^ $(LIBS) $(LDFLAGS) -lpopt $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ ###################
+ # python code
+@@ -1503,7 +1503,7 @@ $(pythonscriptdir)/openchange/mapi.$(SHL
+ 						pyopenchange/pymapi_properties.c		\
+ 						libmapi-openchange.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CC) $(CFLAGS) -fno-strict-aliasing $(DSOOPT) $(LDFLAGS) -o $@ $^ $(PYTHON_CFLAGS) $(PYTHON_LIBS) $(LIBS) 
++	@$(CC) $(CFLAGS) -fno-strict-aliasing $(DSOOPT) $(LDFLAGS) -o $@ $^ $(PYTHON_CFLAGS) $(PYTHON_LIBS) $(LIBS)  $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ # $(pythonscriptdir)/openchange/ocpf.$(SHLIBEXT):	pyopenchange/pyocpf.c				\
+ # 						libocpf.$(SHLIBEXT).$(PACKAGE_VERSION)		\
+@@ -1692,7 +1692,7 @@ libqtmapi.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	qt/lib/foldermodel.o			\
+ 	qt/lib/messagesmodel.o
+ 	@echo "Linking $@"
+-	@$(CXX) $(DSOOPT) $(CXXFLAGS) $(LDFLAGS) -Wl,-soname,libqtmapi.$(SHLIBEXT).$(LIBQTMAPI_SO_VERSION) -o $@ $^ $(LIBS)
++	@$(CXX) $(DSOOPT) $(CXXFLAGS) $(LDFLAGS) -Wl,-soname,libqtmapi.$(SHLIBEXT).$(LIBQTMAPI_SO_VERSION) -o $@ $^ $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 
+ 
+ qt/demo/demoapp: qt/demo/demoapp.o 				\
+@@ -1701,7 +1701,7 @@ qt/demo/demoapp: qt/demo/demoapp.o 				\
+ 	libmapipp.$(SHLIBEXT).$(PACKAGE_VERSION)	\
+ 	libqtmapi.$(SHLIBEXT).$(PACKAGE_VERSION)
+ 	@echo "Linking $@"
+-	@$(CXX) $(CXXFLAGS) -o $@ $^ $(QT4_LIBS) $(LDFLAGS) $(LIBS)
++	@$(CXX) $(CXXFLAGS) -o $@ $^ $(QT4_LIBS) $(LDFLAGS) $(LIBS) $(SAMBA_DEBUG_LDFLAGS) $(SAMBA_DEBUG_LIBS)
+ 	# we don't yet install this...
+ 	ln -sf libqtmapi.$(SHLIBEXT).$(PACKAGE_VERSION) libqtmapi.$(SHLIBEXT)
+ 	ln -sf libqtmapi.$(SHLIBEXT).$(PACKAGE_VERSION) libqtmapi.$(SHLIBEXT).$(LIBQTMAPI_SO_VERSION)

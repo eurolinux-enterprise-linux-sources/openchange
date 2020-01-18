@@ -1,7 +1,11 @@
+import testtools
 import unittest
 import subprocess
+import subunit
+from testtools.matchers import DocTestMatches
+import sys
 
-class TestProgram(unittest.TestCase):
+class TestProgram(testtools.TestCase):
 
     def get_output(self, args, retcode=0):
         proc = subprocess.Popen(args, stdin=None, stdout=subprocess.PIPE, 
@@ -17,9 +21,9 @@ class OpenChangeTestCase(TestProgram):
 
     def verify_command_noerrors(self, command, expectedStandardOutput):
         out, err = self.get_output(command)
-        self.assertEquals(err, "")
-        self.assertEquals(out, expectedStandardOutput)
-
+        self.assertThat(err, DocTestMatches(""))
+        self.assertThat(out, DocTestMatches(expectedStandardOutput))
+        
     def test_help(self):
         refout = open("expected_output--help.txt").read()
         self.verify_command_noerrors([self.progpath, "--help"], refout)

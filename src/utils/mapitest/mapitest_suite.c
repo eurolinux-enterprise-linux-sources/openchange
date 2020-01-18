@@ -20,7 +20,6 @@
 */
 
 #include "utils/mapitest/mapitest.h"
-#include "utils/dlinklist.h"
 
 /**
 	\file

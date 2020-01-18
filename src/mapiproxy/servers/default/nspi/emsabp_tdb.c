@@ -27,6 +27,7 @@
 
 #include "mapiproxy/dcesrv_mapiproxy.h"
 #include "dcesrv_exchange_nsp.h"
+#include <util/debug.h>
 
 /**
    \details Structure to be used for MId traversal within TDB
@@ -71,8 +72,8 @@ _PUBLIC_ TDB_CONTEXT *emsabp_tdb_init(TALLOC_CTX *mem_ctx,
 
 		ret = tdb_store(tdb_ctx, key, dbuf, TDB_INSERT);
 		if (ret == -1) {
-			OC_DEBUG(3, "Unable to create %s record: %s",
-				  EMSABP_TDB_DATA_REC, tdb_errorstr(tdb_ctx));
+			DEBUG(3, ("[%s:%d]: Unable to create %s record: %s\n", __FUNCTION__, __LINE__,
+				  EMSABP_TDB_DATA_REC, tdb_errorstr(tdb_ctx)));
 			tdb_close(tdb_ctx);
 			return NULL;
 		}
@@ -109,15 +110,15 @@ _PUBLIC_ TDB_CONTEXT *emsabp_tdb_init_tmp(TALLOC_CTX *mem_ctx)
 
 	dbuf.dptr = (unsigned char *) talloc_asprintf(mem_ctx, "0x%x", EMSABP_TDB_TMP_MID_START);
 	dbuf.dsize = strlen((const char *)dbuf.dptr);
-
+	
 	ret = tdb_store(tdb_ctx, key, dbuf, TDB_INSERT);
 	if (ret == -1) {
-		OC_DEBUG(3, "Unable to create %s record: %s",
-			  EMSABP_TDB_DATA_REC, tdb_errorstr(tdb_ctx));
+		DEBUG(3, ("[%s:%d]: Unable to create %s record: %s\n", __FUNCTION__, __LINE__,
+			  EMSABP_TDB_DATA_REC, tdb_errorstr(tdb_ctx)));
 		tdb_close(tdb_ctx);
 		return NULL;
-	}
-
+	} 
+	
 	return tdb_ctx;
 }
 
@@ -134,7 +135,7 @@ _PUBLIC_ enum MAPISTATUS emsabp_tdb_close(TDB_CONTEXT *tdb_ctx)
 	OPENCHANGE_RETVAL_IF(!tdb_ctx, MAPI_E_INVALID_PARAMETER, NULL);
 
 	tdb_close(tdb_ctx);
-	OC_DEBUG(0, "TDB database closed");
+	DEBUG(0, ("TDB database closed\n"));
 
 	return MAPI_E_SUCCESS;
 }

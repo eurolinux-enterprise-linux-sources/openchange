@@ -27,6 +27,7 @@
 
 #include "libmapiserver.h"
 #include "libmapi/mapidefs.h"
+#include <util/debug.h>
 
 /**
    \details Calculate the size of a TypedString structure

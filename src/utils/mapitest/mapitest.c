@@ -21,7 +21,6 @@
 
 #include "utils/mapitest/mapitest.h"
 #include "utils/openchange-tools.h"
-#include "utils/dlinklist.h"
 
 #include <popt.h>
 #include <param.h>

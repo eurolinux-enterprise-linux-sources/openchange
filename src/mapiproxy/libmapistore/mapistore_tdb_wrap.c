@@ -25,7 +25,7 @@
 
 #include "mapistore.h"
 #include "mapistore_private.h"
-#include "utils/dlinklist.h"
+#include <dlinklist.h>
 
 static struct tdb_wrap *tdb_list;
 
@@ -35,10 +35,10 @@ static int mapistore_tdb_wrap_destructor(struct tdb_wrap *w)
 	tdb_close(w->tdb);
 	DLIST_REMOVE(tdb_list, w);
 	return 0;
-}
+}				 
 
 /*
- Log tdb messages via OC_DEBUG().
+ Log tdb messages via DEBUG().
 */
 static void mapistore_tdb_wrap_log(TDB_CONTEXT *tdb, enum tdb_debug_level level, 
 				   const char *format, ...) PRINTF_ATTRIBUTE(3,4);
@@ -53,7 +53,7 @@ static void mapistore_tdb_wrap_log(TDB_CONTEXT *tdb, enum tdb_debug_level level,
 	va_start(ap, format);
 	vasprintf(&ptr, format, ap);
 	va_end(ap);
-
+	
 	switch (level) {
 	case TDB_DEBUG_FATAL:
 		dl = 0;
@@ -69,11 +69,11 @@ static void mapistore_tdb_wrap_log(TDB_CONTEXT *tdb, enum tdb_debug_level level,
 		break;
 	default:
 		dl = 0;
-	}
+	}		
 
 	if (ptr != NULL) {
 		const char *name = tdb_name(tdb);
-		OC_DEBUG(dl, "tdb(%s): %s", name ? name : "unnamed", ptr);
+		DEBUG(dl, ("tdb(%s): %s", name ? name : "unnamed", ptr));
 		free(ptr);
 	}
 }

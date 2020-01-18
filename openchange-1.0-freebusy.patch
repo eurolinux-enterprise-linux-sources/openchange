@@ -1,0 +1,13 @@
+diff -up openchange-2.0-QUADRANT/exchange.idl.freebusy openchange-2.0-QUADRANT/exchange.idl
+diff -up openchange-2.0-QUADRANT/libmapi/freebusy.c.freebusy openchange-2.0-QUADRANT/libmapi/freebusy.c
+--- openchange-2.0-QUADRANT/libmapi/freebusy.c.freebusy	2013-01-24 19:55:36.000000000 +0100
++++ openchange-2.0-QUADRANT/libmapi/freebusy.c	2015-06-16 16:32:21.099486703 +0200
+@@ -207,7 +207,7 @@ _PUBLIC_ enum MAPISTATUS GetUserFreeBusy
+ 	OPENCHANGE_RETVAL_IF(!mid || *mid == MAPI_E_NOT_FOUND, MAPI_E_NOT_FOUND, NULL);
+ 
+ 	mapi_object_init(&obj_message);
+-	retval = OpenMessage(obj_store, *fid, *mid, &obj_message, 0x0);
++	retval = OpenMessage(&obj_exfreebusy, *fid, *mid, &obj_message, 0x0);
+ 	OPENCHANGE_RETVAL_IF(retval, retval, NULL);
+ 
+ 	/* Step 11. Get FreeBusy properties */

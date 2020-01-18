@@ -3,7 +3,7 @@
 
    EMSMDBP: EMSMDB Provider implementation
 
-   Copyright (C) Julien Kerihuel 2009-2014
+   Copyright (C) Julien Kerihuel 2009
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -56,7 +56,6 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesSpecific(TALLOC_CTX *mem_ctx,
 							  struct EcDoRpc_MAPI_REPL *mapi_repl,
 							  uint32_t *handles, uint16_t *size)
 {
-	TALLOC_CTX		*local_mem_ctx;
 	enum MAPISTATUS		retval;
 	struct GetProps_req	*request;
 	struct GetProps_repl	*response;
@@ -73,7 +72,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesSpecific(TALLOC_CTX *mem_ctx,
 	uint32_t		stream_size;
 	struct emsmdbp_stream_data *stream_data;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] GetPropertiesSpecific (0x07)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] GetPropertiesSpecific (0x07)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -98,7 +97,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesSpecific(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &rec);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -106,7 +105,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesSpecific(TALLOC_CTX *mem_ctx,
         object = private_data;
 	if (!object) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  object (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  object (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -115,17 +114,14 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesSpecific(TALLOC_CTX *mem_ctx,
 	      || object->type == EMSMDBP_OBJECT_MESSAGE
 	      || object->type == EMSMDBP_OBJECT_ATTACHMENT)) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  GetProperties cannot occur on an object of type '%s' (%d)\n", emsmdbp_getstr_type(object), object->type);
+		DEBUG(5, ("  GetProperties cannot occur on an object of type '%s' (%d)\n", emsmdbp_getstr_type(object), object->type));
 		goto end;
 	}
 
-        local_mem_ctx = talloc_new(NULL);
-        OPENCHANGE_RETVAL_IF(!local_mem_ctx, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
-
-        properties = talloc_zero(local_mem_ctx, struct SPropTagArray);
+        properties = talloc_zero(NULL, struct SPropTagArray);
         properties->cValues = request->prop_count;
         properties->aulPropTag = talloc_array(properties, enum MAPITAGS, request->prop_count);
-        untyped_status = talloc_array(local_mem_ctx, bool, request->prop_count);
+        untyped_status = talloc_array(NULL, bool, request->prop_count);
 
         for (i = 0; i < request->prop_count; i++) {
                 properties->aulPropTag[i] = request->properties[i];
@@ -152,7 +148,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesSpecific(TALLOC_CTX *mem_ctx,
                 }
         }
 
-        data_pointers = emsmdbp_object_get_properties(local_mem_ctx, emsmdbp_ctx, object, properties, &retvals);
+        data_pointers = emsmdbp_object_get_properties(mem_ctx, emsmdbp_ctx, object, properties, &retvals);
         if (data_pointers) {
 		for (i = 0; i < request->prop_count; i++) {
 			if (retvals[i] == MAPI_E_SUCCESS) {
@@ -170,7 +166,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesSpecific(TALLOC_CTX *mem_ctx,
 					stream_size = 0;
 				}
 				if (stream_size > 8192) {
-					OC_DEBUG(5, "attaching stream data for property %.8x\n", properties->aulPropTag[i]);
+					DEBUG(5, ("%s: attaching stream data for property %.8x\n", __FUNCTION__, properties->aulPropTag[i]));
 					stream_data = emsmdbp_stream_data_from_value(object, properties->aulPropTag[i], data_pointers[i], false);
 					if (stream_data) {
 						DLIST_ADD(object->stream_data, stream_data);
@@ -180,7 +176,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesSpecific(TALLOC_CTX *mem_ctx,
 				}
 			}
 		}
-		mapi_repl->error_code = MAPI_E_SUCCESS;
+                mapi_repl->error_code = MAPI_E_SUCCESS;
 		emsmdbp_fill_row_blob(mem_ctx,
 				      emsmdbp_ctx,
 				      &response->layout,
@@ -189,8 +185,10 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesSpecific(TALLOC_CTX *mem_ctx,
 				      data_pointers,
 				      retvals,
 				      untyped_status);
-	}
-	talloc_free(local_mem_ctx);
+                talloc_free(data_pointers);
+        }
+        talloc_free(properties);
+        talloc_free(retvals);
 
  end:
 	*size += libmapiserver_RopGetPropertiesSpecific_size(mapi_req, mapi_repl);
@@ -231,7 +229,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesAll(TALLOC_CTX *mem_ctx,
 	void				**data_pointers;
 	int				i;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] GetPropertiesAll (0x08)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] GetPropertiesAll (0x08)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -256,7 +254,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesAll(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &rec);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -264,14 +262,14 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesAll(TALLOC_CTX *mem_ctx,
 	object = private_data;
 	if (!object) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  object (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  object (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
 	retval = emsmdbp_object_get_available_properties(mem_ctx, emsmdbp_ctx, object, &SPropTagArray);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  object (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  object (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -325,7 +323,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesList(TALLOC_CTX *mem_ctx,
 	struct emsmdbp_object	*object;
 	struct SPropTagArray	*SPropTagArray;
 	
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] GetPropertiesList (0x9)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] GetPropertiesList (0x9)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -349,7 +347,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesList(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &rec);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -357,14 +355,14 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertiesList(TALLOC_CTX *mem_ctx,
 	object = private_data;
 	if (!object) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  object (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  object (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
 	retval = emsmdbp_object_get_available_properties(mem_ctx, emsmdbp_ctx, object, &SPropTagArray);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  object (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  object (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -405,7 +403,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSetProperties(TALLOC_CTX *mem_ctx,
 	uint16_t		i;
 	struct SRow		aRow;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] SetProperties (0x0a)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] SetProperties (0x0a)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -425,7 +423,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSetProperties(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &rec);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -482,7 +480,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopDeleteProperties(TALLOC_CTX *mem_ctx,
 						     struct EcDoRpc_MAPI_REPL *mapi_repl,
 						     uint32_t *handles, uint16_t *size)
 {
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] DeleteProperties (0x0b) -- stub\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] DeleteProperties (0x0b) -- stub\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -539,7 +537,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopOpenStream(TALLOC_CTX *mem_ctx,
 	struct emsmdbp_stream_data	*stream_data;
 	enum OpenStream_OpenModeFlags	mode;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] OpenStream (0x2b)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] OpenStream (0x2b)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -558,7 +556,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopOpenStream(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -607,10 +605,6 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopOpenStream(TALLOC_CTX *mem_ctx,
 	*/
 
 	object = emsmdbp_object_stream_init(NULL, emsmdbp_ctx, parent_object);
-	if (!object) {
-		mapi_repl->error_code = MAPI_E_NO_SUPPORT;
-                goto end;
-	}
 	object->object.stream->property = request->PropertyTag;
 	object->object.stream->stream.position = 0;
 	object->object.stream->stream.buffer.length = 0;
@@ -619,8 +613,8 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopOpenStream(TALLOC_CTX *mem_ctx,
 		object->object.stream->read_write = (mode == OpenStream_ReadWrite);
 		stream_data = emsmdbp_object_get_stream_data(parent_object, object->object.stream->property);
 		if (stream_data) {
-			object->object.stream->stream.buffer.length = stream_data->data.length;
-			object->object.stream->stream.buffer.data = talloc_memdup(object->object.stream, stream_data->data.data, stream_data->data.length);
+			object->object.stream->stream.buffer = stream_data->data;
+			(void) talloc_reference(object->object.stream, object->object.stream->stream.buffer.data);
 			DLIST_REMOVE(parent_object->stream_data, stream_data);
 			talloc_free(stream_data);
 		}
@@ -698,7 +692,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopReadStream(TALLOC_CTX *mem_ctx,
 	struct emsmdbp_object		*object;
 	uint32_t			handle, buffer_size;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] ReadStream (0x2c)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] ReadStream (0x2c)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -718,7 +712,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopReadStream(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &rec);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -727,7 +721,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopReadStream(TALLOC_CTX *mem_ctx,
 	object = (struct emsmdbp_object *) private_data;
 	if (!object || object->type != EMSMDBP_OBJECT_STREAM) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  invalid object\n");
+		DEBUG(5, ("  invalid object\n"));
 		goto end;
 	}
 
@@ -735,12 +729,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopReadStream(TALLOC_CTX *mem_ctx,
 	buffer_size = mapi_req->u.mapi_ReadStream.ByteCount;
 	/* careful here, let's switch to idiot mode */
 	if (buffer_size == 0xBABE) {
-		/* If MaximumByteCount (uint32_t) overflows sizeof (uint16_t) */
-		if (mapi_req->u.mapi_ReadStream.MaximumByteCount.value > 0xFFF0) {
-			buffer_size = 0xFFF0;
-		} else {
-			buffer_size = mapi_req->u.mapi_ReadStream.MaximumByteCount.value;
-		}
+		buffer_size = mapi_req->u.mapi_ReadStream.MaximumByteCount.value;
 	}
 
         mapi_repl->u.mapi_ReadStream.data = emsmdbp_stream_read_buffer(&object->object.stream->stream, buffer_size);
@@ -780,7 +769,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopWriteStream(TALLOC_CTX *mem_ctx,
 	uint32_t			handle;
 	struct WriteStream_req		*request;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] WriteStream (0x2d)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] WriteStream (0x2d)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -799,7 +788,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopWriteStream(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -807,7 +796,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopWriteStream(TALLOC_CTX *mem_ctx,
 	object = (struct emsmdbp_object *) private_data;
 	if (!object || object->type != EMSMDBP_OBJECT_STREAM) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  invalid object\n");
+		DEBUG(5, ("  invalid object\n"));
 		goto end;
 	}
 
@@ -855,7 +844,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopCommitStream(TALLOC_CTX *mem_ctx,
 	uint32_t			handle;
 	void				*private_data;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] CommitStream (0x5d)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] CommitStream (0x5d)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -874,7 +863,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopCommitStream(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &rec);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -882,7 +871,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopCommitStream(TALLOC_CTX *mem_ctx,
 	object = (struct emsmdbp_object *) private_data;
 	if (!object || object->type != EMSMDBP_OBJECT_STREAM) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  invalid object\n");
+		DEBUG(5, ("  invalid object\n"));
 		goto end;
 	}
 
@@ -926,7 +915,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetStreamSize(TALLOC_CTX *mem_ctx,
 	struct emsmdbp_object		*object = NULL;
 	uint32_t			handle;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] GetStreamSize (0x5e)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] GetStreamSize (0x5e)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -944,7 +933,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetStreamSize(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -952,7 +941,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetStreamSize(TALLOC_CTX *mem_ctx,
 	object = (struct emsmdbp_object *) private_data;
 	if (!object || object->type != EMSMDBP_OBJECT_STREAM) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  invalid object\n");
+		DEBUG(5, ("  invalid object\n"));
 		goto end;
 	}
 
@@ -991,7 +980,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSeekStream(TALLOC_CTX *mem_ctx,
 	struct emsmdbp_object		*object = NULL;
 	uint32_t			handle, new_position;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] SeekStream (0x2e)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] SeekStream (0x2e)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -1009,7 +998,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSeekStream(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -1017,7 +1006,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSeekStream(TALLOC_CTX *mem_ctx,
 	object = (struct emsmdbp_object *) private_data;
 	if (!object || object->type != EMSMDBP_OBJECT_STREAM) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  invalid object\n");
+		DEBUG(5, ("  invalid object\n"));
 		goto end;
 	}
 
@@ -1079,7 +1068,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSetStreamSize(TALLOC_CTX *mem_ctx,
 	struct emsmdbp_object		*object;
 	uint32_t			handle;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] SetStreamSize (0x2f)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] SetStreamSize (0x2f)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -1098,7 +1087,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSetStreamSize(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -1106,7 +1095,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSetStreamSize(TALLOC_CTX *mem_ctx,
 	object = (struct emsmdbp_object *) private_data;
 	if (!object || object->type != EMSMDBP_OBJECT_STREAM) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  invalid object\n");
+		DEBUG(5, ("  invalid object\n"));
 		goto end;
 	}
 
@@ -1137,14 +1126,12 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertyIdsFromNames(TALLOC_CTX *mem_ctx,
 							    struct EcDoRpc_MAPI_REPL *mapi_repl,
 							    uint32_t *handles, uint16_t *size)
 {
-	enum mapistore_error	retval;
-	int			i;
-	int			ret;
-	struct GUID		*lpguid;
-	bool			has_transaction = false;
-	uint16_t		mapped_id = 0;
+	int		i, ret;
+	struct GUID	*lpguid;
+	bool		has_transaction = false;
+	uint16_t	mapped_id;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] GetPropertyIdsFromNames (0x56)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] GetPropertyIdsFromNames (0x56)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -1164,56 +1151,48 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetPropertyIdsFromNames(TALLOC_CTX *mem_ctx,
 		ret = mapistore_namedprops_get_mapped_id(emsmdbp_ctx->mstore_ctx->nprops_ctx, 
 							 mapi_req->u.mapi_GetIDsFromNames.nameid[i],
 							 &mapi_repl->u.mapi_GetIDsFromNames.propID[i]);
-		if (ret == MAPISTORE_SUCCESS)
-			continue;
-		// It doesn't exist, let's create it!
-		if (mapi_req->u.mapi_GetIDsFromNames.ulFlags == GetIDsFromNames_GetOrCreate) {
-			if (!has_transaction) {
-				has_transaction = true;
-				retval = mapistore_namedprops_transaction_start(emsmdbp_ctx->mstore_ctx->nprops_ctx);
-				if (retval != MAPISTORE_SUCCESS) {
-					return MAPI_E_UNABLE_TO_COMPLETE;
+		if (ret != MAPISTORE_SUCCESS) {
+			if (mapi_req->u.mapi_GetIDsFromNames.ulFlags == GetIDsFromNames_GetOrCreate) {
+				if (!has_transaction) {
+					has_transaction = true;
+					ldb_transaction_start(emsmdbp_ctx->mstore_ctx->nprops_ctx);
+					mapped_id = mapistore_namedprops_next_unused_id(emsmdbp_ctx->mstore_ctx->nprops_ctx);
+					if (mapped_id == 0) {
+						abort();
+					}
 				}
-
-				retval = mapistore_namedprops_next_unused_id(emsmdbp_ctx->mstore_ctx->nprops_ctx, &mapped_id);
-				if (retval != MAPISTORE_SUCCESS) {
-					OC_DEBUG(0, "ERROR: No remaining namedprops ID available\n");
-					abort();
+				else {
+					mapped_id++;
 				}
-			} else {
-				mapped_id++;
+				mapistore_namedprops_create_id(emsmdbp_ctx->mstore_ctx->nprops_ctx,
+							       mapi_req->u.mapi_GetIDsFromNames.nameid[i],
+							       mapped_id);
+				mapi_repl->u.mapi_GetIDsFromNames.propID[i] = mapped_id;
 			}
-			mapistore_namedprops_create_id(emsmdbp_ctx->mstore_ctx->nprops_ctx,
-						       mapi_req->u.mapi_GetIDsFromNames.nameid[i],
-						       mapped_id);
-			mapi_repl->u.mapi_GetIDsFromNames.propID[i] = mapped_id;
-		} else {
-			mapi_repl->u.mapi_GetIDsFromNames.propID[i] = 0x0000;
-			lpguid = &mapi_req->u.mapi_GetIDsFromNames.nameid[i].lpguid;
-			OC_DEBUG(5, "  no mapping for property %.8x-%.4x-%.4x-%.2x%.2x-%.2x%.2x%.2x%.2x%.2x%.2x:",
-				  lpguid->time_low, lpguid->time_mid, lpguid->time_hi_and_version,
-				  lpguid->clock_seq[0], lpguid->clock_seq[1],
-				  lpguid->node[0], lpguid->node[1],
-				  lpguid->node[2], lpguid->node[3],
-				  lpguid->node[4], lpguid->node[5]);
+			else {
+				mapi_repl->u.mapi_GetIDsFromNames.propID[i] = 0x0000;
+				lpguid = &mapi_req->u.mapi_GetIDsFromNames.nameid[i].lpguid;
+				DEBUG(5, ("  no mapping for property %.8x-%.4x-%.4x-%.2x%.2x-%.2x%.2x%.2x%.2x%.2x%.2x:",
+					  lpguid->time_low, lpguid->time_mid, lpguid->time_hi_and_version,
+					  lpguid->clock_seq[0], lpguid->clock_seq[1],
+					  lpguid->node[0], lpguid->node[1],
+					  lpguid->node[2], lpguid->node[3],
+					  lpguid->node[4], lpguid->node[5]));
+				
+				if (mapi_req->u.mapi_GetIDsFromNames.nameid[i].ulKind == MNID_ID)
+					DEBUG(5, ("%.4x\n", mapi_req->u.mapi_GetIDsFromNames.nameid[i].kind.lid));
+				else if (mapi_req->u.mapi_GetIDsFromNames.nameid[i].ulKind == MNID_STRING)
+					DEBUG(5, ("%s\n", mapi_req->u.mapi_GetIDsFromNames.nameid[i].kind.lpwstr.Name));
+				else
+					DEBUG(5, ("[invalid ulKind]"));
 
-			if (mapi_req->u.mapi_GetIDsFromNames.nameid[i].ulKind == MNID_ID) {
-				OC_DEBUG(5, "%.4x\n", mapi_req->u.mapi_GetIDsFromNames.nameid[i].kind.lid);
-			} else if (mapi_req->u.mapi_GetIDsFromNames.nameid[i].ulKind == MNID_STRING) {
-				OC_DEBUG(5, "%s\n", mapi_req->u.mapi_GetIDsFromNames.nameid[i].kind.lpwstr.Name);
-			} else {
-				OC_DEBUG(5, "[invalid ulKind]");
+				mapi_repl->error_code = MAPI_W_ERRORS_RETURNED;
 			}
-
-			mapi_repl->error_code = MAPI_W_ERRORS_RETURNED;
 		}
 	}
 
 	if (has_transaction) {
-		enum mapistore_error err = mapistore_namedprops_transaction_commit(emsmdbp_ctx->mstore_ctx->nprops_ctx);
-		if (err != MAPISTORE_SUCCESS) {
-			return MAPI_E_UNABLE_TO_COMPLETE;
-		}
+		ldb_transaction_commit(emsmdbp_ctx->mstore_ctx->nprops_ctx);
 	}
 
 	*size += libmapiserver_RopGetPropertyIdsFromNames_size(mapi_repl);
@@ -1247,7 +1226,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetNamesFromIDs(TALLOC_CTX *mem_ctx,
 	struct GetNamesFromIDs_repl	*response;
 	struct MAPINAMEID		*nameid;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] GetNamesFromIDs (0x55)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] GetNamesFromIDs (0x55)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -1305,7 +1284,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopDeletePropertiesNoReplicate(TALLOC_CTX *mem_
 								struct EcDoRpc_MAPI_REPL *mapi_repl,
 								uint32_t *handles, uint16_t *size)
 {
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] DeletePropertiesNoReplicate (0x7a) -- stub\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] DeletePropertiesNoReplicate (0x7a) -- stub\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -1357,7 +1336,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopCopyTo(TALLOC_CTX *mem_ctx,
 	struct emsmdbp_object	*dest_object;
 	struct SPropTagArray	excluded_tags;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCPRPT] CopyTo (0x39)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCPRPT] CopyTo (0x39)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -1377,21 +1356,21 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopCopyTo(TALLOC_CTX *mem_ctx,
 	response->PropertyProblem = NULL;
 
 	if (request->WantAsynchronous) {
-		OC_DEBUG(0, "  warning: asynchronous operations are not supported\n");
+		DEBUG(0, ("  warning: asynchronous operations are not supported\n"));
 	}
 	if ((request->CopyFlags & CopyFlagsMove)) {
-		OC_DEBUG(0, "  moving properties is not supported\n");
+		DEBUG(0, ("  moving properties is not supported\n"));
         }
 	if ((request->CopyFlags & CopyFlagsNoOverwrite)) {
-		OC_DEBUG(0, "  properties WILL BE overwriten despite the operation flags\n");
-	}
+		DEBUG(0, ("  properties WILL BE overwriten despite the operation flags\n"));
+        }
 
 	/* Get the source object */
 	handle = handles[mapi_req->handle_idx];
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &rec);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(0, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(0, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -1399,7 +1378,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopCopyTo(TALLOC_CTX *mem_ctx,
         source_object = private_data;
 	if (!source_object) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(0, "  object (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(0, ("  object (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -1408,7 +1387,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopCopyTo(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &rec);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(0, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(0, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -1416,7 +1395,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopCopyTo(TALLOC_CTX *mem_ctx,
         dest_object = private_data;
 	if (!dest_object) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(0, "  object (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(0, ("  object (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 

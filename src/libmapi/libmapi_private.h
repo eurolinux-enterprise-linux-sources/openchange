@@ -23,12 +23,7 @@
 
 #include "config.h"
 
-#include "utils/dlinklist.h"
-
-#ifndef	__STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS	1
-#endif
-
 #include <inttypes.h>
 
 #if defined(HAVE_PTHREADS)
@@ -69,10 +64,6 @@ enum ndr_err_code ndr_push_ExtendedException(struct ndr_push *, int, uint16_t, c
 enum ndr_err_code ndr_pull_ExtendedException(struct ndr_pull *, int, uint16_t, const struct ExceptionInfo *, struct ExtendedException *);
 enum ndr_err_code ndr_push_AppointmentRecurrencePattern(struct ndr_push *, int, const struct AppointmentRecurrencePattern *);
 enum ndr_err_code ndr_pull_AppointmentRecurrencePattern(struct ndr_pull *, int, struct AppointmentRecurrencePattern *);
-enum ndr_err_code ndr_push_PersistDataArray(struct ndr_push *ndr, int ndr_flags, const struct PersistDataArray *r);
-enum ndr_err_code ndr_pull_PersistDataArray(struct ndr_pull *ndr, int ndr_flags, struct PersistDataArray *r);
-enum ndr_err_code ndr_push_PersistElementArray(struct ndr_push *ndr, int ndr_flags, const struct PersistElementArray *r);
-enum ndr_err_code ndr_pull_PersistElementArray(struct ndr_pull *ndr, int ndr_flags, struct PersistElementArray *r);
 
 /* The following private definitions come from libmapi/nspi.c */
 int nspi_disconnect_dtor(void *);
@@ -87,7 +78,6 @@ NTSTATUS		emsmdb_register_notification(struct mapi_session *, struct NOTIFKEY *)
 void			free_emsmdb_property(struct SPropValue *, void *);
 const void		*pull_emsmdb_property(TALLOC_CTX *, uint32_t *, enum MAPITAGS, DATA_BLOB *);
 enum MAPISTATUS		emsmdb_get_SPropValue(TALLOC_CTX *, DATA_BLOB *, struct SPropTagArray *, struct SPropValue **, uint32_t *, uint8_t);
-enum MAPISTATUS		emsmdb_get_SPropValue_offset(TALLOC_CTX *, DATA_BLOB *, struct SPropTagArray *, struct SPropValue **, uint32_t *, uint32_t *);
 void			emsmdb_get_SRow(TALLOC_CTX *, struct SRow *, struct SPropTagArray *, uint16_t, DATA_BLOB *, uint8_t, uint8_t);
 enum MAPISTATUS		emsmdb_async_connect(struct emsmdb_context *);
 bool 			server_version_at_least(struct emsmdb_context *, uint16_t, uint16_t, uint16_t, uint16_t);
@@ -132,7 +122,7 @@ uint8_t			mapi_recipients_get_org_length(struct mapi_profile *);
 uint16_t		mapi_recipients_RecipientFlags(struct SRow *);
 
 /* The following private definitions come from libmapi/socket/interface.c  */
-void			openchange_load_interfaces(TALLOC_CTX *, const char **, struct interface **);
+void			load_interfaces(TALLOC_CTX *, const char **, struct interface **);
 int			iface_count(struct interface *);
 const char		*iface_n_ip(struct interface *, int);
 const char		*iface_n_bcast(struct interface *, int);

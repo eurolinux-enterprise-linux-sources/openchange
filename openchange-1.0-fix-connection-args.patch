@@ -1,7 +1,7 @@
-diff -up openchange-openchange-2.3-VULCAN/libmapi/IMSProvider.c.fix-connection-args openchange-openchange-2.3-VULCAN/libmapi/IMSProvider.c
---- openchange-openchange-2.3-VULCAN/libmapi/IMSProvider.c.fix-connection-args	2015-05-16 17:22:04.000000000 +0200
-+++ openchange-openchange-2.3-VULCAN/libmapi/IMSProvider.c	2016-04-07 19:10:30.340959912 +0200
-@@ -91,6 +91,7 @@ static char *build_binding_string(struct
+diff -up openchange-1.0-BORG/libmapi/IMSProvider.c.fix-samba-args openchange-1.0-BORG/libmapi/IMSProvider.c
+--- openchange-1.0-BORG/libmapi/IMSProvider.c.fix-samba-args	2016-04-07 18:27:16.678401391 +0200
++++ openchange-1.0-BORG/libmapi/IMSProvider.c	2016-04-07 18:29:00.321613700 +0200
+@@ -90,6 +90,7 @@ static char *build_binding_string(struct
  				  struct mapi_profile *profile)
  {
  	char	*binding;
@@ -9,7 +9,7 @@ diff -up openchange-openchange-2.3-VULCAN/libmapi/IMSProvider.c.fix-connection-a
  
  	/* Sanity Checks */
  	if (!profile) return NULL;
-@@ -101,15 +102,23 @@ static char *build_binding_string(struct
+@@ -100,15 +101,23 @@ static char *build_binding_string(struct
  
  	/* If dump-data option is enabled */
  	if (mapi_ctx->dumpdata == true) {

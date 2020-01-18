@@ -19,9 +19,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "libmapi/libmapi.h"
 #include "mapiproxy/dcesrv_mapiproxy.h"
 #include "mapiproxy/dcesrv_mapiproxy_proto.h"
+#include <util/debug.h>
 
 /**
    \details Dummy init function which reads a parametric option from
@@ -33,7 +33,7 @@ static NTSTATUS dummy_init(struct dcesrv_context *dce_ctx)
 
 	test = lpcfg_parm_string(dce_ctx->lp_ctx, NULL, "mpm_dummy", "test");
 	if (test) {
-		OC_DEBUG(0, "Sample dummy string: %s", test);
+		DEBUG(0, ("Sample dummy string: %s\n", test));
 	}
 
 	return NT_STATUS_OK;
@@ -93,7 +93,7 @@ NTSTATUS samba_init_module(void)
 	/* Register ourselves with the MAPIPROXY subsytem */
 	ret = mapiproxy_module_register(&module);
 	if (!NT_STATUS_IS_OK(ret)) {
-		OC_DEBUG(0, "Failed to register 'dummy' mapiproxy module!");
+		DEBUG(0, ("Failed to register 'dummy' mapiproxy module!\n"));
 		return ret;
 	}
 

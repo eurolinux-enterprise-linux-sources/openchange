@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 ###################################################
-# package to parse the mapi-properties files and
+# package to parse the mapi-properties files and 
 # generate code for libmapi in OpenChange
 #
 # Perl code based on pidl one from Andrew Tridgell and the Samba team
@@ -21,9 +21,6 @@ sub mparse($) { $ret .= $tabs.(shift)."\n"; }
 
 my($opt_outputdir) = '.';
 my($opt_parser) = '';
-
-my $MNID_STRING = 1;
-my $MNID_ID = 0;
 
 my	%prop_types = (
     0x0		=> "PT_UNSPECIFIED",
@@ -156,7 +153,7 @@ sub FileSave($$)
     my($filename) = shift;
     my($v) = shift;
     local(*FILE);
-    open(FILE, ">$filename") || die "can't open $filename";
+    open(FILE, ">$filename") || die "can't open $filename";    
     print FILE $v;
     close(FILE);
 }
@@ -208,7 +205,7 @@ sub mapitags_header($)
     mparse "#endif /* !__MAPITAGS_H__ */";
 
     return $ret;
-
+    
 }
 
 
@@ -240,7 +237,7 @@ sub mapitags_interface($)
     mparse "";
     mparse "static struct mapi_proptags mapitags[] = {";
     indent;
-
+    
     @lines = split(/\n/, $contents);
     foreach $line (@lines) {
 	$line =~ s/^\#+.*$//;
@@ -326,7 +323,7 @@ sub mapitags_interface($)
     deindent;
     mparse "}";
     mparse "";
-    mparse "OC_DEBUG(5, \"type for property '%x' could not be deduced\\n\", untypedtag);";
+    mparse "DEBUG(5, (\"%s: type for property '%x' could not be deduced\\n\", __FUNCTION__, untypedtag));";
     mparse "";
     mparse "return 0;";
     deindent;
@@ -351,7 +348,7 @@ sub mapitags_enum($)
 
     mparse "typedef [v1_enum, flag(NDR_PAHEX)] enum {";
     indent;
-
+    
     @lines = split(/\n/, $contents);
     foreach $line (@lines) {
 	$line =~ s/^\#+.*$//;
@@ -377,9 +374,9 @@ sub mapitags_enum($)
     }
     mparse sprintf "%-51s = %s", "MAPI_PROP_RESERVED", "0xFFFFFFFF";
     deindent;
-    mparse "} MAPITAGS;";
+    mparse "} MAPITAGS;";    
     mparse "";
-
+    
     return $ret;
 }
 
@@ -405,7 +402,7 @@ sub mapi_nameid_private_header($)
     mparse "";
     mparse "static struct mapi_nameid_tags mapi_nameid_tags[] = {";
     indent;
-
+    
     @lines = split(/\n/, $contents);
     foreach $line (@lines) {
 	$line =~ s/^\#+.*$//;
@@ -421,7 +418,7 @@ sub mapi_nameid_private_header($)
 	    if ($prop[0] eq "NULL") {
 		$prop[0] = "0x00000000";
 	    }
-	    mparse sprintf "{ %-51s, %-40s, %-15s, %-30s, %-30s, %-15s, %-20s, 0x0 },",
+	    mparse sprintf "{ %-51s, %-40s, %-15s, %-30s, %-30s, %-15s, %-20s, 0x0 },", 
 	    $prop[0], $prop[1], $prop[2], $prop[3], $prop[4], $prop[5], $prop[6];
 	}
     }
@@ -495,7 +492,7 @@ sub mapi_nameid_header($)
 		    $counter++;
 		}
 		$property = sprintf "0x%.8x", ($propID << 16) | $proptype;
-		mparse sprintf "#define %-51s %s", $prop[0], $property;
+		mparse sprintf "#define %-51s %s", $prop[0], $property; 
 	    }
 	}
     }
@@ -599,7 +596,7 @@ sub mapicodes_enum($)
 
     mparse "typedef [public, v1_enum, flag(NDR_PAHEX)] enum {";
     indent;
-
+    
     @lines = split(/\n/, $contents);
     foreach $line (@lines) {
 	$line =~ s/^\#+.*$//;
@@ -610,9 +607,9 @@ sub mapicodes_enum($)
     }
     mparse sprintf "%-51s = %s", "MAPI_E_RESERVED", "0xFFFFFFFF";
     deindent;
-    mparse "} MAPISTATUS;";
+    mparse "} MAPISTATUS;";    
     mparse "";
-
+    
     return $ret;
 }
 
@@ -641,7 +638,7 @@ sub openchangedb_property($)
     mparse "";
     mparse "static struct pidtags pidtags[] = {";
     indent;
-
+    
     @lines = split(/\n/, $contents);
     foreach $line (@lines) {
 	$line =~ s/^\#+.*$//;
@@ -687,7 +684,7 @@ sub openchangedb_property($)
     mparse "}";
     deindent;
     mparse "}";
-    mparse "OC_DEBUG(0, \"Unsupported property tag '0x%.8x'\\n\", proptag);";
+    mparse "DEBUG(0, (\"[%s:%d]: Unsupported property tag '0x%.8x'\\n\", __FUNCTION__, __LINE__, proptag));";
     mparse "";
     mparse "return NULL;";
     deindent;
@@ -770,17 +767,16 @@ sub codepage_lcid_interface($)
 	    @params = split(/\s+/, $line);
 	    if ($params[0] ne "DEFINE") {
 
-		$params[0] = ($params[1] eq "NULL") ? (sprintf "\"%s\",", $params[0]) :
+		$params[0] = ($params[1] eq "NULL") ? (sprintf "\"%s\",", $params[0]) : 
 		    (sprintf "\"%s (%s)\",", $params[0], $params[1]);
 		$params[0] =~ s/_/ /g;
 		$params[2] = sprintf "\"%s\",", $params[2];
-		mparse sprintf "{ %-32s %-18s %-6s, %-4s, %-24s },",
-		$params[0], $params[2], $params[3], $params[4], $params[5];
+		mparse sprintf "{ %-32s %-18s %-6s, %-4s, %-24s },", 
+		$params[0], $params[2], $params[3], $params[4], $params[5];		    
 	    }
 	}
     }
 
-    mparse q|{ "C",                             "C",               0x0409, 1252, CP_WESTERN_EUROPE_AND_US },|;
     mparse "{ NULL, NULL, 0, 0, 0 }";
     deindent;
     mparse "};";
@@ -801,7 +797,7 @@ sub codepage_lcid_interface($)
     mparse "return locale;";
     deindent;
     mparse "}";
-    mparse "";
+    mparse "";   
 
     # mapi_verify_cpid
     mparse "/**";
@@ -829,7 +825,7 @@ sub codepage_lcid_interface($)
     mparse "return false;";
     deindent;
     mparse "}";
-    mparse "";
+    mparse "";   
 
     # mapi_get_cpid_from_lcid
     mparse "/**";
@@ -1073,7 +1069,7 @@ sub codepage_lcid_interface($)
     deindent;
     mparse "}";
     mparse "";
-
+ 
     # mapi_get_language_from_lcid
     mparse "/**";
     mparse "  \\details Returns Language for a given Locale ID";
@@ -1185,95 +1181,46 @@ sub mapistore_namedprops($)
     mparse sprintf "cn: custom";
     mparse sprintf "";
 
-    for my $key (sort(keys %oleguid)) {
-        my $value = $oleguid{$key};
-
-        mparse sprintf "dn: CN=%s,CN=default", $value;
-        mparse sprintf "cn: %s", $value;
-        mparse sprintf "name: %s", $key;
-        mparse sprintf "oleguid: %s", $value;
-        mparse "";
+    for my $key ( keys %oleguid ) {
+	my $value = $oleguid{$key};
+	
+	mparse sprintf "dn: CN=%s,CN=default", $value;
+	mparse sprintf "cn: %s", $value;
+	mparse sprintf "name: %s", $key;
+	mparse sprintf "oleguid: %s", $value;
+	mparse "";
     }
 
     @lines = split(/\n/, $contents);
     foreach $line (@lines) {
-        $line =~ s/^\#+.*$//;
-        if ($line) {
-            @prop = split(/\s+/, $line);
-            if ($prop[5] eq "MNID_ID" && $prop[7]) {
-                mparse sprintf "dn: CN=%s,CN=%s,CN=default", $prop[2], $oleguid{$prop[6]};
-                mparse sprintf "objectClass: %s", $prop[5];
-                mparse sprintf "cn: %s", $prop[2];
-                mparse sprintf "canonical: %s", $prop[0];
-                mparse sprintf "oleguid: %s", $oleguid{$prop[6]};
-                mparse sprintf "mappedId: %d", hex($prop[7]);
-                mparse sprintf "propId: %d", hex($prop[2]);
-                mparse sprintf "propType: %s", $prop_names{$prop[4]};
-                mparse sprintf "oom: %s", $prop[1];
-                mparse sprintf "";
-            } elsif ($prop[5] eq "MNID_STRING" && $prop[7]) {
-                mparse sprintf "dn: CN=%s,CN=%s,CN=default", $prop[3], $oleguid{$prop[6]};
-                mparse sprintf "objectClass: %s", $prop[5];
-                mparse sprintf "cn: %s", $prop[3];
-                mparse sprintf "canonical: %s", $prop[0];
-                mparse sprintf "oleguid: %s", $oleguid{$prop[6]};
-                mparse sprintf "mappedId: %d", hex($prop[7]);
-                mparse sprintf "propId: 0";
-                mparse sprintf "propType: %s", $prop[4];
-                mparse sprintf "propName: %s", $prop[3];
-                mparse sprintf "";
-            }
-        }
+	$line =~ s/^\#+.*$//;
+	if ($line) {
+	    @prop = split(/\s+/, $line);
+	    if ($prop[5] eq "MNID_ID" && $prop[7]) {
+		mparse sprintf "dn: CN=%s,CN=%s,CN=default", $prop[2], $oleguid{$prop[6]};
+		mparse sprintf "objectClass: %s", $prop[5];
+		mparse sprintf "cn: %s", $prop[2];
+		mparse sprintf "canonical: %s", $prop[0];
+		mparse sprintf "oleguid: %s", $oleguid{$prop[6]};
+		mparse sprintf "mappedId: %d", hex($prop[7]);
+		mparse sprintf "propId: %d", hex($prop[2]);
+		mparse sprintf "propType: %s", $prop_names{$prop[4]};
+		mparse sprintf "oom: %s", $prop[1];
+		mparse sprintf "";
+	    } elsif ($prop[5] eq "MNID_STRING" && $prop[7]) {
+		mparse sprintf "dn: CN=%s,CN=%s,CN=default", $prop[3], $oleguid{$prop[6]};
+		mparse sprintf "objectClass: %s", $prop[5];
+		mparse sprintf "cn: %s", $prop[3];
+		mparse sprintf "canonical: %s", $prop[0];
+		mparse sprintf "oleguid: %s", $oleguid{$prop[6]};
+		mparse sprintf "mappedId: %d", hex($prop[7]);
+		mparse sprintf "propId: 0";
+		mparse sprintf "propType: %s", $prop[4];
+		mparse sprintf "propName: %s", $prop[3];
+		mparse sprintf "";
+	    }
+	}
     }
-    return $ret;
-}
-
-
-#####################################################################
-# generate mapistore_namedprops.py file
-sub mapistore_namedprops_python($)
-{
-    my $contents = shift;
-    my $line;
-    my @lines;
-    my @prop;
-
-    mparse "# python module auto-generated by mparse ";
-    mparse "";
-
-    mparse sprintf "named_properties = [";
-
-    @lines = split(/\n/, $contents);
-    foreach $line (@lines) {
-        $line =~ s/^\#+.*$//;
-        if ($line) {
-            @prop = split(/\s+/, $line);
-            if ($prop[5] eq "MNID_ID" && $prop[7]) {
-                mparse sprintf "{";
-                mparse sprintf "  'type': %d,", $MNID_ID;
-                mparse sprintf "  'canonical': '%s',", $prop[0];
-                mparse sprintf "  'oleguid': '%s',", $oleguid{$prop[6]};
-                mparse sprintf "  'mappedId': %d,", hex($prop[7]);
-                mparse sprintf "  'propId': %d,", hex($prop[2]);
-                mparse sprintf "  'propType': %d,", $prop_names{$prop[4]};
-                mparse sprintf "  'oom': '%s'", $prop[1];
-                mparse sprintf "},";
-            } elsif ($prop[5] eq "MNID_STRING" && $prop[7]) {
-                mparse sprintf "{";
-                mparse sprintf "  'type': %d,", $MNID_STRING;
-                mparse sprintf "  'canonical': '%s',", $prop[0];
-                mparse sprintf "  'oleguid': '%s',", $oleguid{$prop[6]};
-                mparse sprintf "  'mappedId': %d,", hex($prop[7]);
-                mparse sprintf "  'propId': 0,";
-                mparse sprintf "  'propType': %d,", $prop_names{$prop[4]};
-                mparse sprintf "  'propName': '%s'", $prop[3];
-                mparse sprintf "},";
-            }
-        }
-    }
-
-    mparse sprintf "]";
-
     return $ret;
 }
 
@@ -1305,7 +1252,7 @@ sub mapistore_nameid_header($)
 		$proptype = $prop_names{$prop[4]};
 		my $propID = hex $prop[7];
 		$property = sprintf "0x%.8x", ($propID << 16) | $proptype;
-		mparse sprintf "#define %-51s %s", $prop[0], $property;
+		mparse sprintf "#define %-51s %s", $prop[0], $property; 
 	    }
 	}
     }
@@ -1325,17 +1272,17 @@ sub process_file($)
     my $contents = FileLoad($mapi_file);
     defined $contents || return undef;
 
-
+    
     if ($opt_parser eq "mapitags") {
 	print "Generating $outputdir" . "mapitags.h\n";
 	my $parser = ("$outputdir/mapitags.h");
 	FileSave($parser, mapitags_header($contents));
-
+	
 	print "Generating $outputdir" . "mapitags.c\n";
 	$ret = '';
 	my $code_parser = ("$outputdir/mapitags.c");
 	FileSave($code_parser, mapitags_interface($contents));
-
+	
 	print "Generating mapitags_enum.h\n";
 	$ret = '';
 	my $enum_parser = ("mapitags_enum.h");
@@ -1383,12 +1330,6 @@ sub process_file($)
 	print "Generating $outputdir" . "mapistore_namedprops.ldif\n";
 	my $mapistore_parser = ("$outputdir/mapistore_namedprops.ldif");
 	FileSave($mapistore_parser, mapistore_namedprops($contents));
-    }
-
-    if ($opt_parser eq "mapistore_namedprops_python") {
-        print "Generating $outputdir" . "mapistore_namedprops.py\n";
-        my $mapistore_parser = ("$outputdir/mapistore_namedprops.py");
-        FileSave($mapistore_parser, mapistore_namedprops_python($contents));
     }
 
     if ($opt_parser eq "mapistore_nameid") {

@@ -168,7 +168,7 @@ _PUBLIC_ enum MAPISTATUS octool_get_body(TALLOC_CTX *mem_ctx,
 		mapi_object_release(&obj_stream);
 		break;
 	default:
-		OC_DEBUG(0, "Undefined Body");
+		DEBUG(0, ("Undefined Body\n"));
 		break;
 	}
 

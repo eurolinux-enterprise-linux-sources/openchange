@@ -27,7 +27,6 @@
 
 #include "libocpf/ocpf.h"
 #include "libocpf/ocpf_api.h"
-#include "libocpf/ocpf_private.h"
 
 int ocpf_yylex_init(void *);
 int ocpf_yylex_init_extra(struct ocpf_context *, void *);
@@ -291,36 +290,28 @@ _PUBLIC_ enum MAPISTATUS ocpf_set_SPropValue(TALLOC_CTX *mem_ctx,
 				mapi_nameid_custom_string_add(nameid, nel->mnid_string, nel->propType, nel->oleguid);
 			}
 		}
-
+		
 		/* Step3. GetIDsFromNames and map property types */
 		SPropTagArray = talloc_zero(mem_ctx, struct SPropTagArray);
-		retval = mapi_nameid_GetIDsFromNames(nameid, obj_folder, SPropTagArray);
-		if ((retval != MAPI_E_SUCCESS) && (retval != MAPI_W_ERRORS_RETURNED)) {
+		retval = GetIDsFromNames(obj_folder, nameid->count, 
+					 nameid->nameid, 0, &SPropTagArray);
+		if (retval != MAPI_E_SUCCESS) {
 			MAPIFreeBuffer(SPropTagArray);
 			MAPIFreeBuffer(nameid);
 			return retval;
 		}
+		mapi_nameid_SPropTagArray(nameid, SPropTagArray);
 		MAPIFreeBuffer(nameid);
 
 
 		/* Step4. Add named properties */
 		for (nel = ctx->nprops, i = 0; SPropTagArray->aulPropTag[i] && nel->next; nel = nel->next, i++) {
 			if (SPropTagArray->aulPropTag[i]) {
-				if (((SPropTagArray->aulPropTag[i] & 0xFFFF) == PT_BINARY) &&
+				if (((SPropTagArray->aulPropTag[i] & 0xFFFF) == PT_BINARY) && 
 				    (((struct Binary_r *)nel->value)->cb > MAX_READ_SIZE)) {
-					retval = ocpf_stream(mem_ctx, obj_message, SPropTagArray->aulPropTag[i],
+					retval = ocpf_stream(mem_ctx, obj_message, SPropTagArray->aulPropTag[i], 
 							     (struct Binary_r *)nel->value);
 					MAPI_RETVAL_IF(retval, retval, NULL);
-				} else if ((retval == MAPI_W_ERRORS_RETURNED) &&
-					   (SPropTagArray->aulPropTag[i] & 0xFFFF) == PT_ERROR) {
-					/* It's an unsupported property, log it */
-					if (nel->OOM) {
-						oc_log(OC_LOG_WARNING, "Ignoring unsupported property %s:%s", nel->oleguid, nel->OOM);
-					} else if (nel->mnid_id) {
-						oc_log(OC_LOG_WARNING, "Ignoring unsupported property %s:0x%04X", nel->oleguid, nel->mnid_id);
-					} else if (nel->mnid_string) {
-						oc_log(OC_LOG_WARNING, "Ignoring unsupported property %s:%s", nel->oleguid, nel->mnid_string);
-					}
 				} else {
 					ctx->lpProps = add_SPropValue(mem_ctx, ctx->lpProps, &ctx->cValues,
 								       SPropTagArray->aulPropTag[i], nel->value);
@@ -442,7 +433,7 @@ static enum MAPISTATUS ocpf_folder_lookup(TALLOC_CTX *mem_ctx,
 	MAPIFreeBuffer(SPropTagArray);
 	if (retval != MAPI_E_SUCCESS) return false;
 
-	while (((retval = QueryRows(&obj_htable, 0x32, TBL_ADVANCE, TBL_FORWARD_READ, &SRowSet)) != MAPI_E_NOT_FOUND && SRowSet.cRows)) {
+	while (((retval = QueryRows(&obj_htable, 0x32, TBL_ADVANCE, &SRowSet)) != MAPI_E_NOT_FOUND && SRowSet.cRows)) {
 		for (i = 0; i < SRowSet.cRows; i++) {
 			fid = (const uint64_t *)find_SPropValue_data(&SRowSet.aRow[i], PR_FID);
 			if (fid && *fid == sfid) {
@@ -563,12 +554,12 @@ static bool set_external_recipients(TALLOC_CTX *mem_ctx, struct SRowSet *SRowSet
 	SRow_addprop(&(SRowSet->aRow[last]), SPropValue);
 
 	/* PR_7BIT_DISPLAY_NAME */
-	SPropValue.ulPropTag = PidTagAddressBookDisplayNamePrintable;
+	SPropValue.ulPropTag = PidTag7BitDisplayName;
 	SPropValue.value.lpszW = username;
 	SRow_addprop(&(SRowSet->aRow[last]), SPropValue);
 
 	/* PR_SMTP_ADDRESS */
-	SPropValue.ulPropTag = PidTagSmtpAddress;
+	SPropValue.ulPropTag = PidTagPrimarySmtpAddress;
 	SPropValue.value.lpszW = username;
 	SRow_addprop(&(SRowSet->aRow[last]), SPropValue);
 
@@ -629,9 +620,9 @@ _PUBLIC_ enum MAPISTATUS ocpf_set_Recipients(TALLOC_CTX *mem_ctx,
 	SPropTagArray = set_SPropTagArray(mem_ctx, 0x8,
 					  PidTagObjectType,
 					  PidTagDisplayName,
-					  PidTagAddressBookDisplayNamePrintable,
+					  PidTag7BitDisplayName,
 					  PidTagDisplayName,
-					  PidTagSmtpAddress,
+					  PidTagPrimarySmtpAddress,
 					  PidTagGivenName,
 					  PidTagEmailAddress,
 					  PidTagAddressType);
@@ -640,8 +631,8 @@ _PUBLIC_ enum MAPISTATUS ocpf_set_Recipients(TALLOC_CTX *mem_ctx,
 	usernames = talloc_array(mem_ctx, char *, ctx->recipients->cRows + 1);
 	recipClass = talloc_array(mem_ctx, int, ctx->recipients->cRows + 1);
 	for (i = 0; i < ctx->recipients->cRows; i++) {
-		lpProps = get_SPropValue_SRow(&(ctx->recipients->aRow[i]), PidTagAddressBookDisplayNamePrintable);
-		propdata = get_SPropValue(lpProps, PidTagAddressBookDisplayNamePrintable);
+		lpProps = get_SPropValue_SRow(&(ctx->recipients->aRow[i]), PidTag7BitDisplayName);
+		propdata = get_SPropValue(lpProps, PidTag7BitDisplayName);
 		usernames[i] = talloc_strdup((TALLOC_CTX *)usernames, (const char *) propdata);
 
 		lpProps = get_SPropValue_SRow(&(ctx->recipients->aRow[i]), PidTagRecipientType);

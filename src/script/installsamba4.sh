@@ -32,9 +32,8 @@ else
 fi
 
 export PKG_CONFIG_PATH=$SAMBA_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH
-pythondir_nodep=`python -c "from distutils import sysconfig; print sysconfig.get_python_lib(0,0,'/')"`
-pythondir_dep=`python -c "from distutils import sysconfig; print sysconfig.get_python_lib(1,0,'/')"`
-export PYTHONPATH=$SAMBA_PREFIX$pythondir_nodep:$SAMBA_PREFIX$python_dep:$PYTHONPATH
+pythondir=`python -c "from distutils import sysconfig; print sysconfig.get_python_lib(0,0,'/')"`
+export PYTHONPATH=$SAMBA_PREFIX$pythondir:$PYTHONPATH
 
 RUNDIR=$(readlink -f $(dirname $0))
 HOST_OS=`$RUNDIR/../config.guess`
@@ -256,6 +255,11 @@ packages() {
 	pushd samba4/$lib
 	error_check $? "$lib setup"
 
+	extra=""
+	if [ "$lib" == "lib/ldb" ]; then
+	    extra="--builtin-libraries=ccan"
+	fi
+
 	echo ./configure -C --prefix=$SAMBA_PREFIX --enable-developer --bundled-libraries=NONE $extra
 	./configure -C --prefix=$SAMBA_PREFIX --enable-developer --bundled-libraries=NONE $extra
 	error_check $? "$lib configure"
@@ -290,7 +294,7 @@ compile() {
 
     cd $RUNDIR/../samba4
     export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SAMBA_PREFIX/lib/pkgconfig
-    ./configure.developer -C --prefix=$SAMBA_PREFIX --builtin-libraries=replace
+    ./configure.developer -C --prefix=$SAMBA_PREFIX --builtin-libraries=ccan,replace
     error_check $? "samba4 configure"
 
     echo "Step2: Compile Samba4 (Source)"

@@ -29,6 +29,7 @@
 #include "libmapi/libmapi.h"
 #include "libmapi/mapidefs.h"
 #include "gen_ndr/ndr_exchange.h"
+#include <util/debug.h>
 
 /**
    \details Calculate GetPropertiesSpecific Rop size
@@ -59,7 +60,7 @@ _PUBLIC_ uint16_t libmapiserver_RopGetPropertiesSpecific_size(struct EcDoRpc_MAP
 /**
    \details Calculate GetPropertiesAll Rop size
 
-   \param response pointer to the GetPropertiesAll EcDoRpc_MAPI_REPL structure
+   \param request pointer to the GetPropertiesAll EcDoRpc_MAPI_REPL structure
 
    \return Size of GetPropsAll response
  */
@@ -81,7 +82,7 @@ _PUBLIC_ uint16_t libmapiserver_RopGetPropertiesAll_size(struct EcDoRpc_MAPI_REP
 /**
    \details Calculate GetPropertiesList Rop size
 
-   \param response pointer to the GetPropertiesList EcDoRpc_MAPI_REPL structure
+   \param request pointer to the GetPropertiesList EcDoRpc_MAPI_REPL structure
    
    \return Size of GetPropertiesList response
  */
@@ -524,7 +525,7 @@ _PUBLIC_ int libmapiserver_push_property(TALLOC_CTX *mem_ctx,
 		break;
 	default:
 		if (property != 0) {
-			OC_DEBUG(5, "unsupported type: %.4x", (property & 0xffff));
+			DEBUG(5, ("unsupported type: %.4x\n", (property & 0xffff)));
 			abort();
 		}
 		break;
@@ -588,7 +589,7 @@ _PUBLIC_ struct SRow *libmapiserver_ROP_request_to_properties(TALLOC_CTX *mem_ct
 		
 		break;
 	default:
-		OC_DEBUG(0, "opnum %d not implemented yet", opnum);
+		DEBUG(0, ("[%s:%d]: opnum %d not implemented yet\n", __FUNCTION__, __LINE__, opnum));
 		talloc_free(aRow);
 		return NULL;
 	}

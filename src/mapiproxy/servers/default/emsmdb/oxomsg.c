@@ -47,9 +47,8 @@ static void oxomsg_mapistore_handle_message_relocation(struct emsmdbp_context *e
 	char				*owner;
 	struct emsmdbp_object		*folder_object;
 	struct emsmdbp_object		*message_object;
-	enum MAPISTATUS			retval;
 
-	mem_ctx = talloc_new(NULL);
+	mem_ctx = talloc_zero(NULL, TALLOC_CTX);
 
 	property_data = talloc_array(mem_ctx, struct mapistore_property_data, properties_count);
 
@@ -61,8 +60,8 @@ static void oxomsg_mapistore_handle_message_relocation(struct emsmdbp_context *e
 			continue;
 		}
 
-		/* OC_DEBUG(5, (__location__": old message fid: %.16"PRIx64"\n", old_message_object->parent_object->object.folder->folderID)); */
-		/* OC_DEBUG(5, (__location__": old message mid: %.16"PRIx64"\n", old_message_object->object.message->messageID)); */
+		/* DEBUG(5, (__location__": old message fid: %.16"PRIx64"\n", old_message_object->parent_object->object.folder->folderID)); */
+		/* DEBUG(5, (__location__": old message mid: %.16"PRIx64"\n", old_message_object->object.message->messageID)); */
 
 		owner = emsmdbp_get_owner(old_message_object);
 		bin_data = property_data[i].data;
@@ -71,61 +70,58 @@ static void oxomsg_mapistore_handle_message_relocation(struct emsmdbp_context *e
 		case PidTagTargetEntryId:
 			entryID = get_MessageEntryId(mem_ctx, bin_data);
 			if (!entryID) {
-				OC_DEBUG(5, "invalid entryID\n");
+				DEBUG(5, (__location__": invalid entryID\n"));
 				continue;
 			}
 
 			ret = emsmdbp_guid_to_replid(emsmdbp_ctx, owner, &entryID->FolderDatabaseGuid, &replID);
 			if (ret) {
-				OC_DEBUG(5, "unable to deduce folder replID\n");
+				DEBUG(5, (__location__": unable to deduce folder replID\n"));
 				continue;
 			}
 			folderID = (entryID->FolderGlobalCounter.value << 16) | replID;
-			/* OC_DEBUG(5, (__location__": dest folder id: %.16"PRIx64"\n", folderID)); */
+			/* DEBUG(5, (__location__": dest folder id: %.16"PRIx64"\n", folderID)); */
 
 			ret = emsmdbp_guid_to_replid(emsmdbp_ctx, owner, &entryID->MessageDatabaseGuid, &replID);
 			if (ret) {
-				OC_DEBUG(5, "unable to deduce message replID\n");
+				DEBUG(5, (__location__": unable to deduce message replID\n"));
 				continue;
 			}
 			messageID = (entryID->MessageGlobalCounter.value << 16) | replID;
-			/* OC_DEBUG(5, (__location__": dest message id: %.16"PRIx64"\n", messageID)); */
+			/* DEBUG(5, (__location__": dest message id: %.16"PRIx64"\n", messageID)); */
 			break;
 		case PidTagSentMailSvrEID:
 			folderSvrID = get_PtypServerId(mem_ctx, bin_data);
 			if (!folderSvrID) {
-				OC_DEBUG(5, "invalid folderSvrID\n");
+				DEBUG(5, (__location__": invalid folderSvrID\n"));
 				continue;
 			}
 
 			folderID = folderSvrID->FolderId;
-			mapistore_indexing_get_new_folderID(emsmdbp_ctx->mstore_ctx, &messageID);
+			openchangedb_get_new_folderID(emsmdbp_ctx->oc_ctx, &messageID);
 
-			/* OC_DEBUG(5, (__location__": dest folder id: %.16"PRIx64"\n", folderID)); */
+			/* DEBUG(5, (__location__": dest folder id: %.16"PRIx64"\n", folderID)); */
 			break;
 		default:
-			OC_DEBUG(5, "invalid entryid property: %.8x\n", properties[i]);
+			DEBUG(5, (__location__": invalid entryid property: %.8x\n", properties[i]));
 			continue;
 		}
 
-		retval = emsmdbp_object_open_folder_by_fid(mem_ctx, emsmdbp_ctx, old_message_object, folderID, &folder_object);
-		if (retval != MAPI_E_SUCCESS) {
-			OC_DEBUG(5, "Failed to open parent folder with FID=[0x%016"PRIx64"]: %s",
-				  folderID, mapi_get_errstr(retval));
+		if (emsmdbp_object_open_folder_by_fid(mem_ctx, emsmdbp_ctx, old_message_object, folderID, &folder_object) != MAPISTORE_SUCCESS) {
+			DEBUG(5, (__location__": unable to open folder\n"));
 			continue;
 		}
 
 		message_object = emsmdbp_object_message_init(mem_ctx, emsmdbp_ctx, messageID, folder_object);
 		if (mapistore_folder_create_message(emsmdbp_ctx->mstore_ctx, contextID, folder_object->backend_object, message_object, messageID, false, &message_object->backend_object)) {
-			OC_DEBUG(5, "unable to create message in backend\n");
+			DEBUG(5, (__location__": unable to create message in backend\n"));
 			continue;
 		}
 
-		/* FIXME: (from oxomsg 3.2.5.1) PidTagMessageFlags: mfUnsent and mfRead must be cleared.
-		   Note: Property not managed by any current mapistore backend */
+		/* FIXME: (from oxomsg 3.2.5.1) PidTagMessageFlags: mfUnsent and mfRead must be cleared */
 		emsmdbp_object_copy_properties(emsmdbp_ctx, old_message_object, message_object, &excluded_tags, true);
 
-		mapistore_message_save(emsmdbp_ctx->mstore_ctx, contextID, message_object->backend_object, mem_ctx);
+		mapistore_message_save(emsmdbp_ctx->mstore_ctx, contextID, message_object->backend_object);
 		mapistore_indexing_record_add_mid(emsmdbp_ctx->mstore_ctx, contextID, owner, messageID);
 	}
 
@@ -164,7 +160,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSubmitMessage(TALLOC_CTX *mem_ctx,
 	uint32_t		contextID;
 	uint8_t			flags;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXOMSG] SubmitMessage (0x32)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCMSG] SubmitMessage (0x32)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -192,9 +188,9 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSubmitMessage(TALLOC_CTX *mem_ctx,
 	}
 
 	mapistore = emsmdbp_is_mapistore(object);
-	switch ((int)mapistore) {
+	switch (mapistore) {
 	case false:
-		OC_DEBUG(0, "Not implemented yet - shouldn't occur\n");
+		DEBUG(0, ("Not implemented yet - shouldn't occur\n"));
 		break;
 	case true:
 		/* Check if we still have uncommitted streams attached to this message */
@@ -236,6 +232,34 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSubmitMessage(TALLOC_CTX *mem_ctx,
 	return MAPI_E_SUCCESS;
 }
 
+/* Get the organisation name (like "First Organization") as a DN. */
+static bool mapiserver_get_org_dn(struct emsmdbp_context *emsmdbp_ctx,
+					    struct ldb_dn **basedn)
+{
+	int			ret;
+	struct ldb_result	*res = NULL;
+
+	ret = ldb_search(emsmdbp_ctx->samdb_ctx, emsmdbp_ctx, &res,
+			 ldb_get_config_basedn(emsmdbp_ctx->samdb_ctx),
+                         LDB_SCOPE_SUBTREE, NULL,
+			 "(|(objectClass=msExchOrganizationContainer))");
+
+	/* If the search failed */
+        if (ret != LDB_SUCCESS) {
+	  	DEBUG(1, ("exchange_emsmdb: [OXOMSG] mapiserver_get_org_dn ldb_search failure.\n"));
+		return false;
+        }
+        /* If we didn't get the expected entry */
+	if (res->count != 1) {
+	  	DEBUG(1, ("exchange_emsmdb: [OXOMSG] mapiserver_get_org_dn unexpected entry count: %i (expected 1).\n", res->count));
+		return false;
+	}
+	
+	*basedn = ldb_dn_new(emsmdbp_ctx, emsmdbp_ctx->samdb_ctx,
+			     ldb_msg_find_attr_as_string(res->msgs[0], "distinguishedName", NULL));
+	return true;
+}
+
 
 /**
    \details EcDoRpc SetSpooler (0x47) Rop. This operation informs the
@@ -256,7 +280,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSetSpooler(TALLOC_CTX *mem_ctx,
 					       struct EcDoRpc_MAPI_REPL *mapi_repl,
 					       uint32_t *handles, uint16_t *size)
 {
-	OC_DEBUG(4, "exchange_emsmdb: [OXOMSG] SetSpooler (0x47)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXOMSG] SetSpooler (0x47)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -299,10 +323,10 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetAddressTypes(TALLOC_CTX *mem_ctx,
 	int			ret;
 	struct ldb_result	*res = NULL;
 	const char * const	attrs[] = { "msExchTemplateRDNs", NULL };
-	uint32_t                j;
+        uint32_t                j;
 	struct ldb_dn 		*basedn = 0;
-
-	OC_DEBUG(4, "exchange_emsmdb: [OXOMSG] AddressTypes (0x49)\n");
+	
+	DEBUG(4, ("exchange_emsmdb: [OXOMSG] AddressTypes (0x49)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -311,33 +335,30 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetAddressTypes(TALLOC_CTX *mem_ctx,
 	OPENCHANGE_RETVAL_IF(!handles, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!size, MAPI_E_INVALID_PARAMETER, NULL);
 
-	retval = emsmdbp_get_org_dn(emsmdbp_ctx, &basedn);
-	OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, NULL);
-
+	mapiserver_get_org_dn(emsmdbp_ctx, &basedn);
 	ldb_dn_add_child_fmt(basedn, "CN=ADDRESSING");
 	ldb_dn_add_child_fmt(basedn, "CN=ADDRESS-TEMPLATES");
 
 	ret = ldb_search(emsmdbp_ctx->samdb_ctx, emsmdbp_ctx, &res, basedn,
                          LDB_SCOPE_SUBTREE, attrs, "CN=%x", emsmdbp_ctx->userLanguage);
-	talloc_free(basedn);
-	/* If the search failed */
-	if (ret != LDB_SUCCESS) {
-		OC_DEBUG(1, "exchange_emsmdb: [OXOMSG] AddressTypes ldb_search failure.\n");
+        /* If the search failed */
+        if (ret != LDB_SUCCESS) {
+	  	DEBUG(1, ("exchange_emsmdb: [OXOMSG] AddressTypes ldb_search failure.\n"));
 		return MAPI_E_CORRUPT_STORE;
-	}
-	/* If we didn't get the expected entry */
+        }
+        /* If we didn't get the expected entry */
 	if (res->count != 1) {
-		OC_DEBUG(1, "exchange_emsmdb: [OXOMSG] AddressTypes unexpected entry count: %i (expected 1).\n", res->count);
+	  	DEBUG(1, ("exchange_emsmdb: [OXOMSG] AddressTypes unexpected entry count: %i (expected 1).\n", res->count));
 		return MAPI_E_CORRUPT_STORE;
 	}
 	/* If we didn't get the expected number of elements in our record */
 	if (res->msgs[0]->num_elements != 1) {
-	  	OC_DEBUG(1, "exchange_emsmdb: [OXOMSG] AddressTypes unexpected element count: %i (expected 1).\n", res->msgs[0]->num_elements);
+	  	DEBUG(1, ("exchange_emsmdb: [OXOMSG] AddressTypes unexpected element count: %i (expected 1).\n", res->msgs[0]->num_elements));
 		return MAPI_E_CORRUPT_STORE;
 	}
 	/* If we didn't get at least one address type, things are probably bad. It _could_ be allowable though. */
 	if (res->msgs[0]->elements[0].num_values < 1) {
-		OC_DEBUG(1, "exchange_emsmdb: [OXOMSG] AddressTypes unexpected values count: %i (expected 1).\n", res->msgs[0]->num_elements);
+	  	DEBUG(1, ("exchange_emsmdb: [OXOMSG] AddressTypes unexpected values count: %i (expected 1).\n", res->msgs[0]->num_elements));
 	}
 
 	/* If we got to here, it looks sane. Build the reply message. */
@@ -388,7 +409,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopTransportSend(TALLOC_CTX *mem_ctx,
 	bool				mapistore = false;
 	struct emsmdbp_object		*object;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXOMSG] TransportSend (0x4a)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCMSG] TransportSend (0x4a)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -418,15 +439,11 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopTransportSend(TALLOC_CTX *mem_ctx,
 	response = &mapi_repl->u.mapi_TransportSend;
 
 	mapistore = emsmdbp_is_mapistore(object);
-	switch ((int)mapistore) {
+	switch (mapistore) {
 	case false:
-		OC_DEBUG(0, "Not implemented yet - shouldn't occur\n");
+		DEBUG(0, ("Not implemented yet - shouldn't occur\n"));
 		break;
 	case true:
-		retval = emsmdbp_object_attach_sharing_metadata_XML_file(emsmdbp_ctx, object);
-		if (retval != MAPI_E_SUCCESS) {
-			OC_DEBUG(0, "Failing to create sharing metadata for a sharing object: %s\n", mapi_get_errstr(retval));
-		}
 		mapistore_message_submit(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object), object->backend_object, 0);
 
 		oxomsg_mapistore_handle_message_relocation(emsmdbp_ctx, object);
@@ -464,7 +481,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopOptionsData(TALLOC_CTX *mem_ctx,
 {
 	enum MAPISTATUS		retval = MAPI_E_SUCCESS;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXOMSG] OptionsData (0x6f)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXOMSG] OptionsData (0x6f)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -477,11 +494,10 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopOptionsData(TALLOC_CTX *mem_ctx,
 	mapi_repl->handle_idx = mapi_req->handle_idx;
 	mapi_repl->error_code = retval;
 	mapi_repl->u.mapi_OptionsData.Reserved = 0x01; /* always 1, as specified in the doc */
-	mapi_repl->u.mapi_OptionsData.OptionsInfo.cb = 0x0121; /* Outlook expects a 300 bytes response, full of 0s */
-	mapi_repl->u.mapi_OptionsData.OptionsInfo.lpb = talloc_zero_array(mem_ctx, uint8_t, mapi_repl->u.mapi_OptionsData.OptionsInfo.cb);
-	
+	mapi_repl->u.mapi_OptionsData.OptionsInfo.cb = 0x0000;
+	mapi_repl->u.mapi_OptionsData.OptionsInfo.lpb = talloc_array(mem_ctx, uint8_t, mapi_repl->u.mapi_OptionsData.OptionsInfo.cb);
 	mapi_repl->u.mapi_OptionsData.HelpFileSize = 0x0000;
-	mapi_repl->u.mapi_OptionsData.HelpFile = talloc_zero_array(mem_ctx, uint8_t, mapi_repl->u.mapi_OptionsData.HelpFileSize);
+	mapi_repl->u.mapi_OptionsData.HelpFile = talloc_array(mem_ctx, uint8_t, mapi_repl->u.mapi_OptionsData.HelpFileSize);
 
 	*size += libmapiserver_RopOptionsData_size(mapi_repl);
 
@@ -514,7 +530,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetTransportFolder(TALLOC_CTX *mem_ctx,
 	void			*private_data = NULL;
 	uint32_t		handle;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXOMSG] GetTransportFolder (0x6d)\n");
+ 	DEBUG(4, ("exchange_emsmdb: [OXOMSG] GetTransportFolder (0x6d)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -537,7 +553,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopGetTransportFolder(TALLOC_CTX *mem_ctx,
 	object = (struct emsmdbp_object *) private_data;
 	if (!object || object->type != EMSMDBP_OBJECT_MAILBOX) {
 		mapi_repl->error_code = ecNullObject;
-		OC_DEBUG(5, "  invalid object\n");
+		DEBUG(5, ("  invalid object\n"));
 		goto end;
 	}
 

@@ -64,6 +64,7 @@ NTSTATUS dcerpc_server_exchange_mta_qadmin_init(void);
 NTSTATUS dcerpc_server_exchange_store_information_init(void);
 NTSTATUS dcerpc_server_exchange_nsp_init(void);
 NTSTATUS dcerpc_server_exchange_emsmdb_init(void);
+NTSTATUS dcerpc_server_exchange_async_emsmdb_init(void);
 NTSTATUS dcerpc_server_exchange_unknown_init(void);
 
 /* definitions from samba4: librpc/ndr/ndr_table.c */
@@ -141,7 +142,7 @@ enum MAPISTATUS dcesrv_EcDoRpc(struct dcesrv_call_state *, TALLOC_CTX *,struct E
 void dcesrv_EcGetMoreRpc(struct dcesrv_call_state *, TALLOC_CTX *,struct EcGetMoreRpc *);
 enum MAPISTATUS dcesrv_EcRRegisterPushNotification(struct dcesrv_call_state *, TALLOC_CTX *,struct EcRRegisterPushNotification *);
 enum MAPISTATUS dcesrv_EcRUnregisterPushNotification(struct dcesrv_call_state *, TALLOC_CTX *,struct EcRUnregisterPushNotification *);
-enum MAPISTATUS dcesrv_EcDummyRpc(struct dcesrv_call_state *, TALLOC_CTX *,struct EcDummyRpc *);
+void dcesrv_EcDummyRpc(struct dcesrv_call_state *, TALLOC_CTX *,struct EcDummyRpc *);
 void dcesrv_EcRGetDCName(struct dcesrv_call_state *, TALLOC_CTX *,struct EcRGetDCName *);
 void dcesrv_EcRNetGetDCName(struct dcesrv_call_state *, TALLOC_CTX *,struct EcRNetGetDCName *);
 enum MAPISTATUS dcesrv_EcDoRpcExt(struct dcesrv_call_state *, TALLOC_CTX *,struct EcDoRpcExt *);
@@ -151,6 +152,9 @@ void dcesrv_EcUnknown0xC(struct dcesrv_call_state *, TALLOC_CTX *, struct EcUnkn
 void dcesrv_EcUnknown0xD(struct dcesrv_call_state *, TALLOC_CTX *, struct EcUnknown0xD *);
 enum MAPISTATUS dcesrv_EcDoAsyncConnectEx(struct dcesrv_call_state *, TALLOC_CTX *, struct EcDoAsyncConnectEx *);
 void dcesrv_unknown_dummy(struct dcesrv_call_state *, TALLOC_CTX *,struct unknown_dummy *);
+
+/* AsyncEMSMDB protocol function */
+enum MAPISTATUS dcesrv_EcDoAsyncWaitEx(struct dcesrv_call_state *, TALLOC_CTX *, struct EcDoAsyncWaitEx *);
 
 __END_DECLS
 

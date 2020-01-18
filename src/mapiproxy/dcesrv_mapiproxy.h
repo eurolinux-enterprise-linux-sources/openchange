@@ -22,6 +22,10 @@
 #ifndef	__DCESRV_MAPIPROXY_H__
 #define	__DCESRV_MAPIPROXY_H__
 
+#ifndef	_GNU_SOURCE
+#define	_GNU_SOURCE 1
+#endif
+
 #include <sys/types.h>
 
 #include <stdio.h>
@@ -36,6 +40,7 @@
 #include <samba/session.h>
 
 #include <dcerpc_server.h>
+#include <samba_util.h>
 #include <param.h>
 #include <credentials.h>
 
@@ -48,15 +53,13 @@ struct dcesrv_mapiproxy_private {
 	char					*exchname;
 	bool					server_mode;
 	bool					connected;
-	bool					ndrdump;
 	struct cli_credentials			*credentials;
 };
 
 enum exchange_handle {
 	EXCHANGE_HANDLE_NSP,
 	EXCHANGE_HANDLE_EMSMDB,
-	EXCHANGE_HANDLE_DS_RFR,
-	EXCHANGE_HANDLE_ASYNCEMSMDB
+	EXCHANGE_HANDLE_DS_RFR
 };
 
 /* Forward declarations */

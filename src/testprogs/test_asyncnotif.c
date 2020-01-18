@@ -46,6 +46,7 @@ struct poptOption popt_openchange_version[] = {
 #define POPT_OPENCHANGE_VERSION { NULL, 0, POPT_ARG_INCLUDE_TABLE, popt_openchange_version, 0, "Common openchange options:", NULL },
 #define DEFAULT_PROFDB  "%s/.openchange/profiles.ldb"
 
+#if 0
 static int callback(uint16_t NotificationType, void *NotificationData, void *private_data)
 {
 	struct HierarchyTableChange    	*htable;
@@ -55,124 +56,128 @@ static int callback(uint16_t NotificationType, void *NotificationData, void *pri
 	switch(NotificationType) {
 	case fnevNewMail:
 	case fnevNewMail|fnevMbit:
-		OC_DEBUG(0, "[+] New mail Received");
+		DEBUG(0, ("[+] New mail Received\n"));
 		break;
 	case fnevObjectCreated:
-		OC_DEBUG(0, "[+] Folder Created");
+		DEBUG(0, ("[+] Folder Created\n"));
 		break;
 	case fnevObjectDeleted:
-		OC_DEBUG(0, "[+] Folder Deleted");
+		DEBUG(0, ("[+] Folder Deleted\n"));
 		break;
 	case fnevObjectModified:
 	case fnevTbit|fnevObjectModified:
 	case fnevUbit|fnevObjectModified:
 	case fnevTbit|fnevUbit|fnevObjectModified:
-		OC_DEBUG(0, "[+] Folder Modified");
+		DEBUG(0, ("[+] Folder Modified\n"));
 		break;
 	case fnevObjectMoved:
-		OC_DEBUG(0, "[+] Folder Moved");
+		DEBUG(0, ("[+] Folder Moved\n"));
 		break;
 	case fnevObjectCopied:
-		OC_DEBUG(0, "[+] Folder Copied");
+		DEBUG(0, ("[+] Folder Copied\n"));
 		break;
 	case fnevSearchComplete:
-		OC_DEBUG(0, "[+] Search complete in search folder");
+		DEBUG(0, ("[+] Search complete in search folder\n"));
 		break;
 	case fnevTableModified:
 		htable = (struct HierarchyTableChange *) NotificationData;
+		DEBUG(0, ("[+] Hierarchy Table: "));
 		switch (htable->TableEvent) {
 		case TABLE_CHANGED:
-			OC_DEBUG(0, "[+] Hierarchy Table:  changed");
+			DEBUG(0, (" changed\n"));
 			break;
 		case TABLE_ROW_ADDED:
-			OC_DEBUG(0, "[+] Hierarchy Table: row added");
+			DEBUG(0, ("row added\n"));
 			break;
 		case TABLE_ROW_DELETED:
-			OC_DEBUG(0, "[+] Hierarchy Table: row deleted");
+			DEBUG(0, ("row deleted\n"));
 			break;
 		case TABLE_ROW_MODIFIED:
-			OC_DEBUG(0, "[+] Hierarchy Table: row modified");
+			DEBUG(0, ("row modified\n"));
 			break;
 		case TABLE_RESTRICT_DONE:
-			OC_DEBUG(0, "[+] Hierarchy Table: restriction done");
+			DEBUG(0, ("restriction done\n"));
 			break;
 		default:
-			OC_DEBUG(0, "[+] Hierarchy Table: ");
+			DEBUG(0, ("\n"));
 			break;
 		}
 		break;
 	case fnevStatusObjectModified:
-		OC_DEBUG(0, "[+] ICS Notification");
+		DEBUG(0, ("[+] ICS Notification\n"));
 		break;
 	case fnevMbit|fnevObjectCreated:
-		OC_DEBUG(0, "[+] Message created");
+		DEBUG(0, ("[+] Message created\n"));
 		break;
 	case fnevMbit|fnevObjectDeleted:
-		OC_DEBUG(0, "[+] Message deleted");
+		DEBUG(0, ("[+] Message deleted\n"));
 	case fnevMbit|fnevObjectModified:
-		OC_DEBUG(0, "[+] Message modified");
+		DEBUG(0, ("[+] Message modified\n"));
 	case fnevMbit|fnevObjectMoved:
-		OC_DEBUG(0, "[+] Message moved");
+		DEBUG(0, ("[+] Message moved\n"));
 	case fnevMbit|fnevObjectCopied:
-		OC_DEBUG(0, "[+] Message copied");
+		DEBUG(0, ("[+] Message copied\n"));
 	case fnevMbit|fnevTableModified:
 		ctable = (struct ContentsTableChange *) NotificationData;
+		DEBUG(0, ("[+] Contents Table: "));
 		switch (ctable->TableEvent) {
 		case TABLE_CHANGED:
-			OC_DEBUG(0, "[+] Contents Table:  changed");
+			DEBUG(0, (" changed\n"));
 			break;
 		case TABLE_ROW_ADDED:
-			OC_DEBUG(0, "[+] Contents Table: row added");
+			DEBUG(0, ("row added\n"));
 			break;
 		case TABLE_ROW_DELETED:
-			OC_DEBUG(0, "[+] Contents Table: row deleted");
+			DEBUG(0, ("row deleted\n"));
 			break;
 		case TABLE_ROW_MODIFIED:
-			OC_DEBUG(0, "[+] Contents Table: row modified");
+			DEBUG(0, ("row modified\n"));
 			break;
 		case TABLE_RESTRICT_DONE:
-			OC_DEBUG(0, "[+] Contents Table: restriction done");
+			DEBUG(0, ("restriction done\n"));
 			break;
 		default:
-			OC_DEBUG(0, "[+] Contents Table: ");
+			DEBUG(0, ("\n"));
 			break;
 		}
 		break;
 	case fnevMbit|fnevSbit|fnevObjectDeleted:
-		OC_DEBUG(0, "[+] A message is no longer part of a search folder");
+		DEBUG(0, ("[+] A message is no longer part of a search folder\n"));
 		break;
 	case fnevMbit|fnevSbit|fnevObjectModified:
-		OC_DEBUG(0, "[+] A property on a message in a search folder has changed");
+		DEBUG(0, ("[+] A property on a message in a search folder has changed\n"));
 	case fnevMbit|fnevSbit|fnevTableModified:
 		stable = (struct ContentsTableChange *) NotificationData;
+		DEBUG(0, ("[+] Search Table: "));
 		switch (stable->TableEvent) {
 		case TABLE_CHANGED:
-			OC_DEBUG(0, "[+] Search Table:  changed");
+			DEBUG(0, (" changed\n"));
 			break;
 		case TABLE_ROW_ADDED:
-			OC_DEBUG(0, "[+] Search Table: row added");
+			DEBUG(0, ("row added\n"));
 			break;
 		case TABLE_ROW_DELETED:
-			OC_DEBUG(0, "[+] Search Table: row deleted");
+			DEBUG(0, ("row deleted\n"));
 			break;
 		case TABLE_ROW_MODIFIED:
-			OC_DEBUG(0, "[+] Search Table: row modified");
+			DEBUG(0, ("row modified\n"));
 			break;
 		case TABLE_RESTRICT_DONE:
-			OC_DEBUG(0, "[+] Search Table: restriction done");
+			DEBUG(0, ("restriction done\n"));
 			break;
 		default:
-			OC_DEBUG(0, "[+] Search Table: ");
+			DEBUG(0, ("\n"));
 			break;
 		}
 		break;
 	default:
-		OC_DEBUG(0, "[+] Unsupported notification (0x%x)", NotificationType);
+		printf("[+] Unsupported notification (0x%x)\n", NotificationType);
 		break;
 	}
 
 	return 0;
 }
+#endif
 
 int main(int argc, const char *argv[])
 {
@@ -194,10 +199,6 @@ int main(int argc, const char *argv[])
 	const char			*opt_debug = NULL;
 	int				exit_code = 0;
 	uint32_t			notificationFlag = 0;
-	uint32_t			ulConnection;
-	uint16_t			ulEventMask = fnevNewMail;
-	//uint16_t			ulEventMask = fnevNewMail|fnevObjectCreated|fnevObjectDeleted|fnevObjectModified|fnevObjectMoved|fnevObjectCopied|fnevSearchComplete;
-	bool				wholeStore = true;
 
 	enum {OPT_PROFILE_DB=1000, OPT_PROFILE, OPT_PASSWORD, OPT_DEBUG, OPT_DUMPDATA};
 
@@ -300,17 +301,19 @@ int main(int argc, const char *argv[])
 	retval = GetContentsTable(&obj_inbox, &obj_contentstable, 0, &count);
 	printf("mailbox contains %i messages\n", count);
 
-	retval = Subscribe(&obj_store, &ulConnection, ulEventMask, wholeStore, &callback, &obj_store);
-	if (retval != MAPI_E_SUCCESS) {
+#if 0
+	ulEventMask = fnevNewMail|fnevObjectCreated|fnevObjectDeleted|fnevObjectModified|fnevObjectMoved|fnevObjectCopied|fnevSearchComplete|fnevTableModified|fnevStatusObjectModified;
+	retval = Subscribe(&obj_store, &ulConnection, ulEventMask, true, (mapi_notify_callback_t)callback, (void*) (&obj_store));
+        if (retval != MAPI_E_SUCCESS) {
 		mapi_errstr("Subscribe", retval);
 		exit_code = 2;
 		goto cleanup;
 	}
+#endif
 
 	printf("about to start a long wait\n");
-	while ((retval = RegisterAsyncNotification(session, &notificationFlag)) == MAPI_E_SUCCESS ||
-	       retval == MAPI_E_TIMEOUT) {
-		if (retval == MAPI_E_SUCCESS && notificationFlag != 0x00000000) {
+	while ((retval = RegisterAsyncNotification(session, &notificationFlag)) == MAPI_E_SUCCESS) {
+		if (notificationFlag != 0x00000000) {
 			printf("Got a Notification: 0x%08x, woo hoo!\n", notificationFlag);
 			mapi_object_release(&obj_contentstable);
 			mapi_object_init(&obj_contentstable);
@@ -320,7 +323,7 @@ int main(int argc, const char *argv[])
 			printf("going around again, ^C to break out\n");
 		}
 	}
-	if (retval != MAPI_E_SUCCESS) {
+        if (retval != MAPI_E_SUCCESS) {
 		mapi_errstr("RegisterAsyncNotification", retval);
 		exit_code = 2;
 		goto cleanup;

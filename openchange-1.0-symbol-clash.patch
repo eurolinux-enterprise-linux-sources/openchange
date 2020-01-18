@@ -1,22 +1,25 @@
-diff -up openchange-2.1-QUADRANT/libmapi/emsmdb.c.symbol-clash openchange-2.1-QUADRANT/libmapi/emsmdb.c
---- openchange-2.1-QUADRANT/libmapi/emsmdb.c.symbol-clash	2014-04-28 11:58:17.560932938 +0200
-+++ openchange-2.1-QUADRANT/libmapi/emsmdb.c	2014-04-28 12:00:21.085927789 +0200
-@@ -644,7 +644,7 @@ struct mapi_notify_ctx *emsmdb_bind_noti
+diff -up openchange-2.0-QUADRANT/libmapi/emsmdb.c.symbol-clash openchange-2.0-QUADRANT/libmapi/emsmdb.c
+--- openchange-2.0-QUADRANT/libmapi/emsmdb.c.symbol-clash	2013-01-24 19:55:36.000000000 +0100
++++ openchange-2.0-QUADRANT/libmapi/emsmdb.c	2013-11-11 18:21:56.132410403 +0100
+@@ -636,8 +636,8 @@ struct mapi_notify_ctx *emsmdb_bind_noti
+ 	notify_ctx->notifications->prev = NULL;
  	notify_ctx->notifications->next = NULL;
  
- 	openchange_load_interfaces(mem_ctx, lpcfg_interfaces(mapi_ctx->lp_ctx), &ifaces);
+-	load_interfaces(mem_ctx, lpcfg_interfaces(mapi_ctx->lp_ctx), &ifaces);
 -	ipaddr = iface_best_ip(ifaces, mapi_ctx->session->profile->server);
++	libmapi_load_interfaces(mem_ctx, lpcfg_interfaces(mapi_ctx->lp_ctx), &ifaces);
 +	ipaddr = libmapi_iface_best_ip(ifaces, mapi_ctx->session->profile->server);
  	if (!ipaddr) {
  		talloc_free(notify_ctx->notifications);
  		talloc_free(notify_ctx);
-diff -up openchange-2.1-QUADRANT/libmapi/libmapi_private.h.symbol-clash openchange-2.1-QUADRANT/libmapi/libmapi_private.h
---- openchange-2.1-QUADRANT/libmapi/libmapi_private.h.symbol-clash	2014-04-28 11:58:17.560932938 +0200
-+++ openchange-2.1-QUADRANT/libmapi/libmapi_private.h	2014-04-28 12:05:13.875915584 +0200
-@@ -123,13 +123,13 @@ uint16_t		mapi_recipients_RecipientFlags
+diff -up openchange-2.0-QUADRANT/libmapi/libmapi_private.h.symbol-clash openchange-2.0-QUADRANT/libmapi/libmapi_private.h
+--- openchange-2.0-QUADRANT/libmapi/libmapi_private.h.symbol-clash	2013-01-24 19:55:36.000000000 +0100
++++ openchange-2.0-QUADRANT/libmapi/libmapi_private.h	2013-11-11 18:21:56.133410403 +0100
+@@ -122,14 +122,14 @@ uint8_t			mapi_recipients_get_org_length
+ uint16_t		mapi_recipients_RecipientFlags(struct SRow *);
  
  /* The following private definitions come from libmapi/socket/interface.c  */
- void			openchange_load_interfaces(TALLOC_CTX *, const char **, struct interface **);
+-void			load_interfaces(TALLOC_CTX *, const char **, struct interface **);
 -int			iface_count(struct interface *);
 -const char		*iface_n_ip(struct interface *, int);
 -const char		*iface_n_bcast(struct interface *, int);
@@ -24,6 +27,7 @@ diff -up openchange-2.1-QUADRANT/libmapi/libmapi_private.h.symbol-clash openchan
 -const char		*iface_best_ip(struct interface *, const char *);
 -bool			iface_is_local(struct interface *, const char *);
 -bool			iface_same_net(const char *, const char *, const char *);
++void			libmapi_load_interfaces(TALLOC_CTX *, const char **, struct interface **);
 +int			libmapi_iface_count(struct interface *);
 +const char		*libmapi_iface_n_ip(struct interface *, int);
 +const char		*libmapi_iface_n_bcast(struct interface *, int);
@@ -34,10 +38,19 @@ diff -up openchange-2.1-QUADRANT/libmapi/libmapi_private.h.symbol-clash openchan
  
  __END_DECLS
  
-diff -up openchange-2.1-QUADRANT/libmapi/socket/interface.c.symbol-clash openchange-2.1-QUADRANT/libmapi/socket/interface.c
---- openchange-2.1-QUADRANT/libmapi/socket/interface.c.symbol-clash	2014-04-23 21:43:06.000000000 +0200
-+++ openchange-2.1-QUADRANT/libmapi/socket/interface.c	2014-04-28 11:58:17.560932938 +0200
-@@ -228,7 +228,7 @@ void openchange_load_interfaces(TALLOC_C
+diff -up openchange-2.0-QUADRANT/libmapi/socket/interface.c.symbol-clash openchange-2.0-QUADRANT/libmapi/socket/interface.c
+--- openchange-2.0-QUADRANT/libmapi/socket/interface.c.symbol-clash	2013-01-24 19:55:36.000000000 +0100
++++ openchange-2.0-QUADRANT/libmapi/socket/interface.c	2013-11-11 18:21:56.134410403 +0100
+@@ -186,7 +186,7 @@ static void interpret_interface(TALLOC_C
+ /**
+ load the list of network interfaces
+ **/
+-void load_interfaces(TALLOC_CTX *mem_ctx, const char **interfaces, struct interface **local_interfaces)
++void libmapi_load_interfaces(TALLOC_CTX *mem_ctx, const char **interfaces, struct interface **local_interfaces)
+ {
+ 	const char **ptr = interfaces;
+ 	int i;
+@@ -228,7 +228,7 @@ void load_interfaces(TALLOC_CTX *mem_ctx
  /**
    how many interfaces do we have
    **/

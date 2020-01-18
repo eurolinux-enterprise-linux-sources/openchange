@@ -31,8 +31,10 @@
 #include "mapistore.h"
 #include "mapistore_errors.h"
 #include "mapistore_private.h"
-#include "utils/dlinklist.h"
+#include <dlinklist.h>
 
+#include <samba_util.h>
+#include <util/debug.h>
 
 /**
    \file mapistore_backend.c
@@ -67,7 +69,7 @@ _PUBLIC_ enum mapistore_error mapistore_backend_register(const void *_backend)
 		if (backends[i].backend && backend && 
 		    backend->backend.name && backends[i].backend->backend.name &&
 		    !strcmp(backends[i].backend->backend.name, backend->backend.name)) {
-			OC_DEBUG(3, "MAPISTORE backend '%s' already registered", backend->backend.name);
+			DEBUG(3, ("MAPISTORE backend '%s' already registered\n", backend->backend.name));
 			return MAPISTORE_SUCCESS;
 		}
 	}
@@ -82,7 +84,7 @@ _PUBLIC_ enum mapistore_error mapistore_backend_register(const void *_backend)
 
 	num_backends++;
 
-	OC_DEBUG(3, "MAPISTORE backend '%s' registered", backend->backend.name);
+	DEBUG(3, ("MAPISTORE backend '%s' registered\n", backend->backend.name));
 
 	return MAPISTORE_SUCCESS;
 }
@@ -141,16 +143,16 @@ static init_backend_fn load_backend(const char *path)
 
 	handle = dlopen(path, RTLD_NOW);
 	if (handle == NULL) {
-		OC_DEBUG(0, "Unable to open %s: %s", path, dlerror());
+		DEBUG(0, ("Unable to open %s: %s\n", path, dlerror()));
 		return NULL;
 	}
 
 	init_fn = dlsym(handle, MAPISTORE_INIT_MODULE);
 
 	if (init_fn == NULL) {
-		OC_DEBUG(0, "Unable to find %s() in %s: %s",
-			  MAPISTORE_INIT_MODULE, path, dlerror());
-		OC_DEBUG(1, "Loading mapistore backend '%s' failed", path);
+		DEBUG(0, ("Unable to find %s() in %s: %s\n",
+			  MAPISTORE_INIT_MODULE, path, dlerror()));
+		DEBUG(1, ("Loading mapistore backend '%s' failed\n", path));
 		dlclose(handle);
 		return NULL;
 	}
@@ -189,7 +191,7 @@ static init_backend_fn *load_backends(TALLOC_CTX *mem_ctx, const char *path)
 		if (ISDOT(entry->d_name) || ISDOTDOT(entry->d_name)) {
 			continue;
 		}
-
+		
 		filename = talloc_asprintf(mem_ctx, "%s/%s", path, entry->d_name);
 		ret[success] = load_backend(filename);
 		if (ret[success]) {
@@ -272,18 +274,13 @@ enum mapistore_error mapistore_backend_init(TALLOC_CTX *mem_ctx, const char *pat
 	status = mapistore_backend_run_init(ret);
 	talloc_free(ret);
 
-	if (num_backends == 0) {
-		OC_DEBUG(0, "No mapistore backends available (using backend path '%s').", path);
-		return MAPISTORE_ERR_BACKEND_INIT;
-	}
-
 	for (i = 0; i < num_backends; i++) {
 		if (backends[i].backend) {
 			retval = backends[i].backend->backend.init();
 			if (retval != MAPISTORE_SUCCESS) {
-				OC_DEBUG(1, "[!] MAPISTORE backend '%s' initialization failed", backends[i].backend->backend.name);
+				DEBUG(3, ("[!] MAPISTORE backend '%s' initialization failed\n", backends[i].backend->backend.name));
 			} else {
-				OC_DEBUG(3, "MAPISTORE backend '%s' loaded", backends[i].backend->backend.name);
+				DEBUG(3, ("MAPISTORE backend '%s' loaded\n", backends[i].backend->backend.name));
 			}
 		}
 	}
@@ -300,7 +297,7 @@ enum mapistore_error mapistore_backend_init(TALLOC_CTX *mem_ctx, const char *pat
 
    \return a valid backend_context pointer on success, otherwise NULL
  */
-enum mapistore_error mapistore_backend_list_contexts(const char *username, struct indexing_context *ictx, TALLOC_CTX *mem_ctx, struct mapistore_contexts_list **contexts_listP)
+enum mapistore_error mapistore_backend_list_contexts(const char *username, struct tdb_wrap *tdbwrap, TALLOC_CTX *mem_ctx, struct mapistore_contexts_list **contexts_listP)
 {
 	enum mapistore_error		retval;
 	int				i;
@@ -310,7 +307,7 @@ enum mapistore_error mapistore_backend_list_contexts(const char *username, struc
 	MAPISTORE_RETVAL_IF(!contexts_listP, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
 
 	for (i = 0; i < num_backends; i++) {
-		retval = backends[i].backend->backend.list_contexts(username, ictx, mem_ctx, &current_contexts_list);
+		retval = backends[i].backend->backend.list_contexts(username, tdbwrap, mem_ctx, &current_contexts_list);
 		if (retval != MAPISTORE_SUCCESS) {
 			return retval;
 		}
@@ -332,7 +329,7 @@ enum mapistore_error mapistore_backend_list_contexts(const char *username, struc
 
    \return a valid backend_context pointer on success, otherwise NULL
  */
-enum mapistore_error mapistore_backend_create_context(TALLOC_CTX *mem_ctx, struct mapistore_connection_info *conn_info, struct indexing_context *ictx,
+enum mapistore_error mapistore_backend_create_context(TALLOC_CTX *mem_ctx, struct mapistore_connection_info *conn_info, struct tdb_wrap *tdbwrap,
 						      const char *namespace, const char *uri, uint64_t fid, struct backend_context **context_p)
 {
 	struct backend_context		*context;
@@ -341,7 +338,7 @@ enum mapistore_error mapistore_backend_create_context(TALLOC_CTX *mem_ctx, struc
 	void				*backend_object = NULL;
 	int				i;
 
-	OC_DEBUG(5, "namespace is %s and backend_uri is '%s'", namespace, uri);
+	DEBUG(0, ("namespace is %s and backend_uri is '%s'\n", namespace, uri));
 
 	context = talloc_zero(NULL, struct backend_context);
 
@@ -349,7 +346,7 @@ enum mapistore_error mapistore_backend_create_context(TALLOC_CTX *mem_ctx, struc
 		if (backends[i].backend->backend.namespace && 
 		    !strcmp(namespace, backends[i].backend->backend.namespace)) {
 			found = true;
-			retval = backends[i].backend->backend.create_context(context, conn_info, ictx, uri, &backend_object);
+			retval = backends[i].backend->backend.create_context(context, conn_info, tdbwrap, uri, &backend_object);
 			if (retval != MAPISTORE_SUCCESS) {
 				goto end;
 			}
@@ -359,7 +356,7 @@ enum mapistore_error mapistore_backend_create_context(TALLOC_CTX *mem_ctx, struc
 	}
 
 	if (found == false) {
-		OC_DEBUG(0, "MAPISTORE: no backend with namespace '%s' is available", namespace);
+		DEBUG(0, ("MAPISTORE: no backend with namespace '%s' is available\n", namespace));
 		retval = MAPISTORE_ERR_NOT_FOUND; 
 		goto end;
 	}
@@ -526,17 +523,11 @@ enum mapistore_error mapistore_backend_get_path(struct backend_context *bctx, TA
 
 	ret = bctx->backend->context.get_path(bctx->backend_object, mem_ctx, fmid, &bpath);
 
-	if (ret == MAPISTORE_SUCCESS) {
-		if (!bpath) {
-			OC_DEBUG(3, "Mapistore backend return SUCCESS, but path url is NULL");
-			return MAPISTORE_ERR_INVALID_DATA;
-		}
+	if (!ret) {
 		*path = talloc_asprintf(mem_ctx, "%s%s", bctx->backend->backend.namespace, bpath);
 	} else {
 		*path = NULL;
 	}
-
-	talloc_free(bpath);
 
 	return ret;
 }
@@ -672,9 +663,9 @@ enum mapistore_error mapistore_backend_message_set_read_flag(struct backend_cont
 	return bctx->backend->message.set_read_flag(message, flag);
 }
 
-enum mapistore_error mapistore_backend_message_save(struct backend_context *bctx, void *message, TALLOC_CTX *mem_ctx)
+enum mapistore_error mapistore_backend_message_save(struct backend_context *bctx, void *message)
 {
-	return bctx->backend->message.save(message, mem_ctx);
+	return bctx->backend->message.save(message);
 }
 
 enum mapistore_error mapistore_backend_message_submit(struct backend_context *bctx, void *message, enum SubmitFlags flags)

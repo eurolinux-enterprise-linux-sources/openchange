@@ -30,6 +30,7 @@
 #include "mapiproxy/modules/mpm_cache.h"
 #include "libmapi/libmapi.h"
 #include "libmapi/libmapi_private.h"
+#include <util/debug.h>
 
 /**
    \details Create the cache database
@@ -98,8 +99,9 @@ static NTSTATUS  mpm_cache_ldb_add_folder(TALLOC_CTX *mem_ctx,
 
 	ret = ldb_add(ldb_ctx, msg);
 	if (ret != 0) {
-		OC_DEBUG(0, "* Failed to modify record %s: %s",
-			  ldb_dn_get_linearized(msg->dn), ldb_errstring(ldb_ctx));
+		DEBUG(0, ("* [%s:%d] Failed to modify record %s: %s\n",
+			  MPM_LOCATION, ldb_dn_get_linearized(msg->dn), 
+			  ldb_errstring(ldb_ctx)));
 		return NT_STATUS_UNSUCCESSFUL;
 	}
 
@@ -135,8 +137,8 @@ NTSTATUS mpm_cache_ldb_add_message(TALLOC_CTX *mem_ctx,
 	if (!dn) return NT_STATUS_UNSUCCESSFUL;
 	ret = ldb_search(ldb_ctx, mem_ctx, &res, dn, LDB_SCOPE_BASE, NULL, NULL);
 	if (ret == LDB_SUCCESS && !res->count) {
-		OC_DEBUG(5, "* We have to create folder TDB record: CN=0x%"PRIx64",CN=Cache",
-			  message->FolderId);
+		DEBUG(5, ("* [%s:%d] We have to create folder TDB record: CN=0x%"PRIx64",CN=Cache\n", 
+			  MPM_LOCATION, message->FolderId));
 		status = mpm_cache_ldb_add_folder(mem_ctx, ldb_ctx, message->FolderId);
 		if (!NT_STATUS_IS_OK(status)) return status;
 	}
@@ -162,9 +164,9 @@ NTSTATUS mpm_cache_ldb_add_message(TALLOC_CTX *mem_ctx,
 
 	ret = ldb_add(ldb_ctx, msg);
 	if (ret != 0) {
-		OC_DEBUG(0, "* Failed to modify record %s: %s",
-			  ldb_dn_get_linearized(msg->dn),
-			  ldb_errstring(ldb_ctx));
+		DEBUG(0, ("* [%s:%d] Failed to modify record %s: %s\n",
+			  MPM_LOCATION, ldb_dn_get_linearized(msg->dn), 
+			  ldb_errstring(ldb_ctx)));
 		return NT_STATUS_UNSUCCESSFUL;
 	}
 
@@ -204,7 +206,7 @@ NTSTATUS mpm_cache_ldb_add_attachment(TALLOC_CTX *mem_ctx,
 	ret = ldb_search(ldb_ctx, mem_ctx, &res, dn, LDB_SCOPE_BASE, NULL, NULL);
 	if (ret == LDB_SUCCESS && res->count) return NT_STATUS_OK;
 
-	OC_DEBUG(2, "* Create the attachment TDB record");
+	DEBUG(2, ("* [%s:%d] Create the attachment TDB record\n", MPM_LOCATION));
 
 	msg = ldb_msg_new(mem_ctx);
 	if (msg == NULL) return NT_STATUS_NO_MEMORY;
@@ -218,9 +220,9 @@ NTSTATUS mpm_cache_ldb_add_attachment(TALLOC_CTX *mem_ctx,
 
 	ret = ldb_add(ldb_ctx, msg);
 	if (ret != 0) {
-		OC_DEBUG(0, "* Failed to modify record %s: %s",
-			  ldb_dn_get_linearized(msg->dn), 
-			  ldb_errstring(ldb_ctx));
+		DEBUG(0, ("* [%s:%d] Failed to modify record %s: %s\n",
+			  MPM_LOCATION, ldb_dn_get_linearized(msg->dn), 
+			  ldb_errstring(ldb_ctx)));
 		return NT_STATUS_UNSUCCESSFUL;
 	}
 
@@ -282,7 +284,8 @@ NTSTATUS mpm_cache_ldb_add_stream(struct mpm_cache *mpm,
 			attribute = talloc_asprintf(mem_ctx, "0x%x", stream->PropertyTag);
 			basedn = (char *) ldb_msg_find_attr_as_string(res->msgs[0], attribute, NULL);
 			talloc_free(attribute);
-			OC_DEBUG(2, "* Loading from cache 0x%x = %s", stream->PropertyTag, basedn);
+			DEBUG(2, ("* [%s:%d] Loading from cache 0x%x = %s\n", MPM_LOCATION,
+				  stream->PropertyTag, basedn));
 			stream->filename = talloc_strdup(mem_ctx, basedn);
 			stream->cached = true;
 			stream->ahead = false;
@@ -296,7 +299,7 @@ NTSTATUS mpm_cache_ldb_add_stream(struct mpm_cache *mpm,
 					 attach->AttachmentID, message->MessageId,
 					 message->FolderId);
 
-		OC_DEBUG(2, "* Create the stream TDB record for attachment");
+		DEBUG(2, ("* [%s:%d] Create the stream TDB record for attachment\n", MPM_LOCATION));
 	} 
 
 	if (stream->message) {
@@ -312,7 +315,8 @@ NTSTATUS mpm_cache_ldb_add_stream(struct mpm_cache *mpm,
 			attribute = talloc_asprintf(mem_ctx, "0x%x", stream->PropertyTag);
 			basedn = (char *) ldb_msg_find_attr_as_string(res->msgs[0], attribute, NULL);
 			talloc_free(attribute);
-			OC_DEBUG(2, "* Loading from cache 0x%x = %s", stream->PropertyTag, basedn);
+			DEBUG(2, ("* [%s:%d] Loading from cache 0x%x = %s\n", MPM_LOCATION,
+				  stream->PropertyTag, basedn));
 			stream->filename = talloc_strdup(mem_ctx, basedn);
 			stream->cached = true;
 			stream->ahead = false;
@@ -325,7 +329,8 @@ NTSTATUS mpm_cache_ldb_add_stream(struct mpm_cache *mpm,
 		basedn = talloc_asprintf(mem_ctx, "CN=0x%"PRIx64",CN=0x%"PRIx64",CN=Cache",
 					 message->MessageId, message->FolderId);
 		
-		OC_DEBUG(2, "* Modify the message TDB record and append stream information");
+		DEBUG(2, ("* [%s:%d] Modify the message TDB record and append stream information\n",
+			  MPM_LOCATION));
 	}
 
 	stream->cached = false;
@@ -353,9 +358,9 @@ NTSTATUS mpm_cache_ldb_add_stream(struct mpm_cache *mpm,
 	
 	ret = ldb_modify(ldb_ctx, msg);
 	if (ret != 0) {
-		OC_DEBUG(0, "* Failed to modify record %s: %s",
-			  ldb_dn_get_linearized(msg->dn), 
-			  ldb_errstring(ldb_ctx));
+		DEBUG(0, ("* [%s:%d] Failed to modify record %s: %s\n",
+			  MPM_LOCATION, ldb_dn_get_linearized(msg->dn), 
+			  ldb_errstring(ldb_ctx)));
 		return NT_STATUS_UNSUCCESSFUL;
 	}
 

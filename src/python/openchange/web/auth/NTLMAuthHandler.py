@@ -29,8 +29,7 @@ is untested.
 
 from fcntl import flock, LOCK_EX, LOCK_UN
 import httplib
-import logging
-from os import _exit, chown, getpid, getuid, fork, setsid, stat, umask, unlink, \
+from os import _exit, getpid, getuid, fork, setsid, stat, umask, unlink, \
     waitpid, close as close_fd
 from os.path import join, exists
 from select import poll, POLLIN, POLLHUP
@@ -38,7 +37,6 @@ from socket import socket, SHUT_RDWR, AF_INET, AF_UNIX, \
     SOCK_STREAM, MSG_WAITALL, error as socket_error
 from struct import pack, unpack, unpack_from, error as struct_error
 import sys
-import traceback
 from time import sleep, time
 from uuid import uuid4
 
@@ -52,7 +50,6 @@ SAMBA_PORT = 1024
 # those are left unconfigurable, at least for now
 CLIENT_TIMEOUT = 60 * 5 # 5 minutes since last use
 ACTIVITY_TIMEOUT = CLIENT_TIMEOUT # 5 minutes since any socket has been used
-SAMBA_CONNECT_MAX_TRIES = 10 # ~10 seconds
 
 
 ## client-daemon protocol:
@@ -80,7 +77,6 @@ class _NTLMDaemon(object):
         self.owner_pair = owner_pair
         self.samba_host = samba_host
         self.client_data = {}
-        self.log = logging.getLogger(__name__)
 
     def run(self):
         if exists(self.socket_filename):
@@ -94,12 +90,10 @@ class _NTLMDaemon(object):
             waitpid(child_pid, 0)
 
             # we are the child
-            self.log.debug("waiting for ntlm daemon to create socket (%d)",
-                           getpid())
+            # print >> sys.stderr, "waiting for ntlm daemon to create socket (%d)" % getpid()
             while not exists(self.socket_filename):
-                sleep(0.5)
                 pass
-            self.log.debug("socket of ntlm daemon now exists (%d)", getpid())
+            # print >> sys.stderr, "socket of ntlm daemon now exists (%d)" % getpid()
         else:
             raise Exception("failure to fork NTLM daemon")
 
@@ -135,13 +129,14 @@ class _NTLMDaemon(object):
         del httplib
         del resource
 
-        self.log.debug("cleanup done")
+        # print >> sys.stderr, "cleanup done"
 
         child_pid = fork()
         if child_pid > 0:
             _exit(0)
 
-        self.log.info("NTLMAuthHandler daemon spawned with pid %d", getpid())
+        print >> sys.stderr, ("NTLMAuthHandler daemon spawned with pid %d"
+                              % getpid())
         
         # forked processes inherits lock created by flock, so we need to
         # unlock the file here
@@ -149,15 +144,7 @@ class _NTLMDaemon(object):
         # lockf.close()
 
         # we are the daemon
-        # Catch all exceptions here and print them to stderr before exiting
-        # to avoid problems when running under paster
-        try:
-          self._run_as_daemon()
-        except Exception as e:
-          trace = traceback.format_exc()
-          self.log.critical("Uncaught exception: %s\n%s", e,trace)
-          self.log.critical("Exiting")
-          _exit(1)
+        self._run_as_daemon()
 
     def _run_as_daemon(self):
         client_sockets = {}
@@ -204,7 +191,8 @@ class _NTLMDaemon(object):
                 if last_activity + 30.0 < now:
                     shutdown = True
                 elif last_cleanup + 60.0 < now:
-                    self.log.debug("cleaning up old client ids (%d)", getpid())
+                    # print >> sys.stderr, ("cleaning up old client ids (%d)"
+                    #                       % getpid())
                     self._cleanup_client_data(now - CLIENT_TIMEOUT)
                     last_cleanup = now
             else:
@@ -217,17 +205,18 @@ class _NTLMDaemon(object):
                         new_socket_fd = new_socket.fileno()
                         client_sockets[new_socket_fd] = new_socket
                         fd_pool.register(new_socket_fd, POLLIN)
-                        self.log.debug("registered new client socket %d (%d)",
-                                       new_socket_fd, getpid())
+                        # print >> sys.stderr, ("registered new client socket"
+                        # " %d (%d)"
+                        # % (new_socket_fd, getpid()))
                     elif filedesc in client_sockets:
-                        self.log.debug("handling event %d from client socket %d",
-                                       event_no, filedesc)
+                        # print >> sys.stderr, ("handling event %d from client"
+                        # " socket %d" % (event_no, filedesc))
                         client_socket = client_sockets[filedesc]
                         if (event_no & POLLHUP > 0
                             or not self._process_client_request(client_socket,
                                                                 now)):
-                            self.log.debug("removed client socket from pool (%d)",
-                                           getpid())
+                            # print >> sys.stderr, ("removed client socket from"
+                            # " pool (%d)" % getpid())
                             _safe_close(client_socket)
                             fd_pool.unregister(filedesc)
                             del client_sockets[filedesc]
@@ -242,13 +231,14 @@ class _NTLMDaemon(object):
         [_safe_close(client_socket)
          for client_socket in client_sockets.itervalues()]
         
-        self.log.info("NTLMAuthHandler daemon shutdown (%d)", getpid())
+        print >> sys.stderr, ("NTLMAuthHandler daemon shutdown (%d)"
+                              % getpid())
 
     def _cleanup_client_data(self, time_limit):
         def _cleanup_record(client_id):
             record = self.client_data[client_id]
             if "server" in record:
-                self.log.debug("closing server socket")
+                # print >> sys.stderr, "closing server socket"
                 server = record["server"]
                 _safe_close(server)
             del self.client_data[client_id]
@@ -265,13 +255,12 @@ class _NTLMDaemon(object):
         data = client_socket.recv(5, MSG_WAITALL)
         tag = data[0]
         len_client_id = unpack_from("<l", data, 1)[0]
-        self.log.debug("len_client_id: %d", len_client_id)
-        self.log.debug("type(len_client_id): %s", type(len_client_id))
+        # print >> sys.stderr, "len_client_id: %d" % len_client_id
+        # print >> sys.stderr, "type(len_client_id): %s" % type(len_client_id)
         if len_client_id > 0:
             client_id = client_socket.recv(len_client_id, MSG_WAITALL)
         else:
             client_id = ""
-        self.log.debug("client_id: %s", client_id)
 
         if tag == "k":
             if client_id in self.client_data:
@@ -296,11 +285,10 @@ class _NTLMDaemon(object):
             if response == 0:
                 # directly cleanup the client record, in order to reduce the
                 # amount of sockets in use
-                if client_id in self.client_data:
-                  if "server" in self.client_data[client_id]:
-                      server = self.client_data[client_id]["server"]
-                      _safe_close(server)
-                  del self.client_data[client_id]
+                if "server" in self.client_data[client_id]:
+                    server = self.client_data[client_id]["server"]
+                    _safe_close(server)
+                del self.client_data[client_id]
 
             len_ntlm_payload = len(ntlm_payload)
             client_socket.sendall(pack("<Bl", response, len_ntlm_payload)
@@ -313,12 +301,12 @@ class _NTLMDaemon(object):
         return success
 
     def _handle_auth(self, client_id, ntlm_payload):
-        self.log.debug("* client auth stage1")
+        # print >> sys.stderr, "* client auth stage1"
 
         server = self.client_data[client_id]["server"]
-        self.log.debug("host: %s", str(server.getsockname()))
+        # print >> sys.stderr, "host: %s" % str(server.getsockname())
 
-        self.log.debug("building auth_3 and ping packets")
+        # print >> sys.stderr, "building auth_3 and ping packets"
         packet = RPCAuth3OutPacket()
         packet.ntlm_payload = ntlm_payload
         server.sendall(packet.make())
@@ -336,7 +324,7 @@ class _NTLMDaemon(object):
         packet = RPCPingOutPacket()
         packet.call_id = 2
         server.sendall(packet.make())
-        self.log.debug("sent auth3 and ping packets, receiving response")
+        # print >> sys.stderr, "sent auth3 and ping packets, receiving response"
 
         try:
             packet = RPCPacket.from_file(server)
@@ -356,29 +344,28 @@ class _NTLMDaemon(object):
             response = 1
 
         if response == 1:
+            # authentication completed
             self.client_data[client_id]["status"] = "ok"
             del self.client_data[client_id]["server"]
-            self.log.debug("Authentication completed")
         else:
             # we start over with the whole process
-            self.log.debug("Authentication not completed starting over again")
             del self.client_data[client_id]
 
         _safe_close(server)
 
-        self.log.debug("* done with client auth stage1")
+        # print >> sys.stderr, "* done with client auth stage1"
 
         return response
 
     def _handle_negotiate(self, client_id, ntlm_payload):
-        self.log.debug("* client auth stage0")
+        # print >> sys.stderr, "* client auth stage0"
 
-        self.log.debug("connecting to host")
+        # print >> sys.stderr, "connecting to host"
         server = None
 
         connected = False
         attempt = 0
-        while not connected and attempt < SAMBA_CONNECT_MAX_TRIES :
+        while not connected:
             try:
                 attempt = attempt + 1
                 # TODO: we should query port 135 for the right service
@@ -386,31 +373,27 @@ class _NTLMDaemon(object):
                 server.connect((self.samba_host, SAMBA_PORT))
                 connected = True
             except:
-                self.log.error("NTLMAuthHandler: caught exception when"
-                               " connecting to samba host: attempt %d",
-                               attempt)
+                print >> sys.stderr, ("NTLMAuthHandler: caught exception when"
+                                      " connecting to samba host: attempt %d"
+                                      % attempt)
                 sleep(1)
 
-        if not connected:
-            raise Exception("NTLMAuthHandler: unable to connect to samba host"
-                            " aborting after %d attempts" % attempt)
+        # print >> sys.stderr, "host: %s" % str(server.getsockname())
 
-        self.log.debug("server.sockname: %s", str(server.getsockname()))
-
-        self.log.debug("building bind packet")
+        # print >> sys.stderr, "building bind packet"
         packet = RPCBindOutPacket()
         packet.ntlm_payload = ntlm_payload
         
-        self.log.debug("sending bind packet")
+        # print >> sys.stderr, "sending bind packet"
         server.sendall(packet.make())
 
-        self.log.debug("sent bind packet, receiving response")
+        # print >> sys.stderr, "sent bind packet, receiving response"
 
         packet = RPCPacket.from_file(server)
-        self.log.debug("response parsed: %s", packet.pretty_dump())
+        # print >> sys.stderr, "response parsed: %s" % packet.pretty_dump()
 
         if isinstance(packet, RPCBindACKPacket):
-            self.log.debug("ACK received")
+            # print >> sys.stderr, "ACK received"
             self.client_data[client_id] = {"status": "challenged",
                                            "last_used": time(),
                                            "server": server}
@@ -420,7 +403,7 @@ class _NTLMDaemon(object):
             response = 0
             ntlm_payload = ""
 
-        self.log.debug("* done with client auth stage0")
+        # print >> sys.stderr, "* done with client auth stage0"
 
         return (response, ntlm_payload)
 
@@ -430,24 +413,24 @@ class _NTLMAuthClient(object):
         self.work_dir = work_dir
         self.samba_host = samba_host
         self.connection = None
-        self.log = logging.getLogger(__name__)
 
     def server_knows_client(self, client_id):
-        self.log.debug("server knows client? (%d)", getpid())
+        # print >> sys.stderr, "server knows client? (%d)" % getpid()
         payload = "k%s%s" % (pack("<l", len(client_id)), client_id)
         self._send_to_server(payload)
         payload = self._recv_from_server(1)
         if len(payload) > 0:
             code = unpack_from("<B", payload)[0]
-            self.log.debug("server knows client: %d (%d)", code, getpid())
+            # print >> sys.stderr, ("server knows client: %d (%d)"
+            # % (code, getpid()))
         else:
-            self.log.warning("received empty response (%d)", getpid())
+            # print >> sys.stderr, ("received empty response (%d)" % getpid())
             code = 0
 
         return code != 0
 
     def ntlm_transaction(self, client_id="", ntlm_payload=""):
-        self.log.debug("ntlm_transaction (%d)", getpid())
+        # print >> sys.stderr, "ntlm_transaction (%d)" % getpid()
 
         payload = ("t%s%s%s%s"
                    % (pack("<l", len(client_id)), client_id,
@@ -463,11 +446,11 @@ class _NTLMAuthClient(object):
             else:
                 ntlm_payload = ""
         else:
-            self.log.warning("received empty response (%d)", getpid())
+            # print >> sys.stderr, ("received empty response (%d)" % getpid())
             code = 0
             ntlm_payload = ""
 
-        self.log.debug("ntlm_transaction result: %d (%d)", code, getpid())
+        # print >> sys.stderr, "ntlm_transaction result: %d (%d)" % (code, getpid())
 
         return (code != 0, ntlm_payload)
 
@@ -478,20 +461,21 @@ class _NTLMAuthClient(object):
         # sends a series of bytes to the server and make sure it receives them
         # by restarting it if needed
 
-        self.log.debug("sending data (%d)", getpid())
+        # print >>sys.stderr, "sending data (%d)" % getpid()
         sent = False
         while not sent:
             try:
                 self.connection.sendall(payload)
                 sent = True
             except IOError:
-                self.log.debug("(send) reconnecting to server (%d)...", getpid())
+                # print >> sys.stderr, ("(send) reconnecting to server (%d)..."
+                #                      % getpid())
                 sleep(1)
                 self._make_connection()
-        self.log.debug("sent data (%d)", getpid())
+        # print >>sys.stderr, "sent data (%d)" % getpid()
 
     def _recv_from_server(self, nbr_bytes):
-        self.log.debug("receiving data (%d)", getpid())
+        # print >>sys.stderr, "receiving data (%d)" % getpid()
 
         # receives a payload from the server and returns an empty string if
         # something went wrong, just as if the actual request failed
@@ -503,7 +487,7 @@ class _NTLMAuthClient(object):
             # if the server has died, we must return an error anyway
             payload = ""
 
-        self.log.debug("received data (%d)", getpid())
+        # print >>sys.stderr, "received data (%d)" % getpid()
 
         return payload
 
@@ -516,10 +500,10 @@ class _NTLMAuthClient(object):
             lockf = open(lock_filename, "w+")
             lockf.close()
         lockf = open(lock_filename, "r")
-        self.log.info("acquiring lock %s (%d)", lock_filename, getpid())
+        # print >> sys.stderr, "acquiring lock (%d)" % getpid()
         lock_fd = lockf.fileno()
         flock(lock_fd, LOCK_EX)
-        self.log.debug("acquired lock (%d)", getpid())
+        # print >> sys.stderr, "acquired lock (%d)" % getpid()
         self.connection = self._connect_to_daemon(self.work_dir,
                                                   self.samba_host)
         flock(lock_fd, LOCK_UN)
@@ -558,7 +542,6 @@ class NTLMAuthHandler(object):
 
     def __init__(self, application):
         self.application = application
-        self.log = logging.getLogger(__name__)
 
     def __call__(self, env, start_response):
         (work_dir, samba_host, cookie_name, has_auth) \
@@ -572,11 +555,12 @@ class NTLMAuthHandler(object):
         if cookie_name in cookies:
             client_id = cookies[cookie_name]
             server_knows_client = connection.server_knows_client(client_id)
-            self.log.debug("server knows client (pid: %d): %s", getpid(),
-                           str(server_knows_client))
+            # print >> sys.stderr, \
+                # "server knows client (pid: %d): %s" % (getpid(),
+            # str(server_knows_client))
         else:
             server_knows_client = False
-            self.log.info("client did not pass auth cookie")
+            # print >> sys.stderr, "client did not pass auth cookie"
 
         if has_auth:
             auth = env["HTTP_AUTHORIZATION"]
@@ -622,7 +606,6 @@ class NTLMAuthHandler(object):
 
     @staticmethod
     def _read_environment(env):
-        log = logging.getLogger(__name__)
         if "NTLMAUTHHANDLER_WORKDIR" in env:
             work_dir = env["NTLMAUTHHANDLER_WORKDIR"]
             if not exists(work_dir):
@@ -636,8 +619,8 @@ class NTLMAuthHandler(object):
         if "SAMBA_HOST" in env:
             samba_host = env["SAMBA_HOST"]
         else:
-            log.warning("'SAMBA_HOST' not configured, "
-                "'localhost' will be used")
+            print >> sys.stderr, \
+                "'SAMBA_HOST' not configured, 'localhost' will be used"
             samba_host = "localhost"
 
         if "NTLMAUTHHANDLER_COOKIENAME" in env:
@@ -655,7 +638,7 @@ class NTLMAuthHandler(object):
         if "HTTP_COOKIE" in env:
             cookie_str = env["HTTP_COOKIE"]
             for pair in cookie_str.split(";"):
-                (key, value) = pair.strip().split("=", 1)
+                (key, value) = pair.strip().split("=")
                 cookies[key] = value
 
         return cookies
@@ -664,7 +647,7 @@ class NTLMAuthHandler(object):
     def _in_progress_response(start_response, ntlm_data=None,
                               client_id=None, cookie_name=None):
         status = "401 %s" % httplib.responses[401]
-        content = "More data needed...\r\n"
+        content = "More data needed..."
         headers = [("Content-Type", "text/plain"),
                    ("Content-Length", "%d" % len(content))]
         if ntlm_data is None:

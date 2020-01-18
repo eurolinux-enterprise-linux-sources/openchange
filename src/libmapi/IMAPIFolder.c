@@ -108,9 +108,6 @@ _PUBLIC_ enum MAPISTATUS CreateMessage(mapi_object_t *obj_folder, mapi_object_t 
 	mapi_object_set_session(obj_message, session);
 	mapi_object_set_handle(obj_message, mapi_response->handles[1]);
 	mapi_object_set_logon_id(obj_message, logon_id);
-	if (mapi_response->mapi_repl->u.mapi_CreateMessage.HasMessageId) {
-		mapi_object_set_id(obj_message, mapi_response->mapi_repl->u.mapi_CreateMessage.MessageId.MessageId);
-	}
 
 	talloc_free(mapi_response);
 	talloc_free(mem_ctx);
@@ -863,8 +860,7 @@ _PUBLIC_ enum MAPISTATUS DeleteFolder(mapi_object_t *obj_parent,
 	OPENCHANGE_RETVAL_IF(!session, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF((!(DeleteFolderFlags & 0x1)) &&
 			     (!(DeleteFolderFlags & 0x4)) &&
-			     (!(DeleteFolderFlags & 0x10)) &&
-			     DeleteFolderFlags,
+			     (!(DeleteFolderFlags & 0x10)), 
 			     MAPI_E_INVALID_PARAMETER, NULL);
 
 	if ((retval = mapi_object_get_logon_id(obj_parent, &logon_id)) != MAPI_E_SUCCESS)

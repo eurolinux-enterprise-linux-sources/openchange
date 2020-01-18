@@ -60,7 +60,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSetColumns(TALLOC_CTX *mem_ctx,
 	void				*data = NULL;
 	uint32_t			handle;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCTABL] SetColumns (0x12)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCTABL] SetColumns (0x12)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -81,14 +81,14 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSetColumns(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
 	retval = mapi_handles_get_private_data(parent, &data);
 	if (retval) {
 		mapi_repl->error_code = retval;
-		OC_DEBUG(5, "  handle data not found, idx = %x\n", mapi_req->handle_idx);
+		DEBUG(5, ("  handle data not found, idx = %x\n", mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -99,7 +99,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSetColumns(TALLOC_CTX *mem_ctx,
 		OPENCHANGE_RETVAL_IF(!table, MAPI_E_INVALID_PARAMETER, NULL);
 
 		if (table->ulType == MAPISTORE_RULE_TABLE) {
-			OC_DEBUG(5, "  query on rules table are all faked right now\n");
+			DEBUG(5, ("  query on rules table are all faked right now\n"));
 			goto end;
 		}
 
@@ -110,12 +110,12 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSetColumns(TALLOC_CTX *mem_ctx,
 			table->properties = talloc_memdup(table, request.properties, 
 							  request.prop_count * sizeof (uint32_t));
                         if (emsmdbp_is_mapistore(object)) {
-				OC_DEBUG(5, "object: %p, backend_object: %p\n", object, object->backend_object);
+				DEBUG(5, ("[%s] object: %p, backend_object: %p\n", __FUNCTION__, object, object->backend_object));
 				mapistore_table_set_columns(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object),
 							    object->backend_object, request.prop_count, request.properties);
                         } else {
 				/* openchangedb case */
-				OC_DEBUG(5, "object: Setting Columns on openchangedb table\n");
+				DEBUG(5, ("[%s] object: Setting Columns on openchangedb table\n", __FUNCTION__));
 			}
 		}
 	}
@@ -147,7 +147,6 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSortTable(TALLOC_CTX *mem_ctx,
 					      uint32_t *handles, uint16_t *size)
 {
 	enum MAPISTATUS			retval;
-	enum mapistore_error		mretval;
 	struct mapi_handles		*parent;
 	struct emsmdbp_object		*object;
 	struct emsmdbp_object_table	*table;
@@ -156,7 +155,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSortTable(TALLOC_CTX *mem_ctx,
 	void				*data = NULL;
 	uint8_t				status;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCTABL] SortTable (0x13)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCTABL] SortTable (0x13)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -171,23 +170,23 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSortTable(TALLOC_CTX *mem_ctx,
 	mapi_repl->u.mapi_SortTable.TableStatus = TBLSTAT_COMPLETE;
 
 	if ((mapi_req->u.mapi_SortTable.SortTableFlags & TBL_ASYNC)) {
-		OC_DEBUG(5, "  requested async operation -> failure\n");
-		mapi_repl->error_code = MAPI_E_UNKNOWN_FLAGS;
-		goto end;
-	}
+                DEBUG(5, ("  requested async operation -> failure\n"));
+                mapi_repl->error_code = MAPI_E_UNKNOWN_FLAGS;
+                goto end;
+        }
 
 	handle = handles[mapi_req->handle_idx];
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
 	retval = mapi_handles_get_private_data(parent, &data);
 	if (retval) {
 		mapi_repl->error_code = retval;
-		OC_DEBUG(5, "  handle data not found, idx = %x\n", mapi_req->handle_idx);
+		DEBUG(5, ("  handle data not found, idx = %x\n", mapi_req->handle_idx));
 		goto end;
 	}
 	object = (struct emsmdbp_object *) data;
@@ -195,7 +194,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSortTable(TALLOC_CTX *mem_ctx,
 	/* Ensure referring object exists and is a table */
 	if (!object || (object->type != EMSMDBP_OBJECT_TABLE)) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  missing object or not table\n");
+		DEBUG(5, ("  missing object or not table\n"));
 		goto end;
 	}
 
@@ -205,7 +204,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSortTable(TALLOC_CTX *mem_ctx,
 	if (table->ulType != MAPISTORE_MESSAGE_TABLE
             && table->ulType != MAPISTORE_FAI_TABLE) {
 		mapi_repl->error_code = MAPI_E_NO_SUPPORT;
-		OC_DEBUG(5, "  query performed on non contents table\n");
+		DEBUG(5, ("  query performed on non contents table\n"));
 		goto end;
 	}
 
@@ -220,9 +219,9 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSortTable(TALLOC_CTX *mem_ctx,
 	request = &mapi_req->u.mapi_SortTable;
 	if (emsmdbp_is_mapistore(object)) {
 		status = TBLSTAT_COMPLETE;
-		mretval = mapistore_table_set_sort_order(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object), object->backend_object, &request->lpSortCriteria, &status);
-                if (mretval) {
-			mapi_repl->error_code = mapistore_error_to_mapi(mretval);
+		retval = mapistore_table_set_sort_order(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object), object->backend_object, &request->lpSortCriteria, &status);
+                if (retval) {
+			mapi_repl->error_code = retval;
 			goto end;
 		}
 		mapi_repl->u.mapi_SortTable.TableStatus = status;
@@ -230,7 +229,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSortTable(TALLOC_CTX *mem_ctx,
 		/* Parent folder doesn't have any mapistore context associated */
 		status = TBLSTAT_COMPLETE;
 		mapi_repl->u.mapi_SortTable.TableStatus = status;
-		retval = openchangedb_table_set_sort_order(emsmdbp_ctx->oc_ctx, object->backend_object, &request->lpSortCriteria);
+		retval = openchangedb_table_set_sort_order(object->backend_object, &request->lpSortCriteria);
 		if (retval) {
 			mapi_repl->error_code = retval;
 			goto end;
@@ -265,7 +264,6 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopRestrict(TALLOC_CTX *mem_ctx,
 					     uint32_t *handles, uint16_t *size)
 {
 	enum MAPISTATUS			retval;
-	enum mapistore_error		mretval;
 	struct mapi_handles		*parent;
 	struct emsmdbp_object		*object;
 	struct emsmdbp_object_table	*table;
@@ -274,7 +272,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopRestrict(TALLOC_CTX *mem_ctx,
 	void				*data = NULL;
 	uint8_t				status;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCTABL] Restrict (0x14)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCTABL] Restrict (0x14)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -294,14 +292,14 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopRestrict(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
 	retval = mapi_handles_get_private_data(parent, &data);
 	if (retval) {
 		mapi_repl->error_code = retval;
-		OC_DEBUG(5, "  handle data not found, idx = %x\n", mapi_req->handle_idx);
+		DEBUG(5, ("  handle data not found, idx = %x\n", mapi_req->handle_idx));
 		goto end;
 	}
 	object = (struct emsmdbp_object *) data;
@@ -309,7 +307,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopRestrict(TALLOC_CTX *mem_ctx,
 	/* Ensure referring object exists and is a table */
 	if (!object || (object->type != EMSMDBP_OBJECT_TABLE)) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  missing object or not table\n");
+		DEBUG(5, ("  missing object or not table\n"));
 		goto end;
 	}
 
@@ -318,7 +316,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopRestrict(TALLOC_CTX *mem_ctx,
 
 	table->restricted = true;
 	if (table->ulType == MAPISTORE_RULE_TABLE) {
-		OC_DEBUG(5, "  query on rules table are all faked right now\n");
+		DEBUG(5, ("  query on rules table are all faked right now\n"));
 		goto end;
 	}
  
@@ -326,20 +324,19 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopRestrict(TALLOC_CTX *mem_ctx,
 	if (emsmdbp_is_mapistore(object)) {
 		status = TBLSTAT_COMPLETE;
 		contextID = emsmdbp_get_contextID(object);
-		mretval = mapistore_table_set_restrictions(emsmdbp_ctx->mstore_ctx, contextID, object->backend_object, &request.restrictions, &status);
-                if (mretval) {
-                        mapi_repl->error_code = (enum MAPISTATUS) mretval;
+		retval = mapistore_table_set_restrictions(emsmdbp_ctx->mstore_ctx, contextID, object->backend_object, &request.restrictions, &status);
+                if (retval) {
+                        mapi_repl->error_code = retval;
 			goto end;
 		}
 
-		table->numerator = 0;
 		mapistore_table_get_row_count(emsmdbp_ctx->mstore_ctx, contextID, object->backend_object, MAPISTORE_PREFILTERED_QUERY, &object->object.table->denominator);
-
+		
 		mapi_repl->u.mapi_Restrict.TableStatus = status;
 
 		/* Parent folder doesn't have any mapistore context associated */
 	} else {
-		OC_DEBUG(0, "not mapistore Restrict: Not implemented yet\n");
+		DEBUG(0, ("not mapistore Restrict: Not implemented yet\n"));
 		goto end;
 	}
 
@@ -376,15 +373,12 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopQueryRows(TALLOC_CTX *mem_ctx,
 	enum MAPISTATUS			retval;
 	void				*data;
 	enum MAPISTATUS			*retvals;
-	enum mapistore_error		mretval;
-	uint64_t			folderID;
 	void				**data_pointers;
-	uint32_t			count;
+	uint32_t			count, max;
 	uint32_t			handle;
-	uint16_t			flags = 0;
-	int64_t			        i = 0, end;
+	uint32_t			i = 0;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCTABL] QueryRows (0x15)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCTABL] QueryRows (0x15)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -406,13 +400,13 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopQueryRows(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
 	retval = mapi_handles_get_private_data(parent, &data);
 	if (retval) {
-		OC_DEBUG(5, "  handle data not found, idx = %x\n", mapi_req->handle_idx);
+		DEBUG(5, ("  handle data not found, idx = %x\n", mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -420,11 +414,11 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopQueryRows(TALLOC_CTX *mem_ctx,
 
 	/* Ensure referring object exists and is a table */
 	if (!object) {
-		OC_DEBUG(5, "  missing object\n");
+		DEBUG(5, ("  missing object\n"));
 		goto end;
 	}
 	if (object->type != EMSMDBP_OBJECT_TABLE) {
-		OC_DEBUG(5, "  unhandled object type: %d\n", object->type);
+		DEBUG(5, ("  unhandled object type: %d\n", object->type));
 		goto end;
 	}
 
@@ -432,79 +426,48 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopQueryRows(TALLOC_CTX *mem_ctx,
 
 	count = 0;
 	if (table->ulType == MAPISTORE_RULE_TABLE) {
-		OC_DEBUG(5, "  query on rules table are all faked right now\n");
+		DEBUG(5, ("  query on rules table are all faked right now\n"));
 		goto finish;
 	}
 
-	/* Lookup the properties */
-	if (request->ForwardRead) {
-		end = table->numerator + request->RowCount;
-		if (end > table->denominator) {
-			end = table->denominator;
-		}
-	} else {
-		if (table->numerator < request->RowCount) {
-			end = -1;
-		} else {
-			end = table->numerator - request->RowCount;
-		}
+	/* Ensure we are in a case which we can handle, until the featureset is complete. */
+	if (!request->ForwardRead) {
+		DEBUG(0, ("  !ForwardRead is not supported yet\n"));
+		abort();
 	}
 
-	if (table->flags & TableFlags_Depth) {
-		struct SPropTagArray		SPropTagArray;
-
-		SPropTagArray.cValues = table->prop_count;
-		SPropTagArray.aulPropTag = table->properties;
-
-		switch (table->numerator) {
-		case 0x0:
-			count = 0;
-			retval = emsmdbp_object_table_get_recursive_row_props(mem_ctx, emsmdbp_ctx, object, &response->RowData,
-									      &SPropTagArray, 0, &end, &count);
-			if (retval != MAPI_E_SUCCESS) {
-				OC_DEBUG(OC_LOG_WARNING, "Unable to retrieve recursive folder rows");
-				count = 0;
-			}
-			break;
-		default:
-			OC_DEBUG(OC_LOG_WARNING, "Can not move cursor with Depth flag enabled");
-			count = 0;
-			break;
+        /* Lookup the properties */
+	max = table->numerator + request->RowCount;
+	if (max > table->denominator) {
+		max = table->denominator;
+	}
+        for (i = table->numerator; i < max; i++) {
+		data_pointers = emsmdbp_object_table_get_row_props(mem_ctx, emsmdbp_ctx, object, i, MAPISTORE_PREFILTERED_QUERY, &retvals);
+		if (data_pointers) {
+			emsmdbp_fill_table_row_blob(mem_ctx, emsmdbp_ctx,
+						    &response->RowData, table->prop_count,
+						    table->properties, data_pointers, retvals);
+			talloc_free(retvals);
+			talloc_free(data_pointers);
+			count++;
 		}
-	} else {
-		i = table->numerator;
-		while (i != end) {
-			data_pointers = emsmdbp_object_table_get_row_props(mem_ctx, emsmdbp_ctx, object, i, MAPISTORE_PREFILTERED_QUERY, &retvals);
-			if (data_pointers) {
-				emsmdbp_fill_table_row_blob(mem_ctx, emsmdbp_ctx,
-							    &response->RowData, table->prop_count,
-							    table->properties, data_pointers, retvals);
-				talloc_free(retvals);
-				talloc_free(data_pointers);
-				count++;
-			} else {
-				count = 0;
-				goto finish;
-			}
-			i = (request->ForwardRead) ? i + 1 : i - 1;
+		else {
+			count = 0;
+			goto finish;
 		}
 	}
 
 finish:
 	if ((request->QueryRowsFlags & TBL_NOADVANCE) != TBL_NOADVANCE) {
-		table->numerator = (i < 0) ? 0 : i;
+		table->numerator = i;
 	}
 
 	/* QueryRows reply parameters */
 	mapi_repl->error_code = MAPI_E_SUCCESS;
 	response->RowCount = count;
 	if (count) {
-		if (count < request->RowCount) {
-			response->Origin = (request->ForwardRead) ? BOOKMARK_END : BOOKMARK_BEGINNING;
-		} else if (table->numerator > (table->denominator - 2)) {
+		if ((count < request->RowCount) || (table->numerator > (table->denominator - 2))) {
 			response->Origin = BOOKMARK_END;
-		} else if (i < 0) {
-			response->Origin = BOOKMARK_BEGINNING;
 		} else {
 			response->Origin = BOOKMARK_CURRENT;
 		}
@@ -512,45 +475,14 @@ finish:
 	} else {
 		/* useless code for the moment */
 		if (table->restricted) {
-			response->Origin = BOOKMARK_BEGINNING;
+			response->Origin = BOOKMARK_BEGINNING;	
 		}
 		else {
-			response->Origin = (request->ForwardRead) ? BOOKMARK_END : BOOKMARK_BEGINNING;
+			response->Origin = BOOKMARK_END;
 		}
 		response->RowData.length = 0;
 		response->RowData.data = NULL;
-		OC_DEBUG(5, "returning empty data set\n");
-	}
-
-	/* Add notification TableModified subscription */
-	switch (object->parent_object->type) {
-	case EMSMDBP_OBJECT_MAILBOX:
-		if (table->flags & TableFlags_Depth) {
-			/* FIXME: This statement is partially incorrect. TableFlags_Depth triggers
-			 * TableModified notification for every child's table object created underneath,
-			 * while WholeStore implies everything beneath and underneath.
-			 */
-			flags = 0x1;
-		}
-		folderID = object->parent_object->object.mailbox->folderID;
-		break;
-	case EMSMDBP_OBJECT_FOLDER:
-		folderID = object->parent_object->object.folder->folderID;
-		break;
-	default:
-		folderID = 0;
-		break;
-	}
-	if (folderID) {
-		flags |= fnevTableModified;
-		mretval = mapistore_notification_subscription_add(emsmdbp_ctx->mstore_ctx, emsmdbp_ctx->session_uuid,
-								  handle, flags, folderID, 0, table->prop_count,
-								  table->properties);
-		if (mretval != MAPISTORE_SUCCESS) {
-			OC_DEBUG(0, "Failed to add subscription");
-		} else {
-			table->subscription = true;
-		}
+		DEBUG(5, ("%s: returning empty data set\n", __location__));
 	}
 
 end:
@@ -586,7 +518,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopQueryPosition(TALLOC_CTX *mem_ctx,
 	void				*data;
 	uint32_t			handle;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCTABL] QueryPosition (0x17)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCTABL] QueryPosition (0x17)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -603,20 +535,20 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopQueryPosition(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
 	retval = mapi_handles_get_private_data(parent, &data);
 	if (retval) {
-		OC_DEBUG(5, "  no private data or object is not a table");
+		DEBUG(5, ("  no private data or object is not a table"));
 		goto end;
 	}
 	object = (struct emsmdbp_object *) data;
 
 	/* Ensure object exists and is table type */
 	if (!object || (object->type != EMSMDBP_OBJECT_TABLE)) {
-		OC_DEBUG(5, "  no object or object is not a table\n");
+		DEBUG(5, ("  no object or object is not a table\n"));
 		goto end;
 	}
 
@@ -658,9 +590,9 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSeekRow(TALLOC_CTX *mem_ctx,
 	struct emsmdbp_object		*object;
 	struct emsmdbp_object_table	*table;
 	void				*data;
-	int32_t                         next_position;
+        int32_t                         next_position;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCTABL] SeekRow (0x18)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCTABL] SeekRow (0x18)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -679,14 +611,14 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSeekRow(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
 	retval = mapi_handles_get_private_data(parent, &data);
 	if (retval) {
 		mapi_repl->error_code = retval;
-		OC_DEBUG(5, "  handle data not found, idx = %x\n", mapi_req->handle_idx);
+		DEBUG(5, ("  handle data not found, idx = %x\n", mapi_req->handle_idx));
 		goto end;
 	}
 	object = (struct emsmdbp_object *) data;
@@ -694,7 +626,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSeekRow(TALLOC_CTX *mem_ctx,
 	/* Ensure object exists and is table type */
 	if (!object || (object->type != EMSMDBP_OBJECT_TABLE)) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  no object or object is not a table\n");
+		DEBUG(5, ("  no object or object is not a table\n"));
 		goto end;
 	}
 
@@ -714,26 +646,26 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopSeekRow(TALLOC_CTX *mem_ctx,
 	else {
                 next_position = 0;
 		mapi_repl->error_code = MAPI_E_NOT_FOUND;
-		OC_DEBUG(5, "  unhandled 'origin' type: %d\n", mapi_req->u.mapi_SeekRow.origin);
+		DEBUG(5, ("  unhandled 'origin' type: %d\n", mapi_req->u.mapi_SeekRow.origin));
 	}
 
-	if (mapi_repl->error_code == MAPI_E_SUCCESS) {
-		if (next_position < 0) {
-			next_position = 0;
-			mapi_repl->u.mapi_SeekRow.HasSoughtLess = 1;
-		}
-		else if (next_position >= table->denominator) {
-			next_position = table->denominator - 1;
-			mapi_repl->u.mapi_SeekRow.HasSoughtLess = 1;
-		}
-		if (mapi_req->u.mapi_SeekRow.WantRowMovedCount) {
-			mapi_repl->u.mapi_SeekRow.RowsSought = (next_position - table->numerator);
-		}
-		else {
-			mapi_repl->u.mapi_SeekRow.RowsSought = 0;
-		}
-		table->numerator = next_position;
-	}
+        if (mapi_repl->error_code == MAPI_E_SUCCESS) {
+                if (next_position < 0) {
+                        next_position = 0;
+                        mapi_repl->u.mapi_SeekRow.HasSoughtLess = 1;
+                }
+                else if (next_position >= table->denominator) {
+                        next_position = table->denominator - 1;
+                        mapi_repl->u.mapi_SeekRow.HasSoughtLess = 1;
+                }
+                if (mapi_req->u.mapi_SeekRow.WantRowMovedCount) {
+                        mapi_repl->u.mapi_SeekRow.RowsSought = (next_position - table->numerator);
+                }
+                else {
+                        mapi_repl->u.mapi_SeekRow.RowsSought = 0;
+                }
+                table->numerator = next_position;
+        }
 
 end:
 	*size += libmapiserver_RopSeekRow_size(mapi_repl);
@@ -766,7 +698,6 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopFindRow(TALLOC_CTX *mem_ctx,
 	struct emsmdbp_object_table	*table;
 	struct FindRow_req		request;
 	enum MAPISTATUS			retval;
-	enum mapistore_error		mretval;
 	void				*data = NULL;
 	enum MAPISTATUS			*retvals;
 	void				**data_pointers;
@@ -778,7 +709,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopFindRow(TALLOC_CTX *mem_ctx,
 	uint32_t			i;
 	bool				found = false;
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCTABL] FindRow (0x4f)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCTABL] FindRow (0x4f)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -788,7 +719,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopFindRow(TALLOC_CTX *mem_ctx,
 	OPENCHANGE_RETVAL_IF(!size, MAPI_E_INVALID_PARAMETER, NULL);
 
 	request = mapi_req->u.mapi_FindRow;
-
+	
 	mapi_repl->opnum = mapi_req->opnum;
 	mapi_repl->handle_idx = mapi_req->handle_idx;
 	mapi_repl->error_code = MAPI_E_SUCCESS;
@@ -801,14 +732,14 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopFindRow(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
 	retval = mapi_handles_get_private_data(parent, &data);
 	if (retval) {
 		mapi_repl->error_code = retval;
-		OC_DEBUG(5, "  handle data not found, idx = %x\n", mapi_req->handle_idx);
+		DEBUG(5, ("  handle data not found, idx = %x\n", mapi_req->handle_idx));
 		goto end;
 	}
 	object = (struct emsmdbp_object *) data;
@@ -816,7 +747,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopFindRow(TALLOC_CTX *mem_ctx,
 	/* Ensure object exists and is table type */
 	if (!object || (object->type != EMSMDBP_OBJECT_TABLE)) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  no object or object is not a table\n");
+		DEBUG(5, ("  no object or object is not a table\n"));
 		goto end;
 	}
 
@@ -825,7 +756,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopFindRow(TALLOC_CTX *mem_ctx,
 
 	table = object->object.table;
 	if (table->ulType == MAPISTORE_RULE_TABLE) {
-		OC_DEBUG(5, "  query on rules table are all faked right now\n");
+		DEBUG(5, ("  query on rules table are all faked right now\n"));
 		goto end;
 	}
 
@@ -833,19 +764,16 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopFindRow(TALLOC_CTX *mem_ctx,
 		table->numerator = 0;
 	}
 	if (mapi_req->u.mapi_FindRow.ulFlags == DIR_BACKWARD) {
-		OC_DEBUG(5, "  only DIR_FORWARD is supported right now, using work-around\n");
+		DEBUG(5, ("  only DIR_FORWARD is supported right now, using work-around\n"));
 		table->numerator = 0;
 	}
 
 	memset (&row, 0, sizeof(DATA_BLOB));
 
-	switch ((int)emsmdbp_is_mapistore(object)) {
+	switch (emsmdbp_is_mapistore(object)) {
 	case true:
 		/* Restrict rows to be fetched */
-		mretval = mapistore_table_set_restrictions(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object), object->backend_object, &request.res, &status);
-		if (mretval != MAPISTORE_SUCCESS) {
-			OC_DEBUG(5, "mapistore_table_set_restrictions: %s\n", mapistore_errstr(mretval));
-		}
+		retval = mapistore_table_set_restrictions(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object), object->backend_object, &request.res, &status);
 		/* Then fetch rows */
 		/* Lookup the properties and check if we need to flag the PropertyRow blob */
 
@@ -896,10 +824,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopFindRow(TALLOC_CTX *mem_ctx,
 			}
 		}
 
-		mretval = mapistore_table_set_restrictions(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object), object->backend_object, NULL, &status);
-		if (mretval != MAPISTORE_SUCCESS) {
-			OC_DEBUG(5, "mapistore_table_set_restrictions: %s\n", mapistore_errstr(mretval));
-		}
+		retval = mapistore_table_set_restrictions(emsmdbp_ctx->mstore_ctx, emsmdbp_get_contextID(object), object->backend_object, NULL, &status);
 
 		/* Adjust parameters */
 		if (found) {
@@ -914,9 +839,10 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopFindRow(TALLOC_CTX *mem_ctx,
 
 		break;
 	case false:
-		OC_DEBUG(0, "FindRow for openchangedb\n");
+		memset (&row, 0, sizeof(DATA_BLOB));
+		DEBUG(0, ("FindRow for openchangedb\n"));
 		/* Restrict rows to be fetched */
-		retval = openchangedb_table_set_restrictions(emsmdbp_ctx->oc_ctx, object->backend_object, &request.res);
+		retval = openchangedb_table_set_restrictions(object->backend_object, &request.res);
 		/* Then fetch rows */
 		/* Lookup the properties and check if we need to flag the PropertyRow blob */
 		while (!found && table->numerator < table->denominator) {
@@ -965,7 +891,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopFindRow(TALLOC_CTX *mem_ctx,
 			}
 		}
 		/* Reset restrictions */
-		openchangedb_table_set_restrictions(emsmdbp_ctx->oc_ctx, object->backend_object, NULL);
+		openchangedb_table_set_restrictions(object->backend_object, NULL);
 
 		/* Adjust parameters */
 		if (found) {
@@ -1011,7 +937,6 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopResetTable(TALLOC_CTX *mem_ctx,
 					       uint32_t *handles, uint16_t *size)
 {
 	enum MAPISTATUS			retval;
-	enum mapistore_error		mretval;
 	struct mapi_handles		*parent;
 	struct emsmdbp_object		*object;
 	struct emsmdbp_object_table	*table;
@@ -1019,7 +944,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopResetTable(TALLOC_CTX *mem_ctx,
 	uint32_t			handle, contextID;
 	uint8_t				status; /* ignored */
 
-	OC_DEBUG(4, "exchange_emsmdb: [OXCTABL] ResetTable (0x81)\n");
+	DEBUG(4, ("exchange_emsmdb: [OXCTABL] ResetTable (0x81)\n"));
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
@@ -1037,14 +962,14 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopResetTable(TALLOC_CTX *mem_ctx,
 	retval = mapi_handles_search(emsmdbp_ctx->handles_ctx, handle, &parent);
 	if (retval) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  handle (%x) not found: %x\n", handle, mapi_req->handle_idx);
+		DEBUG(5, ("  handle (%x) not found: %x\n", handle, mapi_req->handle_idx));
 		goto end;
 	}
 
 	retval = mapi_handles_get_private_data(parent, &data);
 	if (retval) {
 		mapi_repl->error_code = retval;
-		OC_DEBUG(5, "  handle data not found, idx = %x\n", mapi_req->handle_idx);
+		DEBUG(5, ("  handle data not found, idx = %x\n", mapi_req->handle_idx));
 		goto end;
 	}
 
@@ -1052,7 +977,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopResetTable(TALLOC_CTX *mem_ctx,
 	/* Ensure referring object exists and is a table */
 	if (!object || (object->type != EMSMDBP_OBJECT_TABLE)) {
 		mapi_repl->error_code = MAPI_E_INVALID_OBJECT;
-		OC_DEBUG(5, "  missing object or not table\n");
+		DEBUG(5, ("  missing object or not table\n"));
 		goto end;
 	}
 
@@ -1060,7 +985,7 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopResetTable(TALLOC_CTX *mem_ctx,
 
 	table = object->object.table;
 	if (table->ulType == MAPISTORE_RULE_TABLE) {
-		OC_DEBUG(5, "  query on rules table are all faked right now\n");
+		DEBUG(5, ("  query on rules table are all faked right now\n"));
 	}
 	else {
 		/* 1.1. removes the existing column set */
@@ -1073,13 +998,10 @@ _PUBLIC_ enum MAPISTATUS EcDoRpc_RopResetTable(TALLOC_CTX *mem_ctx,
 		/* 1.2. empty restrictions */
 		if (emsmdbp_is_mapistore(object)) {
 			contextID = emsmdbp_get_contextID(object);
-			mretval = mapistore_table_set_restrictions(emsmdbp_ctx->mstore_ctx, contextID, object->backend_object, NULL, &status);
-			if (mretval != MAPISTORE_SUCCESS) {
-				OC_DEBUG(5, "mapistore_table_set_restrictions: %s\n", mapistore_errstr(mretval));
-			}
+			retval = mapistore_table_set_restrictions(emsmdbp_ctx->mstore_ctx, contextID, object->backend_object, NULL, &status);
 			mapistore_table_get_row_count(emsmdbp_ctx->mstore_ctx, contextID, object->backend_object, MAPISTORE_PREFILTERED_QUERY, &object->object.table->denominator);
 		} else {
-			OC_DEBUG(0, "  mapistore Restrict: Not implemented yet\n");
+			DEBUG(0, ("  mapistore Restrict: Not implemented yet\n"));
 			goto end;
 		}
 

@@ -3,7 +3,7 @@
 
    EMSMDBP: EMSMDB Provider implementation
 
-   Copyright (C) Julien Kerihuel 2009-2014
+   Copyright (C) Julien Kerihuel 2009
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -29,18 +29,8 @@
 #include "mapiproxy/dcesrv_mapiproxy.h"
 #include "dcesrv_exchange_emsmdb.h"
 #include "mapiproxy/libmapiserver/libmapiserver.h"
-#include "mapiproxy/libmapiproxy/fault_util.h"
 
 #include <ldap_ndr.h>
-
-/* Expose samdb_connect prototype */
-struct ldb_context *samdb_connect(TALLOC_CTX *, struct tevent_context *,
-				  struct loadparm_context *,
-				  struct auth_session_info *,
-				  unsigned int);
-
-/* Single connection to samdb */
-static struct ldb_context *samdb_ctx = NULL;
 
 static struct GUID MagicGUID = {
 	.time_low = 0xbeefface,
@@ -50,41 +40,6 @@ static struct GUID MagicGUID = {
 	.node = { 0xde, 0xad, 0xfa, 0xce, 0xca, 0xfe }
 };
 const struct GUID *const MagicGUIDp = &MagicGUID;
-
-/**
-   \details Initialize ldb_context to samdb, creates one for all emsmdbp
-   contexts
-
-   \param lp_ctx pointer to the loadparm context
- */
-static struct ldb_context *samdb_init(struct loadparm_context *lp_ctx)
-{
-	TALLOC_CTX		*mem_ctx;
-	struct tevent_context	*ev;
-	const char		*samdb_url;
-
-	if (samdb_ctx) return samdb_ctx;
-
-	mem_ctx = talloc_autofree_context();
-	ev = tevent_context_init(mem_ctx);
-	if (!ev) {
-		OC_PANIC(false, ("Fail to initialize tevent_context\n"));
-		return NULL;
-	}
-	tevent_loop_allow_nesting(ev);
-
-	/* Retrieve samdb url (local or external) */
-	samdb_url = lpcfg_parm_string(lp_ctx, NULL, "dcerpc_mapiproxy", "samdb_url");
-
-	if (!samdb_url) {
-		samdb_ctx = samdb_connect(mem_ctx, ev, lp_ctx, system_session(lp_ctx), 0);
-	} else {
-		samdb_ctx = samdb_connect_url(mem_ctx, ev, lp_ctx, system_session(lp_ctx),
-					      LDB_FLG_RECONNECT, samdb_url);
-	}
-
-	return samdb_ctx;
-}
 
 /**
    \details Release the MAPISTORE context used by EMSMDB provider
@@ -99,7 +54,7 @@ static int emsmdbp_mapi_store_destructor(void *data)
 	struct mapistore_context *mstore_ctx = (struct mapistore_context *) data;
 
 	mapistore_release(mstore_ctx);
-	OC_DEBUG(6, "MAPISTORE context released\n");
+	DEBUG(6, ("[%s:%d]: MAPISTORE context released\n", __FUNCTION__, __LINE__));
 	return true;
 }
 
@@ -117,7 +72,8 @@ static int emsmdbp_mapi_handles_destructor(void *data)
 	struct mapi_handles_context	*handles_ctx = (struct mapi_handles_context *) data;
 
 	retval = mapi_handles_release(handles_ctx);
-	OC_DEBUG(6, "MAPI handles context released (%s)\n", mapi_get_errstr(retval));
+	DEBUG(6, ("[%s:%d]: MAPI handles context released (%s)\n", __FUNCTION__, __LINE__,
+		  mapi_get_errstr(retval)));
 
 	return (retval == MAPI_E_SUCCESS) ? 0 : -1;
 }
@@ -129,16 +85,17 @@ static int emsmdbp_mapi_handles_destructor(void *data)
    \param lp_ctx pointer to the loadparm_context
    \param username account name for current session
    \param ldb_ctx pointer to the openchange dispatcher ldb database
-
+   
    \return Allocated emsmdbp_context pointer on success, otherwise
    NULL
  */
 _PUBLIC_ struct emsmdbp_context *emsmdbp_init(struct loadparm_context *lp_ctx,
 					      const char *username,
-					      void *oc_ctx)
+					      void *ldb_ctx)
 {
 	TALLOC_CTX		*mem_ctx;
 	struct emsmdbp_context	*emsmdbp_ctx;
+	struct tevent_context	*ev;
 	enum mapistore_error	ret;
 
 	/* Sanity Checks */
@@ -154,30 +111,39 @@ _PUBLIC_ struct emsmdbp_context *emsmdbp_init(struct loadparm_context *lp_ctx,
 
 	emsmdbp_ctx->mem_ctx = mem_ctx;
 
+	ev = tevent_context_init(mem_ctx);
+	if (!ev) {
+		talloc_free(mem_ctx);
+		return NULL;
+	}
+	tevent_loop_allow_nesting(ev); 
+
 	/* Save a pointer to the loadparm context */
 	emsmdbp_ctx->lp_ctx = lp_ctx;
 
-	emsmdbp_ctx->samdb_ctx = samdb_init(lp_ctx);
+	/* return an opaque context pointer on samDB database */
+	emsmdbp_ctx->samdb_ctx = samdb_connect(mem_ctx, ev, lp_ctx, system_session(lp_ctx), 0);
 	if (!emsmdbp_ctx->samdb_ctx) {
 		talloc_free(mem_ctx);
-		OC_DEBUG(0, "Connection to \"sam.ldb\" failed\n");
+		DEBUG(0, ("[%s:%d]: Connection to \"sam.ldb\" failed\n", __FUNCTION__, __LINE__));
 		return NULL;
 	}
 
 	/* Reference global OpenChange dispatcher database pointer within current context */
-	emsmdbp_ctx->oc_ctx = oc_ctx;
+	emsmdbp_ctx->oc_ctx = ldb_ctx;
 
-	/* Initialize the mapistore context */
+	/* Initialize the mapistore context */		
 	emsmdbp_ctx->mstore_ctx = mapistore_init(mem_ctx, lp_ctx, NULL);
 	if (!emsmdbp_ctx->mstore_ctx) {
-		OC_DEBUG(0, "MAPISTORE initialization failed\n");
+		DEBUG(0, ("[%s:%d]: MAPISTORE initialization failed\n", __FUNCTION__, __LINE__));
+
 		talloc_free(mem_ctx);
 		return NULL;
 	}
 
 	ret = mapistore_set_connection_info(emsmdbp_ctx->mstore_ctx, emsmdbp_ctx->samdb_ctx, emsmdbp_ctx->oc_ctx, username);
 	if (ret != MAPISTORE_SUCCESS) {
-		OC_DEBUG(0, "MAPISTORE connection info initialization failed\n");
+		DEBUG(0, ("[%s:%d]: MAPISTORE connection info initialization failed\n", __FUNCTION__, __LINE__));
 		talloc_free(mem_ctx);
 		return NULL;
 	}
@@ -186,7 +152,7 @@ _PUBLIC_ struct emsmdbp_context *emsmdbp_init(struct loadparm_context *lp_ctx,
 	/* Initialize MAPI handles context */
 	emsmdbp_ctx->handles_ctx = mapi_handles_init(mem_ctx);
 	if (!emsmdbp_ctx->handles_ctx) {
-		OC_DEBUG(0, "MAPI handles context initialization failed\n");
+		DEBUG(0, ("[%s:%d]: MAPI handles context initialization failed\n", __FUNCTION__, __LINE__));
 		talloc_free(mem_ctx);
 		return NULL;
 	}
@@ -197,22 +163,6 @@ _PUBLIC_ struct emsmdbp_context *emsmdbp_init(struct loadparm_context *lp_ctx,
 
 
 /**
-   \details Associate the session uuid to the emsmdb context
-
-   \param emsmdbp_ctx pointer to the emsmdb context
-   \param uuid the uuid to associate
-
-   \return true on success, otherwise false
- */
-_PUBLIC_ bool emsmdbp_set_session_uuid(struct emsmdbp_context *emsmdbp_ctx, struct GUID uuid)
-{
-	if (!emsmdbp_ctx) return false;
-
-  emsmdbp_ctx->session_uuid = uuid;
-  return true;
-}
-
-/**
    \details Open openchange.ldb database
 
    \param lp_ctx pointer on the loadparm_context
@@ -220,14 +170,14 @@ _PUBLIC_ bool emsmdbp_set_session_uuid(struct emsmdbp_context *emsmdbp_ctx, stru
    \note This function is just a wrapper over
    mapiproxy_server_openchange_ldb_init
 
-   \return Allocated openchangedb context on success, otherwise NULL
+   \return Allocated LDB context on success, otherwise NULL
  */
-_PUBLIC_ void *emsmdbp_openchangedb_init(struct loadparm_context *lp_ctx)
+_PUBLIC_ void *emsmdbp_openchange_ldb_init(struct loadparm_context *lp_ctx)
 {
 	/* Sanity checks */
 	if (!lp_ctx) return NULL;
 
-	return mapiproxy_server_openchangedb_init(lp_ctx);
+	return mapiproxy_server_openchange_ldb_init(lp_ctx);
 }
 
 
@@ -240,7 +190,7 @@ _PUBLIC_ bool emsmdbp_destructor(void *data)
 	talloc_unlink(emsmdbp_ctx, emsmdbp_ctx->oc_ctx);
 	talloc_free(emsmdbp_ctx->mem_ctx);
 
-	OC_DEBUG(0, "emsmdbp_ctx found and released\n");
+	DEBUG(0, ("[%s:%d]: emsmdbp_ctx found and released\n", __FUNCTION__, __LINE__));
 
 	return true;
 }
@@ -268,8 +218,7 @@ _PUBLIC_ bool emsmdbp_verify_user(struct dcesrv_call_state *dce_call,
 
 	ret = ldb_search(emsmdbp_ctx->samdb_ctx, emsmdbp_ctx, &res,
 			 ldb_get_default_basedn(emsmdbp_ctx->samdb_ctx),
-			 LDB_SCOPE_SUBTREE, recipient_attrs, "sAMAccountName=%s",
-			 ldb_binary_encode_string(emsmdbp_ctx, username));
+			 LDB_SCOPE_SUBTREE, recipient_attrs, "sAMAccountName=%s", username);
 
 	/* If the search failed */
 	if (ret != LDB_SUCCESS || !res->count) {
@@ -325,7 +274,7 @@ _PUBLIC_ bool emsmdbp_verify_userdn(struct dcesrv_call_state *dce_call,
 	ret = ldb_search(emsmdbp_ctx->samdb_ctx, emsmdbp_ctx, &res,
 			 ldb_get_default_basedn(emsmdbp_ctx->samdb_ctx),
 			 LDB_SCOPE_SUBTREE, recipient_attrs, "(legacyExchangeDN=%s)",
-			 ldb_binary_encode_string(emsmdbp_ctx, legacyExchangeDN));
+			 legacyExchangeDN);
 
 	/* If the search failed */
 	if (ret != LDB_SUCCESS || !res->count) {
@@ -393,7 +342,7 @@ _PUBLIC_ enum MAPISTATUS emsmdbp_resolve_recipient(TALLOC_CTX *mem_ctx,
 			 ldb_get_default_basedn(emsmdbp_ctx->samdb_ctx),
 			 LDB_SCOPE_SUBTREE, recipient_attrs,
 			 "(&(objectClass=user)(sAMAccountName=*%s*)(!(objectClass=computer)))",
-			 ldb_binary_encode_string(mem_ctx, recipient));
+			 recipient);
 
 	/* If the search failed, build an external recipient: very basic for the moment */
 	if (ret != LDB_SUCCESS || !res->count) {
@@ -431,7 +380,7 @@ _PUBLIC_ enum MAPISTATUS emsmdbp_resolve_recipient(TALLOC_CTX *mem_ctx,
 	username = (char *) ldb_msg_find_attr_as_string(res->msgs[0], "mailNickname", NULL);
 	legacyExchangeDN = (char *) ldb_msg_find_attr_as_string(res->msgs[0], "legacyExchangeDN", NULL);
 	if (!username || !legacyExchangeDN) {
-		OC_DEBUG(0, "record found but mailNickname or legacyExchangeDN is missing for %s\n", recipient);
+		DEBUG(0, ("record found but mailNickname or legacyExchangeDN is missing for %s\n", recipient));
 		goto failure;
 	}
 	org_length = strlen(legacyExchangeDN) - strlen(username);
@@ -577,93 +526,4 @@ _PUBLIC_ int emsmdbp_source_key_from_fmid(TALLOC_CTX *mem_ctx, struct emsmdbp_co
 	*source_keyP = source_key;
 
 	return MAPISTORE_SUCCESS;
-}
-
-/**
-   \details Extract organization name and group name from the legacy exchange
-   dn of the current logged user.
-
-   \param mem_ctx memory context used for returned values
-   \param emsmdbp_ctx pointer to the EMSMDBP context
-   \param organization_name pointer to the returned organization name
-   \param group_name pointer to the returned group name
-
-   \note You can set organization_name or group_name to NULL if you don't want
-   this values
-
-   \return MAPI_E_SUCCESS or an error if something happens
- */
-_PUBLIC_ enum MAPISTATUS emsmdbp_fetch_organizational_units(TALLOC_CTX *mem_ctx,
-							    struct emsmdbp_context *emsmdbp_ctx,
-							    char **organization_name,
-							    char **group_name)
-{
-	char 		*exdn0, *exdn1;
-	const char 	*EssDN;
-
-	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
-	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx->szUserDN, MAPI_E_NOT_INITIALIZED, NULL);
-
-	EssDN = emsmdbp_ctx->szUserDN;
-	// EssDN has format: /o=organizacion name/ou=group name/cn=Recipients/cn=username
-
-	if (organization_name) {
-		exdn0 = strstr(EssDN, "/o=");
-		OPENCHANGE_RETVAL_IF(!exdn0, MAPI_E_BAD_VALUE, NULL);
-		exdn1 = strstr(EssDN, "/ou=");
-		OPENCHANGE_RETVAL_IF(!exdn1, MAPI_E_BAD_VALUE, NULL);
-		*organization_name = talloc_strndup(mem_ctx, exdn0 + 3, exdn1 - exdn0 - 3);
-		OPENCHANGE_RETVAL_IF(!*organization_name, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
-	}
-
-	if (group_name) {
-		exdn0 = strstr(EssDN, "/ou=");
-		OPENCHANGE_RETVAL_IF(!exdn0, MAPI_E_BAD_VALUE, NULL);
-		exdn1 = strstr(EssDN, "/cn=");
-		OPENCHANGE_RETVAL_IF(!exdn1, MAPI_E_BAD_VALUE, NULL);
-		*group_name = talloc_strndup(mem_ctx, exdn0 + 4, exdn1 - exdn0 - 4);
-		OPENCHANGE_RETVAL_IF(!*group_name, MAPI_E_NOT_ENOUGH_MEMORY, NULL);
-	}
-
-	return MAPI_E_SUCCESS;
-}
-
-/**
-   \details Get the organization name (like "First Organization") as a DN.
-
-   \param emsmdbp_ctx pointer to the EMSMDBP context
-   \param basedn pointer to the returned struct ldb_dn
-
-   \return MAPI_E_SUCCESS or an error if something happens
- */
-_PUBLIC_ enum MAPISTATUS emsmdbp_get_org_dn(struct emsmdbp_context *emsmdbp_ctx, struct ldb_dn **basedn)
-{
-	enum MAPISTATUS		retval;
-	int			ret;
-	struct ldb_result	*res = NULL;
-	char			*org_name;
-
-	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx, MAPI_E_NOT_INITIALIZED, NULL);
-	OPENCHANGE_RETVAL_IF(!emsmdbp_ctx->samdb_ctx, MAPI_E_NOT_INITIALIZED, NULL);
-	OPENCHANGE_RETVAL_IF(!basedn, MAPI_E_INVALID_PARAMETER, NULL);
-
-	retval = emsmdbp_fetch_organizational_units(emsmdbp_ctx, emsmdbp_ctx, &org_name, NULL);
-	OPENCHANGE_RETVAL_IF(retval != MAPI_E_SUCCESS, retval, NULL);
-
-	ret = ldb_search(emsmdbp_ctx->samdb_ctx, emsmdbp_ctx, &res,
-			 ldb_get_config_basedn(emsmdbp_ctx->samdb_ctx),
-                         LDB_SCOPE_SUBTREE, NULL,
-                         "(&(objectClass=msExchOrganizationContainer)(cn=%s))",
-                         ldb_binary_encode_string(emsmdbp_ctx, org_name));
-	talloc_free(org_name);
-
-	/* If the search failed */
-	if (ret != LDB_SUCCESS) {
-		OC_DEBUG(1, "emsmdbp_get_org_dn ldb_search failure.\n");
-		return MAPI_E_NOT_FOUND;
-	}
-
-	*basedn = ldb_dn_new(emsmdbp_ctx, emsmdbp_ctx->samdb_ctx,
-			     ldb_msg_find_attr_as_string(res->msgs[0], "distinguishedName", NULL));
-	return MAPI_E_SUCCESS;
 }

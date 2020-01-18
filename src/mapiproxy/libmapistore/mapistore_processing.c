@@ -28,7 +28,7 @@
 #include "mapistore.h"
 #include "mapistore_errors.h"
 #include "mapistore_private.h"
-#include "utils/dlinklist.h"
+#include <dlinklist.h>
 #include "libmapi/libmapi_private.h"
 
 #include <tdb.h>
@@ -125,7 +125,7 @@ enum mapistore_error mapistore_init_mapping_context(struct processing_context *p
 		pctx->mapping_ctx->used_ctx = mapistore_tdb_wrap_open(pctx, dbpath, 0, 0, O_RDWR|O_CREAT, 0600);
 		talloc_free(dbpath);
 		if (!pctx->mapping_ctx->used_ctx) {
-			OC_DEBUG(3, "%s", strerror(errno));
+			DEBUG(3, ("[%s:%d]: %s\n", __FUNCTION__, __LINE__, strerror(errno)));
 			talloc_free(mem_ctx);
 			talloc_free(pctx->mapping_ctx);
 			return MAPISTORE_ERR_DATABASE_INIT;
@@ -147,8 +147,8 @@ enum mapistore_error mapistore_init_mapping_context(struct processing_context *p
 		ret = tdb_store(pctx->mapping_ctx->used_ctx->tdb, key, dbuf, TDB_INSERT);
 		talloc_free(dbuf.dptr);
 		if (ret == -1) {
-			OC_DEBUG(3, "Unable to create %s record: %s",
-				  MAPISTORE_DB_LAST_ID_KEY, tdb_errorstr(pctx->mapping_ctx->used_ctx->tdb));
+			DEBUG(3, ("[%s:%d]: Unable to create %s record: %s\n", __FUNCTION__, __LINE__,
+				  MAPISTORE_DB_LAST_ID_KEY, tdb_errorstr(pctx->mapping_ctx->used_ctx->tdb)));
 			talloc_free(mem_ctx);
 			talloc_free(pctx->mapping_ctx);
 

@@ -20,7 +20,6 @@
 #include "libmapi/libmapi.h"
 #include "libmapi/libmapi_private.h"
 #include "gen_ndr/ndr_exchange_c.h"
-#include "gen_ndr/ndr_exchange.h"
 #include <param.h>
 
 
@@ -30,21 +29,6 @@
    \brief Name Service Provider (NSPI) stack functions
  */
 
-/**
-   \details Dump the STAT structure
-   
-   \param name the name of STAT structure member
-   \param pStat pointer on the STAT structure to dump
- */
-_PUBLIC_ void nspi_dump_STAT(const char *name, struct STAT *pStat)
-{
-	struct ndr_print	ndr_print;
-	
-	ndr_print.depth = 1;
-	ndr_print.print = ndr_print_debug_helper;
-	ndr_print.no_newline = false;
-	ndr_print_STAT(&ndr_print, name, pStat);
-}
 
 /**
    \details Initialize the STAT structure and set common STAT parameters
@@ -189,7 +173,7 @@ _PUBLIC_ enum MAPISTATUS nspi_unbind(struct nspi_context *nspi_ctx)
 
 	status = dcerpc_NspiUnbind_r(nspi_ctx->rpc_connection->binding_handle, nspi_ctx->mem_ctx, &r);
 	retval = r.out.result;
-	OPENCHANGE_RETVAL_IF((retval != 1) && !NT_STATUS_IS_OK(status), retval, NULL);
+	OPENCHANGE_RETVAL_IF((retval != 1) && !MAPI_STATUS_IS_OK(NT_STATUS_V(status)), retval, NULL);
 
 	return MAPI_E_SUCCESS;
 }
@@ -209,7 +193,7 @@ _PUBLIC_ enum MAPISTATUS nspi_unbind(struct nspi_context *nspi_ctx)
  */
 _PUBLIC_ enum MAPISTATUS nspi_UpdateStat(struct nspi_context *nspi_ctx, 
 					 TALLOC_CTX *mem_ctx,
-					 int32_t *plDelta)
+					 uint32_t *plDelta)
 {
 	struct NspiUpdateStat		r;
 	NTSTATUS			status;
@@ -1110,11 +1094,8 @@ _PUBLIC_ enum MAPISTATUS nspi_ResolveNames(struct nspi_context *nspi_ctx,
 
 	/* Sanity checks */
 	OPENCHANGE_RETVAL_IF(!nspi_ctx, MAPI_E_NOT_INITIALIZED, NULL);
-	OPENCHANGE_RETVAL_IF(!nspi_ctx->rpc_connection, MAPI_E_NOT_INITIALIZED, NULL);
-	OPENCHANGE_RETVAL_IF(!nspi_ctx->rpc_connection->binding_handle, MAPI_E_NOT_INITIALIZED, NULL);
 	OPENCHANGE_RETVAL_IF(!mem_ctx, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!usernames, MAPI_E_INVALID_PARAMETER, NULL);
-	OPENCHANGE_RETVAL_IF(!pPropTags, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!pppRows, MAPI_E_INVALID_PARAMETER, NULL);
 	OPENCHANGE_RETVAL_IF(!pppMIds, MAPI_E_INVALID_PARAMETER, NULL);
 

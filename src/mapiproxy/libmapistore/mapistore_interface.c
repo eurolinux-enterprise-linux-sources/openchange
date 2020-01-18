@@ -3,7 +3,7 @@
 
    OpenChange Project
 
-   Copyright (C) Julien Kerihuel 2009-2015
+   Copyright (C) Julien Kerihuel 2009
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@
 #include "mapistore_private.h"
 #include "mapistore_nameid.h"
 
-#include "utils/dlinklist.h"
+#include <dlinklist.h>
 #include "libmapi/libmapi_private.h"
 
 #include <string.h>
@@ -37,7 +37,6 @@
    \details Initialize the mapistore context
 
    \param mem_ctx pointer to the memory context
-   \param lp_ctx loadparm_context to get smb.conf options
    \param path the path to the location to load the backend providers from (NULL for default)
 
    \return allocate mapistore context on success, otherwise NULL
@@ -48,8 +47,6 @@ _PUBLIC_ struct mapistore_context *mapistore_init(TALLOC_CTX *mem_ctx, struct lo
 	struct mapistore_context	*mstore_ctx;
 	const char			*private_dir;
 	char				*mapping_path;
-	const char			*indexing_url;
-	const char			*cache_url;
 
 	if (!lp_ctx) {
 		return NULL;
@@ -64,28 +61,26 @@ _PUBLIC_ struct mapistore_context *mapistore_init(TALLOC_CTX *mem_ctx, struct lo
 
 	private_dir = lpcfg_private_dir(lp_ctx);
 	if (!private_dir) {
-		OC_DEBUG(5, "private directory was not returned from configuration");
+		DEBUG(5, ("private directory was not returned from configuration\n"));
 		return NULL;
 	}
 
-	if (mapistore_get_mapping_path() == NULL) {
-		mapping_path = talloc_asprintf(NULL, "%s/mapistore", private_dir);
-		mkdir(mapping_path, 0700);
+	mapping_path = talloc_asprintf(NULL, "%s/mapistore", private_dir);
+	mkdir(mapping_path, 0700);
 
-		mapistore_set_mapping_path(mapping_path);
-		talloc_free(mapping_path);
-	}
+	mapistore_set_mapping_path(mapping_path);
+	talloc_free(mapping_path);
 
 	retval = mapistore_init_mapping_context(mstore_ctx->processing_ctx);
 	if (retval != MAPISTORE_SUCCESS) {
-		OC_DEBUG(0, "mapistore_init_mapping_context: %s", mapistore_errstr(retval));
+		DEBUG(0, ("[%s:%d]: %s\n", __FUNCTION__, __LINE__, mapistore_errstr(retval)));
 		talloc_free(mstore_ctx);
 		return NULL;
 	}
 
 	retval = mapistore_backend_init(mstore_ctx, path);
 	if (retval != MAPISTORE_SUCCESS) {
-		OC_DEBUG(0, "mapistore_backend_init: %s", mapistore_errstr(retval));
+		DEBUG(0, ("[%s:%d]: %s\n", __FUNCTION__, __LINE__, mapistore_errstr(retval)));
 		talloc_free(mstore_ctx);
 		return NULL;
 	}
@@ -96,28 +91,23 @@ _PUBLIC_ struct mapistore_context *mapistore_init(TALLOC_CTX *mem_ctx, struct lo
 	mstore_ctx->notifications = NULL;
 	mstore_ctx->subscriptions = NULL;
 	mstore_ctx->conn_info = NULL;
-	mstore_ctx->notification_ctx = NULL;
-
-	indexing_url = lpcfg_parm_string(lp_ctx, NULL, "mapistore", "indexing_backend");
-	mapistore_set_default_indexing_url(indexing_url);
 
 	mstore_ctx->nprops_ctx = NULL;
-	retval = mapistore_namedprops_init(mstore_ctx, lp_ctx, &(mstore_ctx->nprops_ctx));
+	retval = mapistore_namedprops_init(mstore_ctx, &(mstore_ctx->nprops_ctx));
 	if (retval != MAPISTORE_SUCCESS) {
-		OC_DEBUG(0, "ERROR: %s", mapistore_errstr(retval));
+		DEBUG(0, ("[%s:%d]: %s\n", __FUNCTION__, __LINE__, mapistore_errstr(retval)));
 		talloc_free(mstore_ctx);
 		return NULL;
 	}
 
-	retval = mapistore_notification_init(mstore_ctx, lp_ctx, &(mstore_ctx->notification_ctx));
-	if (retval != MAPISTORE_SUCCESS) {
-		OC_DEBUG(0, "[mapistore]: Unable to initialize mapistore notification subsystem: %s\n", mapistore_errstr(retval));
+#if 0
+	mstore_ctx->mq_ipc = mq_open(MAPISTORE_MQUEUE_IPC, O_WRONLY|O_NONBLOCK|O_CREAT, 0755, NULL);
+	if (mstore_ctx->mq_ipc == -1) {
+		DEBUG(0, ("[%s:%d]: Failed to open mqueue for %s\n", __FUNCTION__, __LINE__, MAPISTORE_MQUEUE_IPC));
 		talloc_free(mstore_ctx);
 		return NULL;
 	}
-
-	cache_url = lpcfg_parm_string(lp_ctx, NULL, "mapistore", "indexing_cache");
-	mapistore_set_default_cache_url(cache_url);
+#endif
 
 	return mstore_ctx;
 }
@@ -139,12 +129,11 @@ _PUBLIC_ enum mapistore_error mapistore_release(struct mapistore_context *mstore
 	/* Sanity checks */
 	MAPISTORE_RETVAL_IF(!mstore_ctx, MAPISTORE_ERR_NOT_INITIALIZED, NULL);
 
-	OC_DEBUG(5, "freeing up mstore_ctx ref: %p", mstore_ctx);
+	DEBUG(5, ("freeing up mstore_ctx ref: %p\n", mstore_ctx));
 
 	talloc_free(mstore_ctx->nprops_ctx);
 	talloc_free(mstore_ctx->processing_ctx);
 	talloc_free(mstore_ctx->context_list);
-	talloc_free(mstore_ctx->indexing_list);
 
 	return MAPISTORE_SUCCESS;
 }
@@ -159,7 +148,7 @@ _PUBLIC_ enum mapistore_error mapistore_release(struct mapistore_context *mstore
    \return MAPISTORE_SUCCESS on success, otherwise MAPISTORE error
  */
 _PUBLIC_ enum mapistore_error mapistore_set_connection_info(struct mapistore_context *mstore_ctx, 
-							    struct ldb_context *sam_ctx, struct openchangedb_context *oc_ctx, const char *username)
+							    struct ldb_context *sam_ctx, struct ldb_context *oc_ctx, const char *username)
 {
 	/* Sanity checks */
 	MAPISTORE_RETVAL_IF(!mstore_ctx, MAPISTORE_ERR_NOT_INITIALIZED, NULL);
@@ -197,7 +186,8 @@ _PUBLIC_ enum mapistore_error mapistore_add_context(struct mapistore_context *ms
 	char					*namespace;
 	char					*namespace_start;
 	char					*backend_uri;
-	struct indexing_context			*ictx;
+	char					*mapistore_dir;
+	struct indexing_context_list		*ictx;
 
 	/* Step 1. Perform Sanity Checks on URI */
 	if (!uri || strlen(uri) < 4) {
@@ -209,7 +199,7 @@ _PUBLIC_ enum mapistore_error mapistore_add_context(struct mapistore_context *ms
 	namespace_start = namespace;
 	namespace = strchr(namespace, ':');
 	if (!namespace) {
-		OC_DEBUG(0, "Error - Invalid namespace '%s'", namespace_start);
+		DEBUG(0, ("[%s:%d]: Error - Invalid namespace '%s'\n", __FUNCTION__, __LINE__, namespace_start));
 		talloc_free(mem_ctx);
 		return MAPISTORE_ERR_INVALID_NAMESPACE;
 	}
@@ -217,14 +207,17 @@ _PUBLIC_ enum mapistore_error mapistore_add_context(struct mapistore_context *ms
 	if (namespace[1] && namespace[1] == '/' &&
 	    namespace[2] && namespace[2] == '/' &&
 	    namespace[3]) {
+		/* ensure the user mapistore directory exists before any mapistore operation occurs */
+		mapistore_dir = talloc_asprintf(mem_ctx, "%s/%s", mapistore_get_mapping_path(), owner);
+		mkdir(mapistore_dir, 0700);
+
 		mapistore_indexing_add(mstore_ctx, owner, &ictx);
+		/* mapistore_indexing_add_ref_count(ictx); */
 
 		backend_uri = talloc_strdup(mem_ctx, &namespace[3]);
 		namespace[3] = '\0';
-
-		retval = mapistore_backend_create_context(mstore_ctx, mstore_ctx->conn_info, ictx, namespace_start, backend_uri, fid, &backend_ctx);
+		retval = mapistore_backend_create_context(mstore_ctx, mstore_ctx->conn_info, ictx->index_ctx, namespace_start, backend_uri, fid, &backend_ctx);
 		if (retval != MAPISTORE_SUCCESS) {
-			talloc_free(mem_ctx);
 			return retval;
 		}
 
@@ -241,7 +234,7 @@ _PUBLIC_ enum mapistore_error mapistore_add_context(struct mapistore_context *ms
 		*backend_object = backend_list->ctx->root_folder_object;
 		DLIST_ADD_END(mstore_ctx->context_list, backend_list, struct backend_context_list *);
 	} else {
-		OC_DEBUG(0, "Error - Invalid URI '%s'\n", uri);
+		DEBUG(0, ("[%s:%d]: Error - Invalid URI '%s'\n", __FUNCTION__, __LINE__, uri));
 		talloc_free(mem_ctx);
 		return MAPISTORE_ERR_INVALID_NAMESPACE;
 	}
@@ -272,7 +265,7 @@ _PUBLIC_ enum mapistore_error mapistore_add_context_ref_count(struct mapistore_c
 	if (context_id == -1) return MAPISTORE_ERROR;
 
 	/* Step 0. Ensure the context exists */
-	OC_DEBUG(0, "mapistore_add_context_ref_count: context_is to increment is %d", context_id);
+	DEBUG(0, ("mapistore_add_context_ref_count: context_is to increment is %d\n", context_id));
 	backend_ctx = mapistore_backend_lookup(mstore_ctx->context_list, context_id);
 	MAPISTORE_RETVAL_IF(!backend_ctx, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
 
@@ -283,7 +276,7 @@ _PUBLIC_ enum mapistore_error mapistore_add_context_ref_count(struct mapistore_c
 	if (backend_ctx->indexing) {
 		/* mapistore_indexing_add_ref_count(backend_ctx->indexing); */
 	} else {
-		oc_log(OC_LOG_FATAL, "mapistore_add_context_ref_count: This should never occur");
+		DEBUG(0, ("[%s:%d]: This should never occur\n", __FUNCTION__, __LINE__));
 		abort();
 	}
 
@@ -343,7 +336,7 @@ _PUBLIC_ enum mapistore_error mapistore_del_context(struct mapistore_context *ms
 	if (context_id == -1) return MAPISTORE_ERROR;
 
 	/* Step 0. Ensure the context exists */
-	OC_DEBUG(5, "mapistore_del_context: context_id to del is %d", context_id);
+	DEBUG(0, ("mapistore_del_context: context_id to del is %d\n", context_id));
 	backend_ctx = mapistore_backend_lookup(mstore_ctx->context_list, context_id);
 	MAPISTORE_RETVAL_IF(!backend_ctx, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
 
@@ -352,7 +345,7 @@ _PUBLIC_ enum mapistore_error mapistore_del_context(struct mapistore_context *ms
 		if (backend_list->ctx->context_id == context_id) {
 			found = true;
 			break;
-		}
+		}		
 	}
 	if (found == false) {
 		return MAPISTORE_ERROR;
@@ -362,7 +355,7 @@ _PUBLIC_ enum mapistore_error mapistore_del_context(struct mapistore_context *ms
 	/* if (backend_ctx->indexing) {
 		mapistore_indexing_del_ref_count(backend_ctx->indexing);
 		if (backend_ctx->indexing->ref_count == 0) {
-			OC_DEBUG(5, ("freeing up mapistore_indexing ctx: %p\n", backend_ctx->indexing));
+			DEBUG(5, ("freeing up mapistore_indexing ctx: %p\n", backend_ctx->indexing));
 			DLIST_REMOVE(mstore_ctx->indexing_list, backend_ctx->indexing);
 			talloc_unlink(mstore_ctx->indexing_list, backend_ctx->indexing);
 			backend_ctx->indexing = NULL;
@@ -433,8 +426,6 @@ _PUBLIC_ const char *mapistore_errstr(enum mapistore_error mapistore_err)
 		return "Failed creating the context";
 	case MAPISTORE_ERR_INVALID_NAMESPACE:
 		return "Invalid Namespace";
-	case MAPISTORE_ERR_INVALID_URI:
-		return "Invalid URI";
 	case MAPISTORE_ERR_NOT_FOUND:
 		return "Not Found";
 	case MAPISTORE_ERR_REF_COUNT:
@@ -449,10 +440,6 @@ _PUBLIC_ const char *mapistore_errstr(enum mapistore_error mapistore_err)
 		return "Error receiving message";
 	case MAPISTORE_ERR_DENIED:
 		return "Insufficient rights to perform the operation";
-	case MAPISTORE_ERR_CONN_REFUSED:
-		return "Connection refused";
-	case MAPISTORE_ERR_NOT_AVAILABLE:
-		return "Not available";
 	case MAPISTORE_ERR_NOT_IMPLEMENTED:
 		return "Not implemented";
 	}
@@ -462,11 +449,17 @@ _PUBLIC_ const char *mapistore_errstr(enum mapistore_error mapistore_err)
 
 _PUBLIC_ enum mapistore_error mapistore_list_contexts_for_user(struct mapistore_context *mstore_ctx, const char *owner, TALLOC_CTX *mem_ctx, struct mapistore_contexts_list **contexts_listp)
 {
-	struct indexing_context		*ictx;
+	char					*mapistore_dir;
+	struct indexing_context_list		*ictx;
+
+	/* ensure the user mapistore directory exists before any mapistore operation occurs */
+	mapistore_dir = talloc_asprintf(mem_ctx, "%s/%s", mapistore_get_mapping_path(), owner);
+	mkdir(mapistore_dir, 0700);
 
 	mapistore_indexing_add(mstore_ctx, owner, &ictx);
-	/* TODO change backend definition to accept indexing_context instead of tdb_wrap */
-	return mapistore_backend_list_contexts(owner, ictx, mem_ctx, contexts_listp);
+	/* mapistore_indexing_add_ref_count(ictx); */
+ 
+	return mapistore_backend_list_contexts(owner, ictx->index_ctx, mem_ctx, contexts_listp);
 }
 
 _PUBLIC_ enum mapistore_error mapistore_create_root_folder(const char *username, enum mapistore_context_role ctx_role, uint64_t fid, const char *name, TALLOC_CTX *mem_ctx, char **mapistore_urip)
@@ -484,11 +477,8 @@ _PUBLIC_ enum mapistore_error mapistore_create_root_folder(const char *username,
    \param mstore_ctx pointer to the mapistore context
    \param context_id the context identifier referencing the backend
    where the directory will be opened
-   \param folder the parent folder object
-   \param mem_ctx the memory context where child_folder is created
+   \param parent_fid the parent folder identifier
    \param fid folder identifier to open
-   \param [out] child_folder location where to store new mapistore
-   backend object on success
 
    \return MAPISTORE_SUCCESS on success, otherwise MAPISTORE errors
  */
@@ -543,31 +533,27 @@ _PUBLIC_ enum mapistore_error mapistore_folder_create_folder(struct mapistore_co
 
    \param mstore_ctx pointer to the mapistore context
    \param context_id the context identifier referencing the backend
-   \param folder the folder object
+   \param parent_fid the parent folder identifier
+   \param fid the folder identifier representing the folder to delete
    \param flags flags that control the behaviour of the operation
-   \param mem_ctx memory context where deleted_fmids_p is allocated
-   \param deleted_fmids_p pointer to the deleted fmids array
-   \param deleted_fmids_count_p pointer to the number of deleted fmids
 
    \return MAPISTORE_SUCCESS on success, otherwise MAPISTORE errors
  */
-_PUBLIC_ enum mapistore_error mapistore_folder_delete(struct mapistore_context *mstore_ctx, uint32_t context_id, void *folder, uint8_t flags, TALLOC_CTX *mem_ctx, uint64_t **deleted_fmids_p, uint32_t *deleted_fmids_count_p)
+_PUBLIC_ enum mapistore_error mapistore_folder_delete(struct mapistore_context *mstore_ctx, uint32_t context_id, void *folder, uint8_t flags)
 {
 	struct backend_context	*backend_ctx;
 	enum mapistore_error	ret;
-	TALLOC_CTX		*local_mem_ctx;
+	TALLOC_CTX		*mem_ctx;
 	void			*subfolder;
-	uint64_t		*child_fmids, *deleted_fmids;
+	uint64_t		*child_fmids;
 	uint32_t		i, child_count;
-	uint32_t		deleted_count = 0;
+
+	/* TODO : handle the removal of entries in indexing.tdb */
 
 	/* Sanity checks */
 	MAPISTORE_SANITY_CHECKS(mstore_ctx, NULL);
-	MAPISTORE_RETVAL_IF(!deleted_fmids_p, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
-	MAPISTORE_RETVAL_IF(!deleted_fmids_count_p, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
 
-	local_mem_ctx = talloc_new(NULL);
-	MAPISTORE_RETVAL_IF(!local_mem_ctx, MAPISTORE_ERR_NO_MEMORY, NULL);
+	mem_ctx = talloc_zero(NULL, TALLOC_CTX);
 
 	/* Step 1. Find the backend context */
 	backend_ctx = mapistore_backend_lookup(mstore_ctx->context_list, context_id);
@@ -577,15 +563,10 @@ _PUBLIC_ enum mapistore_error mapistore_folder_delete(struct mapistore_context *
 	}
 
 	/* Step 2a. Handle deletion of normal messages */
-	ret = mapistore_folder_get_child_fmids(mstore_ctx, context_id, folder, MAPISTORE_MESSAGE_TABLE, local_mem_ctx, &child_fmids, &child_count);
+	ret = mapistore_folder_get_child_fmids(mstore_ctx, context_id, folder, MAPISTORE_MESSAGE_TABLE, mem_ctx, &child_fmids, &child_count);
 	if (ret != MAPISTORE_SUCCESS) {
 		goto end;
 	}
-
-	deleted_fmids = talloc_zero_array(mem_ctx, uint64_t, 1);
-	MAPISTORE_RETVAL_IF(!deleted_fmids, MAPISTORE_ERR_NO_MEMORY, local_mem_ctx);
-	*deleted_fmids_p = deleted_fmids;
-
 	if (child_count > 0) {
 		if ((flags & DEL_MESSAGES)) {
 			for (i = 0; i < child_count; i++) {
@@ -593,12 +574,6 @@ _PUBLIC_ enum mapistore_error mapistore_folder_delete(struct mapistore_context *
 				if (ret != MAPISTORE_SUCCESS) {
 					goto end;
 				}
-
-				deleted_fmids[deleted_count] = child_fmids[i];
-				deleted_count++;
-				deleted_fmids = talloc_realloc(mem_ctx, deleted_fmids, uint64_t,
-							       deleted_count + 1);
-				MAPISTORE_RETVAL_IF(!deleted_fmids, MAPISTORE_ERR_NO_MEMORY, local_mem_ctx);
 			}
 		}
 		else {
@@ -608,7 +583,7 @@ _PUBLIC_ enum mapistore_error mapistore_folder_delete(struct mapistore_context *
 	}
 
 	/* Step 2b. Handle deletion of FAI messages */
-	ret = mapistore_folder_get_child_fmids(mstore_ctx, context_id, folder, MAPISTORE_FAI_TABLE, local_mem_ctx, &child_fmids, &child_count);
+	ret = mapistore_folder_get_child_fmids(mstore_ctx, context_id, folder, MAPISTORE_FAI_TABLE, mem_ctx, &child_fmids, &child_count);
 	if (ret != MAPISTORE_SUCCESS) {
 		goto end;
 	}
@@ -619,12 +594,6 @@ _PUBLIC_ enum mapistore_error mapistore_folder_delete(struct mapistore_context *
 				if (ret != MAPISTORE_SUCCESS) {
 					goto end;
 				}
-
-				deleted_fmids[deleted_count] = child_fmids[i];
-				deleted_count++;
-				deleted_fmids = talloc_realloc(mem_ctx, deleted_fmids, uint64_t,
-							       deleted_count + 1);
-				MAPISTORE_RETVAL_IF(!deleted_fmids, MAPISTORE_ERR_NO_MEMORY, local_mem_ctx);
 			}
 		}
 		else {
@@ -634,14 +603,14 @@ _PUBLIC_ enum mapistore_error mapistore_folder_delete(struct mapistore_context *
 	}
 
 	/* Step 3. Handle deletion of child folders */
-	ret = mapistore_folder_get_child_fmids(mstore_ctx, context_id, folder, MAPISTORE_FOLDER_TABLE, local_mem_ctx, &child_fmids, &child_count);
+	ret = mapistore_folder_get_child_fmids(mstore_ctx, context_id, folder, MAPISTORE_FOLDER_TABLE, mem_ctx, &child_fmids, &child_count);
 	if (ret != MAPISTORE_SUCCESS) {
 		goto end;
 	}
 	if (child_count > 0) {
 		if ((flags & DEL_FOLDERS)) {
 			for (i = 0; i < child_count; i++) {
-				ret = mapistore_backend_folder_open_folder(backend_ctx, folder, local_mem_ctx, child_fmids[i], &subfolder);
+				ret = mapistore_backend_folder_open_folder(backend_ctx, folder, mem_ctx, child_fmids[i], &subfolder);
 				if (ret != MAPISTORE_SUCCESS) {
 					goto end;
 				}
@@ -650,12 +619,6 @@ _PUBLIC_ enum mapistore_error mapistore_folder_delete(struct mapistore_context *
 				if (ret != MAPISTORE_SUCCESS) {
 					goto end;
 				}
-
-				deleted_fmids[deleted_count] = child_fmids[i];
-				deleted_count++;
-				deleted_fmids = talloc_realloc(mem_ctx, deleted_fmids, uint64_t,
-							       deleted_count + 1);
-				MAPISTORE_RETVAL_IF(!deleted_fmids, MAPISTORE_ERR_NO_MEMORY, local_mem_ctx);
 			}
 		}
 		else {
@@ -668,8 +631,7 @@ _PUBLIC_ enum mapistore_error mapistore_folder_delete(struct mapistore_context *
 	ret = mapistore_backend_folder_delete(backend_ctx, folder);
 
 end:
-	*deleted_fmids_count_p = deleted_count;
-	talloc_free(local_mem_ctx);
+	talloc_free(mem_ctx);
 
 	return ret;
 }
@@ -779,17 +741,7 @@ _PUBLIC_ enum mapistore_error mapistore_folder_move_copy_messages(struct mapisto
 }
 
 /**
-   \details Move a mapistore folder to target folder
 
-   \param mstore_ctx pointer to the mapistore context
-   \param context_id the context identifier referencing the backend
-   \param move_folder the folder backend object to move
-   \param target_folder the folder backend object which becomes the parent folder of move_folder.
-   If it is NULL, then the move_folder will become to a root folder
-   \param mem_ctx the TALLOC_CTX memory context
-   \param new_folder_name the new folder name after performing the move operation
-
-   \return MAPISTORE_SUCCESS on success, otherwise MAPISTORE errors
  */
 _PUBLIC_ enum mapistore_error mapistore_folder_move_folder(struct mapistore_context *mstore_ctx, uint32_t context_id,
 							   void *move_folder, void *target_folder, TALLOC_CTX *mem_ctx, const char *new_folder_name)
@@ -873,8 +825,6 @@ _PUBLIC_ enum mapistore_error mapistore_folder_get_child_count(struct mapistore_
 
 	/* Sanity checks */
 	MAPISTORE_SANITY_CHECKS(mstore_ctx, NULL);
-	MAPISTORE_RETVAL_IF(!folder, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
-	MAPISTORE_RETVAL_IF(!RowCount, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
 
 	/* Step 0. Ensure the context exists */
 	backend_ctx = mapistore_backend_lookup(mstore_ctx->context_list, context_id);
@@ -1524,7 +1474,7 @@ _PUBLIC_ enum mapistore_error mapistore_message_set_read_flag(struct mapistore_c
 
    \return MAPISTORE_SUCCESS on success, otherwise MAPISTORE errors
  */
-_PUBLIC_ enum mapistore_error mapistore_message_save(struct mapistore_context *mstore_ctx, uint32_t context_id, void *message, TALLOC_CTX *mem_ctx)
+_PUBLIC_ enum mapistore_error mapistore_message_save(struct mapistore_context *mstore_ctx, uint32_t context_id, void *message)
 {
 	struct backend_context	*backend_ctx;
 
@@ -1536,7 +1486,7 @@ _PUBLIC_ enum mapistore_error mapistore_message_save(struct mapistore_context *m
 	MAPISTORE_RETVAL_IF(!backend_ctx, MAPISTORE_ERR_INVALID_PARAMETER, NULL);
 
 	/* Step 2. Call backend savechangesmessage */
-	return mapistore_backend_message_save(backend_ctx, message, mem_ctx);
+	return mapistore_backend_message_save(backend_ctx, message);
 }
 
 
@@ -1857,66 +1807,9 @@ _PUBLIC_ enum MAPISTATUS mapistore_error_to_mapi(enum mapistore_error mapistore_
 		mapi_err = MAPI_E_NOT_IMPLEMENTED;
 		break;
 	default:
-		OC_DEBUG (4, "unknown mapistore error: %.8x", mapistore_err);
+		DEBUG (4, ("[%s] unknown mapistore error: %.8x\n", __PRETTY_FUNCTION__, mapistore_err));
 		mapi_err = MAPI_E_INVALID_PARAMETER;
 	}
 
 	return mapi_err;
-}
-
-/**
-   \details Map a MAPI error code to MAPISTORE error code. We cannot
-   map 1 to 1 for the reduced MAPISTORE scope, then we mostly likely
-   return general MAPISTORE error code.
-
-   \param mapi_err the mapi status error code
-
-   \return the mapped MAPISTORE error
- */
-_PUBLIC_ enum mapistore_error mapi_error_to_mapistore(enum MAPISTATUS mapi_err)
-{
-        enum mapistore_error mapistore_err;
-
-        /* We cannot map 1 to 1 so we do the general error mapping */
-
-        switch(mapi_err) {
-        case MAPI_E_SUCCESS:
-                mapistore_err = MAPISTORE_SUCCESS;
-                break;
-        case MAPI_E_NO_SUPPORT:
-                mapistore_err = MAPISTORE_ERROR;
-                break;
-        case MAPI_E_NOT_ENOUGH_MEMORY:
-                mapistore_err = MAPISTORE_ERR_NO_MEMORY;
-                break;
-        case MAPI_E_NOT_INITIALIZED:
-                mapistore_err = MAPISTORE_ERR_NOT_INITIALIZED;
-                break;
-        case MAPI_E_CORRUPT_STORE:
-                mapistore_err = MAPISTORE_ERR_CORRUPTED;
-                break;
-        case MAPI_E_DISK_ERROR:
-                mapistore_err = MAPISTORE_ERR_INVALID_DATA;
-                break;
-        case MAPI_E_NOT_FOUND:
-                mapistore_err = MAPISTORE_ERR_NOT_FOUND;
-                break;
-        case MAPI_E_COLLISION:
-                mapistore_err = MAPISTORE_ERR_EXIST;
-                break;
-        case MAPI_E_NO_ACCESS:
-                mapistore_err = MAPISTORE_ERR_DENIED;
-                break;
-        case MAPI_E_NOT_IMPLEMENTED:
-                mapistore_err = MAPISTORE_ERR_NOT_IMPLEMENTED;
-                break;
-        case MAPI_E_INVALID_PARAMETER:
-                mapistore_err = MAPISTORE_ERR_INVALID_PARAMETER;
-                break;
-        default:
-                OC_DEBUG(4, "Using default mapistore error for %s", mapi_get_errstr(mapi_err));
-                mapistore_err = MAPISTORE_ERROR;
-        }
-
-        return mapistore_err;
 }

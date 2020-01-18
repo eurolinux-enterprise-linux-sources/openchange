@@ -27,7 +27,6 @@
 
 #include "libocpf/ocpf.h"
 #include "libocpf/ocpf_api.h"
-#include "libocpf/ocpf_private.h"
 
 #include <sys/stat.h>
 

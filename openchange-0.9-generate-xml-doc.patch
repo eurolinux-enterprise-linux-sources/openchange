@@ -138,6 +138,67 @@ diff -up openchange-2.0-QUADRANT/libocpf/Doxyfile.in.generate-xml-doc openchange
  
  # The XML_SCHEMA tag can be used to specify an XML schema, 
  # which can be used by a validating XML parser to check the 
+diff -up openchange-2.0-QUADRANT/Makefile.generate-xml-doc openchange-2.0-QUADRANT/Makefile
+--- openchange-2.0-QUADRANT/Makefile.generate-xml-doc	2013-02-14 12:23:27.592802631 +0100
++++ openchange-2.0-QUADRANT/Makefile	2013-02-14 12:26:02.032792012 +0100
+@@ -1588,32 +1588,31 @@ uninstallman:
+ 	@./script/uninstallman.sh $(DESTDIR)$(mandir) $(manpages)
+ 
+ doxygen:	
+-	@if test ! -d apidocs ; then						\
+-		echo "Doxify API documentation: HTML and man pages";		\
+-		mkdir -p apidocs/html;						\
+-		mkdir -p apidocs/man;						\
+-		$(DOXYGEN) Doxyfile;						\
+-		$(DOXYGEN) libmapi/Doxyfile;					\
+-		$(DOXYGEN) libmapiadmin/Doxyfile;				\
+-		$(DOXYGEN) libocpf/Doxyfile;					\
+-		$(DOXYGEN) libmapi++/Doxyfile;					\
+-		$(DOXYGEN) mapiproxy/Doxyfile;					\
+-		$(DOXYGEN) utils/mapitest/Doxyfile;				\
+-		$(DOXYGEN) mapiproxy/libmapistore/Doxyfile;			\
+-		cp -f doc/doxygen/index.html apidocs/html;			\
+-		cp -f doc/doxygen/pictures/* apidocs/html/overview;		\
+-		cp -f doc/doxygen/pictures/* apidocs/html/libmapi;		\
+-		cp -f doc/doxygen/pictures/* apidocs/html/libmapiadmin;		\
+-		cp -f doc/doxygen/pictures/* apidocs/html/libmapi++;		\
+-		cp -f doc/doxygen/pictures/* apidocs/html/libocpf;		\
+-		cp -f doc/doxygen/pictures/* apidocs/html/mapitest;		\
+-		cp -f doc/doxygen/pictures/* apidocs/html/mapiproxy;		\
+-		cp -f doc/doxygen/pictures/* apidocs/html/libmapistore;		\
+-		cp -f mapiproxy/documentation/pictures/* apidocs/html/mapiproxy;\
+-		rm -f apidocs/man/man3/todo.3;					\
+-		rm -f apidocs/man/man3/bug.3;					\
+-		rm -f apidocs/man/man3/*.c.3;					\
+-	fi								
++	echo "Doxify API documentation: HTML and man pages"
++	mkdir -p apidocs/html
++	mkdir -p apidocs/man
++	mkdir -p apidocs/xml
++	$(DOXYGEN) Doxyfile
++	$(DOXYGEN) libmapi/Doxyfile
++	$(DOXYGEN) libmapiadmin/Doxyfile
++	$(DOXYGEN) libocpf/Doxyfile
++	$(DOXYGEN) libmapi++/Doxyfile
++	$(DOXYGEN) mapiproxy/Doxyfile
++	$(DOXYGEN) utils/mapitest/Doxyfile
++	$(DOXYGEN) mapiproxy/libmapistore/Doxyfile
++	cp -f doc/doxygen/index.html apidocs/html
++	cp -f doc/doxygen/pictures/* apidocs/html/overview
++	cp -f doc/doxygen/pictures/* apidocs/html/libmapi
++	cp -f doc/doxygen/pictures/* apidocs/html/libmapiadmin
++	cp -f doc/doxygen/pictures/* apidocs/html/libmapi++
++	cp -f doc/doxygen/pictures/* apidocs/html/libocpf
++	cp -f doc/doxygen/pictures/* apidocs/html/mapitest
++	cp -f doc/doxygen/pictures/* apidocs/html/mapiproxy
++	cp -f doc/doxygen/pictures/* apidocs/html/libmapistore
++	cp -f mapiproxy/documentation/pictures/* apidocs/html/mapiproxy
++	rm -f apidocs/man/man3/todo.3
++	rm -f apidocs/man/man3/bug.3
++	rm -f apidocs/man/man3/*.c.3
+ 
+ etags:
+ 	etags `find $(srcdir) -name "*.[ch]"`
 diff -up openchange-2.0-QUADRANT/mapiproxy/Doxyfile.in.generate-xml-doc openchange-2.0-QUADRANT/mapiproxy/Doxyfile.in
 --- openchange-2.0-QUADRANT/mapiproxy/Doxyfile.in.generate-xml-doc	2013-01-24 19:55:36.000000000 +0100
 +++ openchange-2.0-QUADRANT/mapiproxy/Doxyfile.in	2013-02-14 12:23:27.596802685 +0100

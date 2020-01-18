@@ -31,6 +31,10 @@
    users of the store (rather than storage providers).
  */
 
+#ifndef	_GNU_SOURCE
+#define	_GNU_SOURCE
+#endif
+
 #ifndef	_PUBLIC_
 #define	_PUBLIC_
 #endif
@@ -43,12 +47,14 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
+#if 0
+#include <mqueue.h>
+#endif
 
 #include <tdb.h>
 #include <ldb.h>
 #include <talloc.h>
-
-#include <libmemcached/memcached.h>
+#include <util/debug.h>
 
 #include "libmapi/libmapi.h"
 
@@ -66,9 +72,6 @@ typedef	int (*init_backend_fn) (void);
 
 #define	MAPISTORE_SOFT_DELETE		1
 #define	MAPISTORE_PERMANENT_DELETE	2
-
-/* Default filename for named properties backend using ldb */
-#define MAPISTORE_DB_NAMED  "named_properties.ldb"
 
 struct mapistore_message {
 	/* message props */
@@ -118,7 +121,7 @@ struct mapistore_connection_info {
 	uint16_t			repl_id;
 	struct mapistore_context	*mstore_ctx;
 	struct ldb_context		*sam_ctx; /* samdb */
-	struct openchangedb_context	*oc_ctx; /* openchangedb */
+	struct ldb_context		*oc_ctx; /* openchangedb */
 };
 
 enum mapistore_context_role {
@@ -146,25 +149,7 @@ struct mapistore_contexts_list {
 	struct mapistore_contexts_list	*next;
 };
 
-struct indexing_context {
-	enum mapistore_error	(*add_fmid)(struct indexing_context *, const char *, uint64_t, const char *);
-	enum mapistore_error	(*update_fmid)(struct indexing_context *, const char *, uint64_t, const char *);
-	enum mapistore_error	(*del_fmid)(struct indexing_context *, const char *, uint64_t, uint8_t);
-	enum mapistore_error	(*get_uri)(struct indexing_context *, const char *, TALLOC_CTX *, uint64_t, char **, bool *);
-	enum mapistore_error	(*get_fmid)(struct indexing_context *, const char *, const char *, bool, uint64_t *, bool *);
-
-	enum mapistore_error	(*allocate_fmid)(struct indexing_context *, const char *, uint64_t *);
-	enum mapistore_error	(*allocate_fmids)(struct indexing_context *, const char *, int, uint64_t *);
-
-	/* Backend URL */
-	const char *url;
-
-	/* Custom backend data */
-	void *data;
-
-	/* Custom backend cache */
-	void *cache;
-};
+struct tdb_wrap;
 
 struct mapistore_backend {
 	/** backend operations */
@@ -174,8 +159,8 @@ struct mapistore_backend {
 		const char	*namespace;
 
 		enum mapistore_error	(*init)(void);
-		enum mapistore_error	(*list_contexts)(const char *, struct indexing_context *, TALLOC_CTX *, struct mapistore_contexts_list **);
-		enum mapistore_error	(*create_context)(TALLOC_CTX *, struct mapistore_connection_info *, struct indexing_context *, const char *, void **);
+		enum mapistore_error	(*list_contexts)(const char *, struct tdb_wrap *, TALLOC_CTX *, struct mapistore_contexts_list **);
+		enum mapistore_error	(*create_context)(TALLOC_CTX *, struct mapistore_connection_info *, struct tdb_wrap *, const char *, void **);
 		enum mapistore_error	(*create_root_folder)(const char *, enum mapistore_context_role, uint64_t, const char *, TALLOC_CTX *, char **);
 	} backend;
 
@@ -209,7 +194,7 @@ struct mapistore_backend {
 		enum mapistore_error	(*get_message_data)(void *, TALLOC_CTX *, struct mapistore_message **);
 		enum mapistore_error	(*modify_recipients)(void *, struct SPropTagArray *, uint16_t, struct mapistore_message_recipient *);
                 enum mapistore_error	(*set_read_flag)(void *, uint8_t);
-		enum mapistore_error	(*save)(void *, TALLOC_CTX *);
+		enum mapistore_error	(*save)(void *);
 		enum mapistore_error	(*submit)(void *, enum SubmitFlags);
                 enum mapistore_error	(*open_attachment)(void *, TALLOC_CTX *, uint32_t, void **);
                 enum mapistore_error	(*create_attachment)(void *, TALLOC_CTX *, void **, uint32_t *);
@@ -244,11 +229,13 @@ struct mapistore_backend {
 	} manager;
 };
 
+struct indexing_context_list;
+
 struct backend_context {
 	const struct mapistore_backend	*backend;
 	void				*backend_object;
 	void				*root_folder_object;
-	struct indexing_context		*indexing;
+	struct indexing_context_list	*indexing;
 	uint32_t			context_id;
 	uint32_t			ref_count;
 	char				*uri;
@@ -262,10 +249,6 @@ struct backend_context_list {
 
 struct processing_context;
 
-struct mapistore_notification_context {
-	memcached_st				*memc_ctx;
-};
-
 struct mapistore_context {
 	struct processing_context		*processing_ctx;
 	struct backend_context_list		*context_list;
@@ -273,10 +256,11 @@ struct mapistore_context {
 	struct replica_mapping_context_list	*replica_mapping_list;
 	struct mapistore_subscription_list	*subscriptions;
 	struct mapistore_notification_list	*notifications;
-	struct namedprops_context		*nprops_ctx;
+	struct ldb_context			*nprops_ctx;
 	struct mapistore_connection_info	*conn_info;
-	const char				*cache;
-	struct mapistore_notification_context	*notification_ctx;
+#if 0
+	mqd_t					mq_ipc;
+#endif
 };
 
 struct mapistore_freebusy_properties {
@@ -312,11 +296,8 @@ int mapistore_getprops(struct mapistore_context *, uint32_t, TALLOC_CTX *, uint6
 int mapistore_setprops(struct mapistore_context *, uint32_t, uint64_t, uint8_t, struct SRow *);
 
 struct mapistore_context *mapistore_init(TALLOC_CTX *, struct loadparm_context *, const char *);
-void mapistore_set_default_indexing_url(const char *);
-void mapistore_set_default_cache_url(const char *);
-char *mapistore_get_default_cache_url(void);
 enum mapistore_error mapistore_release(struct mapistore_context *);
-enum mapistore_error mapistore_set_connection_info(struct mapistore_context *, struct ldb_context *, struct openchangedb_context *, const char *);
+enum mapistore_error mapistore_set_connection_info(struct mapistore_context *, struct ldb_context *, struct ldb_context *, const char *);
 enum mapistore_error mapistore_add_context(struct mapistore_context *, const char *, const char *, uint64_t, uint32_t *, void **);
 enum mapistore_error mapistore_add_context_ref_count(struct mapistore_context *, uint32_t);
 enum mapistore_error mapistore_del_context(struct mapistore_context *, uint32_t);
@@ -328,7 +309,7 @@ enum mapistore_error mapistore_create_root_folder(const char *, enum mapistore_c
 
 enum mapistore_error mapistore_folder_open_folder(struct mapistore_context *, uint32_t, void *, TALLOC_CTX *, uint64_t, void **);
 enum mapistore_error mapistore_folder_create_folder(struct mapistore_context *, uint32_t, void *, TALLOC_CTX *, uint64_t, struct SRow *, void **);
-enum mapistore_error mapistore_folder_delete(struct mapistore_context *, uint32_t, void *, uint8_t, TALLOC_CTX *, uint64_t **, uint32_t *);
+enum mapistore_error mapistore_folder_delete(struct mapistore_context *, uint32_t, void *, uint8_t);
 enum mapistore_error mapistore_folder_open_message(struct mapistore_context *, uint32_t, void *, TALLOC_CTX *, uint64_t, bool, void **);
 enum mapistore_error mapistore_folder_create_message(struct mapistore_context *, uint32_t, void *, TALLOC_CTX *, uint64_t, uint8_t, void **);
 enum mapistore_error mapistore_folder_delete_message(struct mapistore_context *, uint32_t, void *, uint64_t, uint8_t);
@@ -347,7 +328,7 @@ enum mapistore_error mapistore_folder_fetch_freebusy_properties(struct mapistore
 enum mapistore_error mapistore_message_get_message_data(struct mapistore_context *, uint32_t, void *, TALLOC_CTX *, struct mapistore_message **);
 enum mapistore_error mapistore_message_modify_recipients(struct mapistore_context *, uint32_t, void *, struct SPropTagArray *, uint16_t, struct mapistore_message_recipient *);
 enum mapistore_error mapistore_message_set_read_flag(struct mapistore_context *, uint32_t, void *, uint8_t);
-enum mapistore_error mapistore_message_save(struct mapistore_context *, uint32_t, void *, TALLOC_CTX *);
+enum mapistore_error mapistore_message_save(struct mapistore_context *, uint32_t, void *);
 enum mapistore_error mapistore_message_submit(struct mapistore_context *, uint32_t, void *, enum SubmitFlags);
 enum mapistore_error mapistore_message_open_attachment(struct mapistore_context *, uint32_t, void *, TALLOC_CTX *, uint32_t, void **);
 enum mapistore_error mapistore_message_create_attachment(struct mapistore_context *, uint32_t, void *, TALLOC_CTX *, void **, uint32_t *);
@@ -368,7 +349,7 @@ enum mapistore_error mapistore_properties_get_properties(struct mapistore_contex
 enum mapistore_error mapistore_properties_set_properties(struct mapistore_context *, uint32_t, void *, struct SRow *);
 
 enum MAPISTATUS mapistore_error_to_mapi(enum mapistore_error);
-enum mapistore_error mapi_error_to_mapistore(enum MAPISTATUS);
+
 
 /* definitions from mapistore_processing.c */
 enum mapistore_error mapistore_set_mapping_path(const char *);
@@ -390,54 +371,117 @@ enum mapistore_error mapistore_indexing_record_add_fid(struct mapistore_context 
 enum mapistore_error mapistore_indexing_record_del_fid(struct mapistore_context *, uint32_t, const char *, uint64_t, uint8_t);
 enum mapistore_error mapistore_indexing_record_add_mid(struct mapistore_context *, uint32_t, const char *, uint64_t);
 enum mapistore_error mapistore_indexing_record_del_mid(struct mapistore_context *, uint32_t, const char *, uint64_t, uint8_t);
-enum mapistore_error mapistore_indexing_record_add_fmid_for_uri(struct mapistore_context *, uint32_t, const char *, uint64_t, const char *);
 enum mapistore_error mapistore_indexing_record_get_uri(struct mapistore_context *, const char *, TALLOC_CTX *, uint64_t, char **, bool *);
 enum mapistore_error mapistore_indexing_record_get_fmid(struct mapistore_context *, const char *, const char *, bool, uint64_t *, bool *);
-
-enum mapistore_error mapistore_indexing_get_new_folderID(struct mapistore_context *, uint64_t *);
-enum mapistore_error mapistore_indexing_get_new_folderID_as_user(struct mapistore_context *, const char *, uint64_t *);
-enum mapistore_error mapistore_indexing_get_new_folderIDs(struct mapistore_context *, TALLOC_CTX *, uint64_t, struct UI8Array_r **);
-enum mapistore_error mapistore_indexing_reserve_fmid_range(struct mapistore_context *, uint64_t, uint64_t *);
 
 /* definitions from mapistore_replica_mapping.c */
 enum mapistore_error mapistore_replica_mapping_add(struct mapistore_context *, const char *, struct replica_mapping_context_list **);
 enum mapistore_error mapistore_replica_mapping_guid_to_replid(struct mapistore_context *, const char *username, const struct GUID *, uint16_t *);
 enum mapistore_error mapistore_replica_mapping_replid_to_guid(struct mapistore_context *, const char *username, uint16_t, struct GUID *);
 
-struct namedprops_context;
-
 /* definitions from mapistore_namedprops.c */
-enum mapistore_error mapistore_namedprops_get_mapped_id(struct namedprops_context *, struct MAPINAMEID, uint16_t *);
-enum mapistore_error mapistore_namedprops_next_unused_id(struct namedprops_context *, uint16_t *);
-enum mapistore_error mapistore_namedprops_create_id(struct namedprops_context *, struct MAPINAMEID, uint16_t);
-enum mapistore_error mapistore_namedprops_get_nameid(struct namedprops_context *, uint16_t, TALLOC_CTX *mem_ctx, struct MAPINAMEID **);
-enum mapistore_error mapistore_namedprops_get_nameid_type(struct namedprops_context *, uint16_t, uint16_t *);
-enum mapistore_error mapistore_namedprops_transaction_start(struct namedprops_context *);
-enum mapistore_error mapistore_namedprops_transaction_commit(struct namedprops_context *);
+enum mapistore_error mapistore_namedprops_get_mapped_id(struct ldb_context *ldb_ctx, struct MAPINAMEID, uint16_t *);
+uint16_t mapistore_namedprops_next_unused_id(struct ldb_context *);
+enum mapistore_error mapistore_namedprops_create_id(struct ldb_context *, struct MAPINAMEID, uint16_t);
+enum mapistore_error mapistore_namedprops_get_nameid(struct ldb_context *, uint16_t, TALLOC_CTX *mem_ctx, struct MAPINAMEID **);
+enum mapistore_error mapistore_namedprops_get_nameid_type(struct ldb_context *, uint16_t, uint16_t *);
 
+/* definitions from mapistore_mgmt.c */
+#if 0
+enum mapistore_error mapistore_mgmt_backend_register_user(struct mapistore_connection_info *, const char *, const char *);
+enum mapistore_error mapistore_mgmt_backend_unregister_user(struct mapistore_connection_info *, const char *, const char *);
+enum mapistore_error mapistore_mgmt_interface_register_subscription(struct mapistore_connection_info *, struct mapistore_mgmt_notif *);
+enum mapistore_error mapistore_mgmt_interface_unregister_subscription(struct mapistore_connection_info *, struct mapistore_mgmt_notif *);
+enum mapistore_error mapistore_mgmt_interface_register_bind(struct mapistore_connection_info *, uint16_t, uint8_t *, uint16_t, uint8_t *);
+#endif
 
-/* definitions from mapistore_notification.c */
-enum mapistore_error mapistore_notification_session_add(struct mapistore_context *, struct GUID, struct GUID, const char *);
-enum mapistore_error mapistore_notification_session_delete(struct mapistore_context *, struct GUID);
-enum mapistore_error mapistore_notification_session_exist(struct mapistore_context *, struct GUID);
-enum mapistore_error mapistore_notification_session_get(TALLOC_CTX *, struct mapistore_context *, struct GUID, struct GUID *, char **);
+/* definitions from mapistore_notifications.c (proof-of-concept) */
 
-enum mapistore_error mapistore_notification_resolver_add(struct mapistore_context *, const char *, const char *);
-enum mapistore_error mapistore_notification_resolver_exist(struct mapistore_context *, const char *);
-enum mapistore_error mapistore_notification_resolver_get(TALLOC_CTX *, struct mapistore_context *, const char *, uint32_t *, const char ***);
-enum mapistore_error mapistore_notification_resolver_delete(struct mapistore_context *, const char *, const char *);
+/* notifications subscriptions */
+struct mapistore_subscription_list {
+	struct mapistore_subscription *subscription;
+	struct mapistore_subscription_list *next;
+	struct mapistore_subscription_list *prev;
+};
 
-enum mapistore_error mapistore_notification_subscription_add(struct mapistore_context *, struct GUID, uint32_t, uint16_t, uint64_t, uint64_t, uint32_t, enum MAPITAGS *);
-enum mapistore_error mapistore_notification_subscription_exist(struct mapistore_context *, struct GUID);
-enum mapistore_error mapistore_notification_subscription_delete(struct mapistore_context *, struct GUID);
-enum mapistore_error mapistore_notification_subscription_delete_by_handle(struct mapistore_context *, struct GUID, uint32_t);
+struct mapistore_table_subscription_parameters {
+	uint8_t table_type;
+	uint64_t folder_id; /* the parent folder id */
+};
 
-enum mapistore_error mapistore_notification_deliver_add(struct mapistore_context *, struct GUID, uint8_t *, size_t);
-enum mapistore_error mapistore_notification_deliver_exist(struct mapistore_context *, struct GUID);
-enum mapistore_error mapistore_notification_deliver_get(TALLOC_CTX *, struct mapistore_context *, struct GUID, uint8_t **, size_t *);
-enum mapistore_error mapistore_notification_deliver_delete(struct mapistore_context *, struct GUID);
+struct mapistore_object_subscription_parameters {
+	bool whole_store;
+	uint64_t folder_id;
+	uint64_t object_id;
+};
 
-enum mapistore_error mapistore_notification_payload_newmail(TALLOC_CTX *, char *, char *, char *, char, uint8_t **, size_t *);
+struct mapistore_subscription {
+	uint32_t        handle;
+	uint16_t        notification_types;
+	union {
+		struct mapistore_table_subscription_parameters table_parameters;
+		struct mapistore_object_subscription_parameters object_parameters;
+	} parameters;
+#if 0
+	char		*mqueue_name;
+	mqd_t		mqueue;
+#endif
+};
+
+struct mapistore_subscription *mapistore_new_subscription(TALLOC_CTX *, struct mapistore_context *, const char *, uint32_t, uint16_t, void *);
+
+/* notifications (implementation) */
+
+struct mapistore_notification_list {
+	struct mapistore_notification *notification;
+	struct mapistore_notification_list *next;
+	struct mapistore_notification_list *prev;
+};
+
+enum mapistore_notification_type {
+	MAPISTORE_OBJECT_CREATED = 1,
+	MAPISTORE_OBJECT_MODIFIED = 2,
+	MAPISTORE_OBJECT_DELETED = 3,
+	MAPISTORE_OBJECT_COPIED = 4,
+	MAPISTORE_OBJECT_MOVED = 5,
+	MAPISTORE_OBJECT_NEWMAIL = 6
+};
+
+struct mapistore_table_notification_parameters {
+	uint8_t table_type;
+	uint32_t row_id;
+
+	uint32_t handle;
+	uint64_t folder_id; /* the parent folder id */
+	uint64_t object_id; /* the folder/message id */
+	uint32_t instance_id;
+};
+
+struct mapistore_object_notification_parameters {
+	uint64_t folder_id;      /* the parent folder id */
+	uint64_t object_id;      /* the folder/message id */
+        uint64_t old_folder_id;  /* used for copy/move notifications */
+        uint64_t old_object_id;  /* used for copy/move notifications */
+	uint16_t tag_count;
+	enum MAPITAGS *tags;
+	bool new_message_count;
+	uint32_t message_count;
+};
+
+struct mapistore_notification {
+	uint32_t object_type;
+	enum mapistore_notification_type event;
+	union {
+		struct mapistore_table_notification_parameters table_parameters;
+		struct mapistore_object_notification_parameters object_parameters;
+	} parameters;
+};
+
+struct mapistore_subscription_list *mapistore_find_matching_subscriptions(struct mapistore_context *, struct mapistore_notification *);
+enum mapistore_error mapistore_delete_subscription(struct mapistore_context *, uint32_t, uint16_t);
+void mapistore_push_notification(struct mapistore_context *, uint8_t, enum mapistore_notification_type, void *);
+enum MAPISTATUS mapistore_get_queued_notifications(struct mapistore_context *, struct mapistore_subscription *, struct mapistore_notification_list **);
+enum MAPISTATUS mapistore_get_queued_notifications_named(struct mapistore_context *, const char *, struct mapistore_notification_list **);
 
 __END_DECLS
 
