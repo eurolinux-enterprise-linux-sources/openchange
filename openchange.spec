@@ -1,6 +1,6 @@
 %{!?python_sitearch: %global python_sitearch %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib(1)")}
 
-%global samba_version 4.2.0-2
+%global samba_version 4.8.3
 %global talloc_version 2.0.5
 %global nickname VULCAN
 
@@ -20,7 +20,7 @@
 
 Name: openchange
 Version: 2.3
-Release: 2%{?dist}
+Release: 3%{?dist}
 Group: Applications/System
 Summary: Provides access to Microsoft Exchange servers using native protocols
 License: GPLv3+ and Public Domain
@@ -82,6 +82,8 @@ Patch8: openchange-2.3-nomemcached.patch
 
 # Fix connection arguments to work properly with newer samba
 Patch9: openchange-1.0-fix-connection-args.patch
+
+Patch10: openchange-2.3-libical-3.0.patch
 
 %description
 OpenChange provides libraries to access Microsoft Exchange servers
@@ -151,6 +153,7 @@ This package provides the server elements for OpenChange.
 %patch7 -p1 -b .samba-4.4
 %patch8 -p1 -b .nomemcached
 %patch9 -p1 -b .fix-connection-args
+%patch10 -p1 -b .libical-3.0
 
 %build
 ./autogen.sh
@@ -298,6 +301,10 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %changelog
+* Wed Aug 22 2018 Milan Crha <mcrha@redhat.com> - 2.3-3
+- Add patch to build against libical 3.0
+- Rebuild against rebased samba
+
 * Thu Apr 07 2016 Milan Crha <mcrha@redhat.com> - 2.3-2
 - Add patch to fix connection string
 
